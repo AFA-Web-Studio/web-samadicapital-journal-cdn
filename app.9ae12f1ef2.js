@@ -1167,23 +1167,26 @@ function getXP(count){
 // v25.16: نمرهٔ انضباط = دقیقاً همان عددی که آکادمی از /api/journal-stats می‌خواند
 // (worker.js، حلقهٔ journal-stats). هر تغییری اینجا باید در سرور هم باشد و برعکس.
 // روی همهٔ تریدهای زنده (باز و بسته)، چون آکادمی هم همین‌طور می‌شمارد.
-const DISC_W={sl:35,entryReasons:25,rr:25,emotion:15};
+// v25.18: هفت معیار، جمع ۱۰۰ — کپیِ DISC_W و disciplineChecks در worker.js.
+const DISC_W={sl:25,slReasons:10,tp:10,tpReasons:10,entryReasons:20,rr:15,emotion:10};
+const DISC_LABELS={sl:'قیمت حد ضرر',slReasons:'دلیل حد ضرر',tp:'قیمت حد سود',tpReasons:'دلیل حد سود',
+  entryReasons:'دلیل ورود',rr:'R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵)',emotion:'احساس لحظهٔ ورود'};
 function academyDiscipline(list){
   const live=(list||[]).filter(t=>t&&!t._deleted);
   const num=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:null};
-  let sl=0,rs=0,rr=0,em=0;
+  const has=a=>Array.isArray(a)&&a.length>0;
+  const cnt=Object.fromEntries(Object.keys(DISC_W).map(k=>[k,0]));
   for(const t of live){
     const e=num(t.entry),s=num(t.stopLoss),tp=num(t.takeProfit);
-    if(s!=null)sl++;
-    if(Array.isArray(t.entryReasons)&&t.entryReasons.length>0)rs++;
-    // v25.17: حداقلِ R:R همان قانونِ دوره است (rrMinFor): ≥۲، زیر ۱ ساعت ≥۱٫۵
-    if(e!=null&&s!=null&&tp!=null&&Math.abs(e-s)>0&&Math.abs(tp-e)/Math.abs(e-s)+1e-9>=rrMinFor(t.timeframe))rr++;
-    if(String(t.emotion||'').trim())em++;
+    const c={sl:s!=null,slReasons:has(t.slReasons),tp:tp!=null,tpReasons:has(t.tpReasons),entryReasons:has(t.entryReasons),
+      // v25.17: حداقلِ R:R همان قانونِ دوره است (rrMinFor): ≥۲، زیر ۱ ساعت ≥۱٫۵
+      rr:e!=null&&s!=null&&tp!=null&&Math.abs(e-s)>0&&Math.abs(tp-e)/Math.abs(e-s)+1e-9>=rrMinFor(t.timeframe),
+      emotion:!!String(t.emotion||'').trim()};
+    for(const k in DISC_W)if(c[k])cnt[k]++;
   }
-  const k=live.length, f=x=>k?x/k:0;
-  const parts={sl:f(sl),entryReasons:f(rs),rr:f(rr),emotion:f(em)};
-  return{parts,counted:k,
-    score:k?Math.round(parts.sl*DISC_W.sl+parts.entryReasons*DISC_W.entryReasons+parts.rr*DISC_W.rr+parts.emotion*DISC_W.emotion):0};
+  const k=live.length;
+  const parts=Object.fromEntries(Object.keys(DISC_W).map(x=>[x,k?cnt[x]/k:0]));
+  return{parts,counted:k,score:k?Math.round(Object.keys(DISC_W).reduce((a,x)=>a+cnt[x]/k*DISC_W[x],0)):0};
 }
 function computeStats(trades,discList){
   // v13: ترتیب زمانی واقعی — منحنی سرمایه/دراودان/استریک حتی با ثبت ترید گذشته درست می‌ماند
@@ -1591,10 +1594,7 @@ function insightsCard(s){
 function disciplineCard(s){
   if(!s||!s.discipline||!s.discipline.counted)return '';
   const d=s.discipline;
-  const items=[[`قیمت حد ضرر (${faNum(DISC_W.sl)}٪)`,d.parts.sl],
-               [`دلیل ورود (${faNum(DISC_W.entryReasons)}٪)`,d.parts.entryReasons],
-               [`R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵) (${faNum(DISC_W.rr)}٪)`,d.parts.rr],
-               [`احساس لحظهٔ ورود (${faNum(DISC_W.emotion)}٪)`,d.parts.emotion]];
+  const items=Object.keys(DISC_W).map(k=>[`${DISC_LABELS[k]} (${faNum(DISC_W[k])}٪)`,d.parts[k]]);
   const col=d.score>=75?'var(--green)':d.score>=45?'var(--gold)':'var(--red)';
   return `<div class="card fade-up" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:16px">
@@ -5760,7 +5760,7 @@ function renderAICoach(){
         <div class="ai-card-head"><div class="ai-card-title">نمره انضباط</div><span class="ai-chip">DISCIPLINE</span></div>
         <div class="ai-score"><strong class="${score>=75?'green':score>=45?'gold':'red'}">${faNum(score)}</strong><span>از ۱۰۰</span></div>
         <div class="ai-meter"><i style="width:${score}%"></i></div>
-        <div class="ai-note">قیمت حد ضرر ۳۵٪ · دلیل ورود ۲۵٪ · R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵) ۲۵٪ · احساس لحظهٔ ورود ۱۵٪ — همان نمره‌ای که آکادمی می‌بیند.</div>
+        <div class="ai-note">${Object.keys(DISC_W).map(k=>`${DISC_LABELS[k]} ${faNum(DISC_W[k])}٪`).join(' · ')} — همان نمره‌ای که آکادمی می‌بیند.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px">
           <div class="sc" style="min-height:78px"><div class="sc-lbl">تریدهای بررسی‌شده</div><div class="sc-val gold">${faNum(closed.length)}</div></div>
           <div class="sc" style="min-height:78px"><div class="sc-lbl">کل ژورنال</div><div class="sc-val">${faNum(trades.length)}</div></div>
