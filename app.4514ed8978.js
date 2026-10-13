@@ -948,7 +948,16 @@ async function loadTrades(uid) {
   }
   return merged.filter(t => !t?._deleted);
 }
+// فیلدهای محاسبه‌ای که نسخه‌های قبلی روی تریدها گذاشتند؛ هرگز ذخیره نشوند
+const DERIVED_TRADE_FIELDS = ['_notRevenge', '_sizeOk'];
+function stripDerived(list){
+  return (Array.isArray(list) ? list : []).map(x => {
+    if (!x || typeof x !== 'object' || !DERIVED_TRADE_FIELDS.some(k => k in x)) return x;
+    const c = { ...x }; for (const k of DERIVED_TRADE_FIELDS) delete c[k]; return c;
+  });
+}
 async function saveTrades(uid, t) {
+  t = stripDerived(t);
   const safeUid = uid.replace(/[^a-zA-Z0-9_-]/g, '_');
   const key = 'sc_trades_' + safeUid;
   let server = await cloudGetRaw(key);
@@ -2640,6 +2649,15 @@ function confirmProRisk(t){
   return confirm('⚠️ مدیریت ریسک' + '\n\n• ' + miss.join('\n• ') + '\n\nبا همین ثبت شود؟');
 }
 
+// v25.14: دانشجویی که دلیلِ حد ضرر را می‌نویسد ولی قیمتش را خالی می‌گذارد؛ بی‌قیمت، «حد ضرر
+// مشخص بود» حساب نمی‌شود. جلوگیر نیست، ولی به خانهٔ قیمت می‌برد.
+function confirmSlPrice(t){
+  if(_rc(t.slReasons)<1 || hasDefinedRisk(t)) return true;
+  if(confirm('⚠️ دلیلِ حد ضرر را نوشته‌ای ولی قیمتِ حد ضرر خالی است.\n\nبدون قیمت، «حد ضرر مشخص بود» حساب نمی‌شود.\n\nبدون قیمت ثبت شود؟')) return true;
+  const el=document.getElementById('f-sl'); if(el){ el.scrollIntoView({block:'center',behavior:'smooth'}); setTimeout(()=>el.focus(),250); }
+  return false;
+}
+
 function confirmReasonDepth(t){
   if(!isCourseAccount())return true;
   const prev=TRADES.find(x=>x.id===t.id);
@@ -2698,6 +2716,7 @@ function saveTrade(id){
     }
   }
   if(!confirmReasonDepth(t))return;
+  if(!confirmSlPrice(t))return;
   if(!confirmRR(t))return;
   if(!confirmProRisk(t))return;
   const exists=TRADES.find(x=>x.id===id);
@@ -3094,8 +3113,11 @@ function updateImportButton(){
 // همان شرطی که نمره‌ی دیسیپلین استفاده می‌کند؛ هر دو باید یکی بمانند.
 // v20: هر معامله‌ای که اصول ورودش کامل نیست وارد صف می‌شود — نه فقط
 // واردشده‌های دست‌نخورده. هدف رساندن معامله به استانداردِ آکادمی است.
+// v25.14: قیمتِ حد ضرر هم — همان معیارِ قانون «حد ضرر مشخص بود» (hasDefinedRisk). قبلاً فقط
+// دلیل‌ها را می‌دید و «تمام شد» می‌گفت، در حالی که کارت پلن همان تریدها را بی‌حد ضرر می‌شمرد.
+function qcComplete(t){ return principlesMet(t) && hasDefinedRisk(t); }
 function qcNeedsJournal(t){
-  return !!t && !t._deleted && !principlesMet(t);
+  return !!t && !t._deleted && !qcComplete(t);
 }
 function qcPendingTrades(){
   return TRADES.filter(qcNeedsJournal)
@@ -3125,8 +3147,8 @@ function renderQuickCompleteBanner(){
   if(!n){el.innerHTML='';return}
   el.innerHTML=`<div class="qc-banner fade-in">
     <span class="qc-banner-ico">⚡</span>
-    <div class="qc-banner-txt">${faNum(n)} معامله هنوز ژورنال‌نویسی نشده
-      <small>دلیل ورود و احساست را با چند لمس اضافه کن</small></div>
+    <div class="qc-banner-txt">${faNum(n)} معامله هنوز کامل نیست
+      <small>دلیل‌ها و قیمت حد ضرر را با چند لمس اضافه کن</small></div>
     <button class="btn btn-primary" onclick="openQuickComplete()">تکمیل سریع</button>
   </div>`;
 }
@@ -3137,7 +3159,7 @@ function openQuickComplete(){
   }
   const queue=qcPendingTrades();
   if(!queue.length){showToast('همه‌ی معاملات وارد‌شده کامل‌اند 🎉');return}
-  QC_STATE={ ids:queue.map(t=>t.id), i:0, done:0, unsaved:0, draft:null, allReasons:false };
+  QC_STATE={ ids:queue.map(t=>t.id), i:0, done:0, partial:0, unsaved:0, draft:null, allReasons:false };
   qcLoadDraft();
   renderQuickComplete();
   document.getElementById('det-sheet').classList.add('open');
@@ -3152,7 +3174,7 @@ function qcLoadDraft(){
     slReasons: Array.isArray(t.slReasons)?[...t.slReasons]:[],
     tpReasons: Array.isArray(t.tpReasons)?[...t.tpReasons]:[],
     strategy:t.strategy||'', emotion:t.emotion||'', session:t.session||'',
-    timeframe:t.timeframe||'', stopLoss:t.stopLoss||'', notes:t.notes||''
+    timeframe:t.timeframe||'', stopLoss:t.stopLoss||'', takeProfit:t.takeProfit||'', notes:t.notes||''
   } : null;
 }
 
@@ -3257,12 +3279,19 @@ function renderQuickComplete(){
       <div class="qc-label">چرا حد ضرر آنجا بود؟ <em>حداقل ${faNum(ENTRY_PRINCIPLES.sl)} مورد</em></div>
       <div class="chip-group">${getSLList(t.direction).map(r=>
         `<div class="chip ${d.slReasons.includes(r)?'selected':''}" data-value="${esc(r)}" onclick="qcToggleReason(this.dataset.value,this,'slReasons')">${esc(r)}</div>`).join('')}</div>
+      <div class="qc-label" style="margin-top:10px">قیمت حد ضرر</div>
+      <input class="fi" id="qc-sl" type="number" step="any" inputmode="decimal" style="direction:ltr;text-align:left"
+             value="${esc(d.stopLoss)}" placeholder="مثلاً ${esc(String(t.entry||''))}" oninput="qcSetText('stopLoss',this.value)">
+      ${isIsolatedBudget(t)?'':'<div class="qc-hint" style="margin-top:6px">بدون قیمت، «حد ضرر مشخص بود» حساب نمی‌شود — دلیلش به‌تنهایی کافی نیست.</div>'}
     </div>
 
     <div class="qc-field">
       <div class="qc-label">چرا حد سود آنجا بود؟ <em>حداقل ${faNum(ENTRY_PRINCIPLES.tp)} مورد</em></div>
       <div class="chip-group">${getTPList(t.direction).map(r=>
         `<div class="chip ${d.tpReasons.includes(r)?'selected':''}" data-value="${esc(r)}" onclick="qcToggleReason(this.dataset.value,this,'tpReasons')">${esc(r)}</div>`).join('')}</div>
+      <div class="qc-label" style="margin-top:10px">قیمت حد سود <em>برای R:R</em></div>
+      <input class="fi" type="number" step="any" inputmode="decimal" style="direction:ltr;text-align:left"
+             value="${esc(d.takeProfit)}" placeholder="قیمت حد سود" oninput="qcSetText('takeProfit',this.value)">
     </div>
 
     <div class="qc-field"><div class="qc-label">حالت روحی‌ات موقع ورود</div>
@@ -3277,15 +3306,11 @@ function renderQuickComplete(){
     <div class="qc-field"><div class="qc-label">تایم‌فریم</div>
       ${qcChips('timeframe',getDynList('sc_timeframes',TIMEFRAMES),d.timeframe)}</div>
 
-    <div class="qc-field"><div class="qc-label">حد ضرری که در نظر داشتی <em>اختیاری</em></div>
-      <input class="fi" type="number" step="any" inputmode="decimal" style="direction:ltr;text-align:left"
-             value="${esc(d.stopLoss)}" placeholder="قیمت حد ضرر" oninput="qcSetText('stopLoss',this.value)"></div>
-
     <div class="qc-field"><div class="qc-label">یادداشت</div>
       <textarea class="fi" maxlength="1000" placeholder="چه چیزی دیدی؟ چه چیزی را اشتباه خواندی؟"
                 oninput="qcSetText('notes',this.value)">${esc(d.notes)}</textarea></div>
 
-    <div class="qc-hint">یادداشت اختیاری است و در هیچ نمره‌ای حساب نمی‌شود — فقط برای خودت.</div>
+    <div class="qc-hint">یادداشت در نمرهٔ انضباط هم حساب می‌شود — چند کلمه از چیزی که آن روز دیدی، به خودت بیشتر کمک می‌کند.</div>
 
     <div class="qc-actions">
       <button class="btn btn-ghost" onclick="qcSkip()">رد کن</button>
@@ -3297,11 +3322,11 @@ function renderQuickComplete(){
 function qcApplyDraft(){
   const t=qcCurrent(), d=QC_STATE.draft;
   if(!t||!d)return false;
-  const snap=x=>JSON.stringify([x.entryReasons,x.slReasons,x.tpReasons,x.strategy,x.emotion,x.session,x.timeframe,x.stopLoss,x.notes]);
+  const snap=x=>JSON.stringify([x.entryReasons,x.slReasons,x.tpReasons,x.strategy,x.emotion,x.session,x.timeframe,String(x.stopLoss??''),String(x.takeProfit??''),x.notes]);
   const before=snap(t);
   t.entryReasons=[...d.entryReasons]; t.slReasons=[...d.slReasons]; t.tpReasons=[...d.tpReasons];
   t.strategy=d.strategy; t.emotion=d.emotion; t.session=d.session; t.timeframe=d.timeframe;
-  t.stopLoss=String(d.stopLoss||''); t.notes=d.notes;
+  t.stopLoss=String(d.stopLoss||''); t.takeProfit=String(d.takeProfit||''); t.notes=d.notes;
   const after=snap(t);
   if(before===after)return false;
   t.updatedAt=new Date().toISOString();
@@ -3309,7 +3334,8 @@ function qcApplyDraft(){
 }
 
 async function qcSaveAndNext(){
-  if(qcApplyDraft()){ QC_STATE.done++; QC_STATE.unsaved++; }
+  // فقط کارتی که واقعاً کامل شد (اصول + قیمت حد ضرر) «کامل» شمرده می‌شود
+  if(qcApplyDraft()){ QC_STATE.unsaved++; if(qcComplete(qcCurrent())) QC_STATE.done++; else QC_STATE.partial++; }
   QC_STATE.i++;
   qcLoadDraft();
   renderQuickComplete();
@@ -3327,11 +3353,16 @@ async function qcFlush(quiet=false){
 }
 
 function qcFinishedMarkup(){
+  // «تمام شد» فقط وقتی که با همان معیارِ صف چیزی نمانده باشد
+  const left=qcPendingTrades().length;
+  const noSl=TRADES.filter(t=>t&&!t._deleted&&principlesMet(t)&&!hasDefinedRisk(t)).length;
   return`<div class="qc-done">
-    <span class="qc-done-ico">🎉</span>
-    <div class="qc-done-t">تمام شد</div>
-    <div class="qc-done-s">${faNum(QC_STATE.done)} معامله ژورنال‌نویسی شد.<br>نمره‌ی دیسیپلینت همین حالا به‌روز شده است.</div>
-    <button class="btn btn-primary" onclick="qcExit()">بستن</button>
+    <span class="qc-done-ico">${left?'✅':'🎉'}</span>
+    <div class="qc-done-t">${left?'این دور تمام شد':'تمام شد'}</div>
+    <div class="qc-done-s">${faNum(QC_STATE.done)} معامله کامل شد${QC_STATE.partial?`، ${faNum(QC_STATE.partial)} معامله هنوز ناقص است`:''}.
+      ${left?`<br>${faNum(left)} معامله هنوز کامل نیست${noSl?` — ${faNum(noSl)} تا فقط قیمت حد ضرر کم دارند`:''}.`:'<br>نمره‌ی دیسیپلینت همین حالا به‌روز شده است.'}</div>
+    ${left?'<button class="btn btn-primary" onclick="qcExit().then(openQuickComplete)">ادامهٔ تکمیل</button><button class="btn btn-ghost" style="margin-top:8px" onclick="qcExit()">بستن</button>'
+          :'<button class="btn btn-primary" onclick="qcExit()">بستن</button>'}
   </div>`;
 }
 
@@ -3535,7 +3566,8 @@ function pbAnnotate(list){
   const ms = t => { const m=String(t.date||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m)return null;
     const hm=String(t.time||'').match(/^(\d{1,2}):(\d{2})$/);
     return Number(t.openMs)>0?Number(t.openMs):Date.UTC(+m[1],+m[2]-1,+m[3],hm?+hm[1]:0,hm?+hm[2]:0) };
-  const sorted=[...list].filter(t=>ms(t)!=null).sort((a,b)=>ms(a)-ms(b));
+  // v25.14: روی کپی — قبلاً _notRevenge/_sizeOk روی خودِ تریدها می‌نشست و با ذخیره به داده می‌رفت
+  const sorted=list.filter(t=>ms(t)!=null).map(t=>({...t})).sort((a,b)=>ms(a)-ms(b));
   let lastLossAt=null;
   // بودجه‌ی پله بر اساس تعداد تریدهای ثبت‌شده تعیین می‌شود (همان چیزی که
   // داشبورد نشان می‌دهد)، پس همان ورودی را می‌دهیم.
