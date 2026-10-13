@@ -1176,7 +1176,8 @@ function academyDiscipline(list){
     const e=num(t.entry),s=num(t.stopLoss),tp=num(t.takeProfit);
     if(s!=null)sl++;
     if(Array.isArray(t.entryReasons)&&t.entryReasons.length>0)rs++;
-    if(e!=null&&s!=null&&tp!=null&&Math.abs(e-s)>0&&Math.abs(tp-e)/Math.abs(e-s)>=1)rr++;
+    // v25.17: حداقلِ R:R همان قانونِ دوره است (rrMinFor): ≥۲، زیر ۱ ساعت ≥۱٫۵
+    if(e!=null&&s!=null&&tp!=null&&Math.abs(e-s)>0&&Math.abs(tp-e)/Math.abs(e-s)+1e-9>=rrMinFor(t.timeframe))rr++;
     if(String(t.emotion||'').trim())em++;
   }
   const k=live.length, f=x=>k?x/k:0;
@@ -1592,7 +1593,7 @@ function disciplineCard(s){
   const d=s.discipline;
   const items=[[`قیمت حد ضرر (${faNum(DISC_W.sl)}٪)`,d.parts.sl],
                [`دلیل ورود (${faNum(DISC_W.entryReasons)}٪)`,d.parts.entryReasons],
-               [`R:R ≥ ۱ (${faNum(DISC_W.rr)}٪)`,d.parts.rr],
+               [`R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵) (${faNum(DISC_W.rr)}٪)`,d.parts.rr],
                [`احساس لحظهٔ ورود (${faNum(DISC_W.emotion)}٪)`,d.parts.emotion]];
   const col=d.score>=75?'var(--green)':d.score>=45?'var(--gold)':'var(--red)';
   return `<div class="card fade-up" style="margin-bottom:12px">
@@ -5759,7 +5760,7 @@ function renderAICoach(){
         <div class="ai-card-head"><div class="ai-card-title">نمره انضباط</div><span class="ai-chip">DISCIPLINE</span></div>
         <div class="ai-score"><strong class="${score>=75?'green':score>=45?'gold':'red'}">${faNum(score)}</strong><span>از ۱۰۰</span></div>
         <div class="ai-meter"><i style="width:${score}%"></i></div>
-        <div class="ai-note">قیمت حد ضرر ۳۵٪ · دلیل ورود ۲۵٪ · R:R ≥ ۱ ۲۵٪ · احساس لحظهٔ ورود ۱۵٪ — همان نمره‌ای که آکادمی می‌بیند.</div>
+        <div class="ai-note">قیمت حد ضرر ۳۵٪ · دلیل ورود ۲۵٪ · R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵) ۲۵٪ · احساس لحظهٔ ورود ۱۵٪ — همان نمره‌ای که آکادمی می‌بیند.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px">
           <div class="sc" style="min-height:78px"><div class="sc-lbl">تریدهای بررسی‌شده</div><div class="sc-val gold">${faNum(closed.length)}</div></div>
           <div class="sc" style="min-height:78px"><div class="sc-lbl">کل ژورنال</div><div class="sc-val">${faNum(trades.length)}</div></div>
