@@ -1164,7 +1164,27 @@ function getXP(count){
 // ══════════════════════════════════════════════════════
 // STATS ENGINE (expanded)
 // ══════════════════════════════════════════════════════
-function computeStats(trades){
+// v25.16: نمرهٔ انضباط = دقیقاً همان عددی که آکادمی از /api/journal-stats می‌خواند
+// (worker.js، حلقهٔ journal-stats). هر تغییری اینجا باید در سرور هم باشد و برعکس.
+// روی همهٔ تریدهای زنده (باز و بسته)، چون آکادمی هم همین‌طور می‌شمارد.
+const DISC_W={sl:35,entryReasons:25,rr:25,emotion:15};
+function academyDiscipline(list){
+  const live=(list||[]).filter(t=>t&&!t._deleted);
+  const num=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:null};
+  let sl=0,rs=0,rr=0,em=0;
+  for(const t of live){
+    const e=num(t.entry),s=num(t.stopLoss),tp=num(t.takeProfit);
+    if(s!=null)sl++;
+    if(Array.isArray(t.entryReasons)&&t.entryReasons.length>0)rs++;
+    if(e!=null&&s!=null&&tp!=null&&Math.abs(e-s)>0&&Math.abs(tp-e)/Math.abs(e-s)>=1)rr++;
+    if(String(t.emotion||'').trim())em++;
+  }
+  const k=live.length, f=x=>k?x/k:0;
+  const parts={sl:f(sl),entryReasons:f(rs),rr:f(rr),emotion:f(em)};
+  return{parts,counted:k,
+    score:k?Math.round(parts.sl*DISC_W.sl+parts.entryReasons*DISC_W.entryReasons+parts.rr*DISC_W.rr+parts.emotion*DISC_W.emotion):0};
+}
+function computeStats(trades,discList){
   // v13: ترتیب زمانی واقعی — منحنی سرمایه/دراودان/استریک حتی با ثبت ترید گذشته درست می‌ماند
   const closed=trades.filter(t=>t.exit)
     .sort((a,b)=>((a.date||'')+' '+(a.time||'')).localeCompare((b.date||'')+' '+(b.time||'')));
@@ -1266,28 +1286,9 @@ function computeStats(trades){
     }
   });
 
-  // دیسیپلین: حدضرر، دلایل ورود، یادداشت، R:R ≥ ۱
-  const _pct=(n,d)=>d?n/d:0;
-  // v18.3: تریدی که از فایل صرافی وارد شده و هنوز کامل نشده، «ژورنال‌نویسی» نبوده
-  // پس نباید نمره‌ی دیسیپلین را پایین بیاورد. به‌محض اینکه دانشجو دلیل/حدضرر/یادداشت
-  // برایش بنویسد، دوباره وارد محاسبه می‌شود.
-  const journalFrom=journalStartFor(trades);
-  const journaled=closed.filter(t=>tradeTouched(t,journalFrom));
-  const dBase=journaled;   // اگر خالی باشد یعنی هنوز هیچ معامله‌ای ژورنال‌نویسی نشده
-  // v20: نمره روی «اصول ورود» بنا شده، نه روی یادداشت‌نویسیِ سلیقه‌ای.
-  const discParts={
-    entryReasons:_pct(dBase.filter(t=>principleCounts(t).entry>=needFor(t).entry).length,dBase.length),
-    slReasons:_pct(dBase.filter(t=>_rc(t.slReasons)>=needFor(t).sl).length,dBase.length),
-    tpReasons:_pct(dBase.filter(t=>_rc(t.tpReasons)>=needFor(t).tp).length,dBase.length),
-    sl:_pct(dBase.filter(hasDefinedRisk).length,dBase.length),
-    rr:(()=>{const w=dBase.filter(t=>calcRR(t));return w.length?_pct(w.filter(t=>+calcRR(t)>=1).length,w.length):0})()
-  };
-  // معامله‌هایی که از دوره‌ی دفتر مانده‌اند و دلیلی ندارند
-  const archived=closed.length-journaled.length;
-  const principleFull=_pct(dBase.filter(principlesMet).length,dBase.length);
-  const discipline={parts:discParts,archived,counted:dBase.length,principleFull,
-    score:Math.round(discParts.entryReasons*30+discParts.slReasons*15+discParts.tpReasons*15
-                    +discParts.sl*20+discParts.rr*20)};
+  // v25.16: یک نمره در همه‌جا — همان فرمولِ آکادمی (academyDiscipline). اگر فراخواننده فقط
+  // تریدهای بسته را داده، فهرست کامل را جدا می‌فرستد تا عدد با آکادمی یکی بماند.
+  const discipline=academyDiscipline(discList||trades);
 
   return{
     total,closed:closed.length,open:trades.filter(t=>!t.exit).length,total_trades:trades.length,
@@ -1587,24 +1588,12 @@ function insightsCard(s){
 // v13: کارت نمره دیسیپلین
 // ══════════════════════════════════════════════════════
 function disciplineCard(s){
-  if(!s||!s.discipline||!s.closed)return '';
+  if(!s||!s.discipline||!s.discipline.counted)return '';
   const d=s.discipline;
-  if(!d.counted){
-    return `<div class="card fade-up" style="margin-bottom:12px">
-      <div class="card-title">🎖️ نمره دیسیپلین</div>
-      <div style="font-size:12.5px;color:var(--text2);line-height:2">
-        ${faNum(d.archived||0)} معامله از دوره‌ی دفترِ کاغذی داری که دلیلی برایشان ثبت نشده — آن موقع
-        جایی برای نوشتنش نبود، پس در نمره حساب نمی‌شوند.
-        اصولِ ورود درست: <b>${entryNeedText()} دلیل ورود</b>،
-        <b>${faNum(ENTRY_PRINCIPLES.sl)} دلیل حد ضرر</b> و <b>${faNum(ENTRY_PRINCIPLES.tp)} دلیل حد سود</b>.
-      </div>
-      ${SESSION?.role==='student'&&!SESSION?.isViewOnly?`<button class="btn btn-primary" style="margin-top:12px" onclick="openQuickComplete()">⚡ تکمیل سریع</button>`:''}
-      </div>`;
-  }
-  const items=[[`دلیل ورود (${entryNeedText()})`,d.parts.entryReasons],
-               [`دلیل حد ضرر (${faNum(ENTRY_PRINCIPLES.sl)}+)`,d.parts.slReasons],
-               [`دلیل حد سود (${faNum(ENTRY_PRINCIPLES.tp)}+)`,d.parts.tpReasons],
-               ['حد ضرر ثبت‌شده',d.parts.sl],['R:R ≥ ۱',d.parts.rr]];
+  const items=[[`قیمت حد ضرر (${faNum(DISC_W.sl)}٪)`,d.parts.sl],
+               [`دلیل ورود (${faNum(DISC_W.entryReasons)}٪)`,d.parts.entryReasons],
+               [`R:R ≥ ۱ (${faNum(DISC_W.rr)}٪)`,d.parts.rr],
+               [`احساس لحظهٔ ورود (${faNum(DISC_W.emotion)}٪)`,d.parts.emotion]];
   const col=d.score>=75?'var(--green)':d.score>=45?'var(--gold)':'var(--red)';
   return `<div class="card fade-up" style="margin-bottom:12px">
     <div style="display:flex;align-items:center;gap:16px">
@@ -1614,7 +1603,7 @@ function disciplineCard(s){
       <div style="flex:1;min-width:0">
         <div class="card-title" style="margin-bottom:10px">🎖️ نمره دیسیپلین</div>
         ${items.map(([k,v])=>`<div class="disc-row"><span>${k}</span><div class="disc-bar"><div style="width:${Math.round(v*100)}%;background:${v>=0.75?'var(--green)':v>=0.45?'var(--gold)':'var(--red)'}"></div></div><b>${faNum(Math.round(v*100))}٪</b></div>`).join('')}
-        ${d.archived?`<div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.8">📚 ${faNum(d.archived)} معامله‌ی پیش از راه‌اندازی ژورنال در این نمره حساب نشده — آن موقع جایی برای ثبت دلیل نبود. اگر دلیلی را به یاد آوردی و اضافه کنی، همان لحظه وارد محاسبه می‌شود.</div>`:''}
+        <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.8">روی ${faNum(d.counted)} ترید · همین عدد در آکادمی ملاک جلسهٔ مازاد است.</div>
       </div>
     </div>
   </div>`;
@@ -2006,8 +1995,8 @@ function renderStudentDashboard(){
     return;
   }
   // v13: فیلتر بازه زمانی — آمار روی بازه انتخابی، XP/دیسیپلین/تقویم روی کل
-  // فاز اول اعمال می‌شود، بعد بازه‌ی زمانی. نمره‌ی اصول فاز را دنبال می‌کند ولی
-  // بازه را نه — مقایسه‌ی اصولِ قبل و بعد از حرفه‌ای‌شدن خودش هدف این تفکیک است.
+  // فاز اول اعمال می‌شود، بعد بازه‌ی زمانی. v25.16: کارت دیسیپلین نه فاز را دنبال می‌کند نه
+  // بازه را — همان عددِ آکادمی روی همهٔ تریدها.
   const phased=phaseFilter(TRADES);
   const ftr=rangeFilter(phased);
   const fs=computeStats(ftr);
@@ -2050,7 +2039,7 @@ function renderStudentDashboard(){
 
     ${statBody}
 
-    ${disciplineCard(allS)}
+    ${disciplineCard({discipline:academyDiscipline(TRADES)})}
 
     ${heatmapCalendar(TRADES)}
 
@@ -4254,7 +4243,7 @@ function renderMentorDashboard(){
 function mentorSignals(uid){
   const all = (ALL_TRADES[uid] || []).filter(t => !t._deleted);
   const closed = all.filter(t => t.exit);
-  const st = computeStats(closed);
+  const st = computeStats(closed, all);
   const flags = [];
   const days = (() => {
     const last = all.map(t => t.date).filter(Boolean).sort().pop();
@@ -4344,14 +4333,14 @@ function _renderMentorDashboard(){
   const el=document.getElementById('dash-content');
   const sorted=Object.entries(STUDENTS).map(([uid,st])=>{
     const tr=(ALL_TRADES[uid]||[]).filter(t=>t.exit);
-    const ss=computeStats(tr);
+    const ss=computeStats(tr,ALL_TRADES[uid]||[]);
     return{uid,st,ss,count:ALL_TRADES[uid]?.length||0,pnl:ss?.total||0};
   }).sort((a,b)=>b.pnl-a.pnl);
 
   // v14.2: شاخص‌های آکادمی
   const week=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
   const active7=Object.values(ALL_TRADES).filter(arr=>(arr||[]).some(t=>(t.date||'')>=week)).length;
-  const _dscores=Object.values(ALL_TRADES).map(a=>computeStats((a||[]).filter(t=>t.exit))).filter(Boolean).map(x=>x.discipline?.score||0);
+  const _dscores=Object.values(ALL_TRADES).map(a=>computeStats((a||[]).filter(t=>t.exit),a||[])).filter(Boolean).map(x=>x.discipline?.score||0);
   const discAvg=_dscores.length?Math.round(_dscores.reduce((a,b)=>a+b,0)/_dscores.length):0;
 
   const rows=mentorRows();
@@ -4495,7 +4484,7 @@ function renderMentorMain(){
 
 function renderStudentCards(){
   const sorted=Object.entries(STUDENTS).map(([uid,st])=>{
-    const ss=computeStats((ALL_TRADES[uid]||[]).filter(t=>t.exit));
+    const ss=computeStats((ALL_TRADES[uid]||[]).filter(t=>t.exit),ALL_TRADES[uid]||[]);
     return{uid,st,ss,count:ALL_TRADES[uid]?.length||0};
   }).sort((a,b)=>(b.ss?.total||0)-(a.ss?.total||0));
   if(!sorted.length)return '<div class="empty"><span class="empty-ico">👥</span><div class="empty-t">هنوز دانشجوی ثبت نشده</div></div>';
@@ -5731,7 +5720,7 @@ async function retryDelivery(id){if(alertDemoMode()){const d=ALERT_STATE.deliver
 function getAICoachData(){
   const trades=SESSION?.role==='mentor'?Object.values(ALL_TRADES).flat():TRADES;
   const closed=(trades||[]).filter(t=>t.exit);
-  const stats=computeStats(closed);
+  const stats=computeStats(closed,trades||[]);
   return{trades:trades||[],closed,stats};
 }
 
@@ -5770,7 +5759,7 @@ function renderAICoach(){
         <div class="ai-card-head"><div class="ai-card-title">نمره انضباط</div><span class="ai-chip">DISCIPLINE</span></div>
         <div class="ai-score"><strong class="${score>=75?'green':score>=45?'gold':'red'}">${faNum(score)}</strong><span>از ۱۰۰</span></div>
         <div class="ai-meter"><i style="width:${score}%"></i></div>
-        <div class="ai-note">براساس کامل‌بودن پلن، ثبت حد ضرر، دلایل ورود و ثبات اجرای معاملات بسته‌شده.</div>
+        <div class="ai-note">قیمت حد ضرر ۳۵٪ · دلیل ورود ۲۵٪ · R:R ≥ ۱ ۲۵٪ · احساس لحظهٔ ورود ۱۵٪ — همان نمره‌ای که آکادمی می‌بیند.</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:16px">
           <div class="sc" style="min-height:78px"><div class="sc-lbl">تریدهای بررسی‌شده</div><div class="sc-val gold">${faNum(closed.length)}</div></div>
           <div class="sc" style="min-height:78px"><div class="sc-lbl">کل ژورنال</div><div class="sc-val">${faNum(trades.length)}</div></div>
