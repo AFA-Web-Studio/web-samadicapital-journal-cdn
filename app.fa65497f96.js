@@ -3294,7 +3294,7 @@ function renderQuickComplete(){
              value="${esc(d.takeProfit)}" placeholder="قیمت حد سود" oninput="qcSetText('takeProfit',this.value)">
     </div>
 
-    <div class="qc-field"><div class="qc-label">حالت روحی‌ات موقع ورود</div>
+    <div class="qc-field"><div class="qc-label">حالت روحی‌ات موقع ورود <em>در نمرهٔ انضباط حساب می‌شود</em></div>
       ${qcChips('emotion',EMOTIONS,d.emotion)}</div>
 
     <div class="qc-field"><div class="qc-label">استراتژی</div>
@@ -3310,7 +3310,7 @@ function renderQuickComplete(){
       <textarea class="fi" maxlength="1000" placeholder="چه چیزی دیدی؟ چه چیزی را اشتباه خواندی؟"
                 oninput="qcSetText('notes',this.value)">${esc(d.notes)}</textarea></div>
 
-    <div class="qc-hint">یادداشت در نمرهٔ انضباط هم حساب می‌شود — چند کلمه از چیزی که آن روز دیدی، به خودت بیشتر کمک می‌کند.</div>
+    <div class="qc-hint">یادداشت فقط برای خودت است و در هیچ نمره‌ای حساب نمی‌شود.</div>
 
     <div class="qc-actions">
       <button class="btn btn-ghost" onclick="qcSkip()">رد کن</button>
