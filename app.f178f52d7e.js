@@ -517,7 +517,7 @@ async function updateCoinInfo(){
   const up = (info.ch||0) >= 0;
   box.innerHTML = `
     <div style="display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:8px 12px">
-      <img src="${info.image}" width="22" height="22" style="border-radius:50%;flex-shrink:0" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'${sym[0]}',style:'width:22px;height:22px;border-radius:50%;background:var(--gold-dim);color:#0a0a0a;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700'}))"/>
+      <img src="${info.image}" alt="" width="22" height="22" style="border-radius:50%;flex-shrink:0" onerror="this.replaceWith(Object.assign(document.createElement('div'),{textContent:'${sym[0]}',style:'width:22px;height:22px;border-radius:50%;background:var(--gold-dim);color:#0a0a0a;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700'}))"/>
       <span style="font-size:12px;font-weight:600">${info.name}</span>
       <span style="font-family:var(--f-mono);font-size:13px;color:var(--text)">${fmtPrice(info.price)}</span>
       <span style="font-family:var(--f-mono);font-size:11px;font-weight:600;color:${up?'var(--green)':'var(--red)'};margin-inline-start:auto;display:flex;align-items:center;gap:3px">${up?'▲':'▼'} ${Math.abs(info.ch||0).toFixed(2)}%</span>
