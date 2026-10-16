@@ -4852,7 +4852,7 @@ function startSession(s){
     document.getElementById('nav-add').style.display='flex';
     document.getElementById('nav-mentor').style.display='none';
     document.getElementById('fab').style.display='flex';
-    // v25.0: مربی هوشمندِ عضو تا معلوم شدنِ پلن پنهان؛ بقیه همیشه دارند
+    // v25.0: تحلیلگرِ خودکارِ عضو تا معلوم شدنِ پلن پنهان؛ بقیه همیشه دارند
     const navAi=document.getElementById('nav-ai'); if(navAi) navAi.style.display=isMember()?'none':'';
     if(isMember()) loadBilling().then(B=>B.refresh()).catch(()=>{});
     setTimeout(()=>healPushSubscription(),6000);
@@ -4951,7 +4951,7 @@ function renderMentorSettings(){
     {k:'xp',      l:'🎓 پله‌ها'},
     {k:'lists',   l:'📝 لیست‌ها'},
     // تب «اسکن AI» حذف شد: renderMSAPI() هرگز نوشته نشده بود و کلیک روی آن
-    // پنل تنظیمات را می‌شکست. مربی هوشمند کاملاً محلی است و تنظیماتی نمی‌خواهد.
+    // پنل تنظیمات را می‌شکست. تحلیلگر خودکار کاملاً محلی است و تنظیماتی نمی‌خواهد.
   ];
   return `
   <div class="card" style="margin-bottom:12px">
@@ -5746,15 +5746,15 @@ function renderAICoach(){
   const scope=SESSION?.role==='mentor'?'کل آکادمی':'عملکرد شخصی';
   el.innerHTML=`<div class="ai-shell fade-up">
     <section class="ai-hero">
-      <div class="ai-kicker">AI PERFORMANCE COACH</div>
-      <h1 class="ai-title">مربی هوشمند عملکرد</h1>
+      <div class="ai-kicker">PERFORMANCE ANALYST</div>
+      <h1 class="ai-title">تحلیلگر خودکار عملکرد</h1>
       <p class="ai-sub">داده‌های ژورنال را به تصمیم‌های قابل اجرا تبدیل می‌کند؛ با تمرکز روی انضباط، تکرارپذیری ستاپ‌ها و کنترل رفتار بعد از برد و باخت.</p>
-      <div class="ai-status">محیط آزمایشی امن · ${scope}</div>
+      <div class="ai-status">تحلیل خودکار از داده‌های ژورنال · ${scope}</div>
     </section>
     <div class="ai-grid">
       <section class="ai-card">
         <div class="ai-card-head"><div class="ai-card-title">اولویت‌های این هفته</div><span class="ai-chip">ACTION PLAN</span></div>
-        ${signals.length?`<div class="coach-list">${signals.map((x,i)=>`<div class="coach-item"><span class="coach-num">۰${faNum(i+1)}</span><div><b>${esc(x.title)}</b><p>${esc(x.text)}</p></div></div>`).join('')}</div>`:`<div class="ai-empty"><div class="ai-empty-mark">AI</div>برای ساخت تحلیل معنادار، ابتدا چند معامله بسته‌شده با حد ضرر، دلیل ورود و یادداشت ثبت کن.</div>`}
+        ${signals.length?`<div class="coach-list">${signals.map((x,i)=>`<div class="coach-item"><span class="coach-num">۰${faNum(i+1)}</span><div><b>${esc(x.title)}</b><p>${esc(x.text)}</p></div></div>`).join('')}</div>`:`<div class="ai-empty"><div class="ai-empty-mark">∑</div>برای ساخت تحلیل معنادار، ابتدا چند معامله بسته‌شده با حد ضرر، دلیل ورود و یادداشت ثبت کن.</div>`}
       </section>
       <section class="ai-card">
         <div class="ai-card-head"><div class="ai-card-title">نمره انضباط</div><span class="ai-chip">DISCIPLINE</span></div>
@@ -5767,23 +5767,18 @@ function renderAICoach(){
         </div>
       </section>
       <section class="ai-card wide">
-        <div class="ai-card-head"><div class="ai-card-title">از مربی بپرس</div><span class="ai-chip">PRIVATE BETA</span></div>
-        <div id="ai-answer" class="ai-note" style="min-height:22px">نمونه: «مهم‌ترین ضعف معاملات اخیر من چیست؟»</div>
-        <div class="ai-prompt"><textarea id="ai-question" class="fi" placeholder="سؤال خود را درباره عملکرد ژورنال بنویسید..."></textarea><button class="ai-send" onclick="askAICoach()" aria-label="ارسال سؤال">←</button></div>
-        <div class="ai-note">در این نسخه، پاسخ از تحلیل امن و محلی داده‌های Staging ساخته می‌شود؛ اتصال مدل زبانی در مرحله Agent فعال خواهد شد.</div>
+        <div class="ai-card-head"><div class="ai-card-title">جمع‌بندی</div><span class="ai-chip">SUMMARY</span></div>
+        <div class="ai-note" style="min-height:22px">${coachSummary(stats,closed.length)}</div>
+        <div class="ai-note">این تحلیل با قاعده‌های ثابت از روی معامله‌های بستهٔ خودت ساخته می‌شود — نه هوش مصنوعی، و هیچ داده‌ای به بیرون نمی‌رود.</div>
       </section>
     </div>
   </div>`;
 }
 
-function askAICoach(){
-  const q=document.getElementById('ai-question')?.value.trim();
-  const answer=document.getElementById('ai-answer');if(!answer)return;
-  if(!q){answer.textContent='لطفاً سؤال خود را بنویسید.';return}
-  const {closed,stats}=getAICoachData();
-  if(!closed.length){answer.textContent='هنوز معامله بسته‌شده کافی برای تحلیل وجود ندارد. ابتدا داده کامل ژورنال را ثبت کن.';return}
-  const signals=buildCoachSignals(stats,closed.length);
-  answer.textContent=signals.length?`جمع‌بندی فعلی: ${signals.map(x=>x.title).join('، ')}. پیشنهاد اصلی: ${signals[0].text}`:'داده فعلی نشانه هشدار جدی ندارد؛ روی تکرار ستاپ‌های مستند و حفظ اندازه ریسک تمرکز کن.';
+function coachSummary(stats,closedCount){
+  if(!closedCount)return 'هنوز معامله بسته‌شده کافی برای تحلیل وجود ندارد. ابتدا داده کامل ژورنال را ثبت کن.';
+  const signals=buildCoachSignals(stats,closedCount);
+  return esc(signals.length?`جمع‌بندی فعلی: ${signals.map(x=>x.title).join('، ')}. پیشنهاد اصلی: ${signals[0].text}`:'داده فعلی نشانه هشدار جدی ندارد؛ روی تکرار ستاپ‌های مستند و حفظ اندازه ریسک تمرکز کن.');
 }
 
 function nav(name,btn){

@@ -44,7 +44,7 @@
   const featureRows = cat => [
     ...(cat[0]?.items || []).map((f, i) => [esc(f.label), p => !!p.items?.[i]?.on]),
     ['هشدار قیمت (تلگرام، گوشی، داخل برنامه)', p => p.alerts ? faNum(p.alerts) + ' هشدار' : false],
-    ['مربی هوشمند (AI Coach)', p => !!p.ai]
+    ['تحلیلگر خودکار عملکرد', p => !!p.ai]
   ];
 
   // ══════════ استایل ══════════
@@ -284,7 +284,7 @@
         <div class="bl-tag">${esc(p.tagline || '')}</div>
         <div class="bl-price"><b data-v="${price || 0}">${price ? n2(price) : '—'}</b><span>USDT</span></div>
         <div class="bl-per">${per}</div>
-        <div class="bl-pf"><span class="${p.alerts ? '' : 'dim'}">${p.alerts ? '🔔 ' + faNum(p.alerts) + ' هشدار' : '🔕 بدون هشدار'}</span><span class="${p.ai ? '' : 'off'}">🤖 مربی هوشمند</span>${(p.bullets || []).map(b => `<span>${esc(b)}</span>`).join('')}</div>
+        <div class="bl-pf"><span class="${p.alerts ? '' : 'dim'}">${p.alerts ? '🔔 ' + faNum(p.alerts) + ' هشدار' : '🔕 بدون هشدار'}</span><span class="${p.ai ? '' : 'off'}">📊 تحلیلگر خودکار</span>${(p.bullets || []).map(b => `<span>${esc(b)}</span>`).join('')}</div>
       </button>`;
     };
     const sel = cat.find(p => p.id === st.plan);
@@ -351,6 +351,7 @@
         <div class="bl-hint">سه رقمِ بعد از ممیز (<bdi dir="ltr">${n2(inv.amount)}</bdi>) واریزت را از بقیه جدا می‌کند و تأیید را خودکار می‌کند. اگر صرافی کارمزد را از مبلغ کم می‌کند، کارمزد را اضافه کن تا <b>مبلغِ دریافتی</b> همین باشد.</div>
       </div>
       <div class="bl-net"><b>BEP20 — BNB Smart Chain</b><span>⚠️ فقط همین شبکه — واریز روی شبکه‌ی دیگر برنمی‌گردد</span></div>
+      <div class="ab-meta" style="margin:-2px 0 10px">پیش از پرداخت، <a href="/terms#refund" target="_blank" style="color:var(--gold-light)">سیاست بازپرداخت</a> را بخوان.</div>
       <div class="bl-box">
         <div class="bl-lbl">آدرس ولت (تتر USDT)</div>
         <div class="bl-addr"><div class="bl-qr" id="bl-qr"></div><div><code>${esc(inv.address)}</code><button class="bl-copy" onclick="BILLING.copy('${esc(inv.address)}','آدرس کپی شد')">کپی آدرس</button></div></div>
@@ -417,6 +418,13 @@
   }
 
   // ══════════ ثبت‌نام ══════════
+  // v25.20: منبعِ ثبت‌نام — ?ref= / ?utm_source= همین صفحه، وگرنه آنچه صفحهٔ اصلی در sc_src نگه داشته
+  function signupSource() {
+    const ok = v => (v = String(v || '').trim().toLowerCase(), /^[a-z0-9][a-z0-9_.-]{0,39}$/.test(v) ? v : null);
+    try { const q = new URLSearchParams(location.search); const u = ok(q.get('ref') || q.get('utm_source') || q.get('src')); if (u) return u; } catch (_) {}
+    try { const s = JSON.parse(localStorage.getItem('sc_src') || 'null'); if (s && Date.now() - s.at < 30 * 864e5) return ok(s.s); } catch (_) {}
+    return null;
+  }
   function signupLinkHTML() { return `<div class="su-link" id="su-link">حساب نداری؟ <button type="button" onclick="openSignup()">ثبت‌نام — ${faNum(7)} روز رایگان</button></div>`; }
   function openSignup() {
     const lc = document.querySelector('#login-screen .lc'); if (!lc) return;
@@ -435,6 +443,7 @@
       </div>
       <div id="su-err" class="err-msg" style="display:none"></div>
       <button class="btn btn-primary lg-go" id="su-go" onclick="BILLING.signupStart()">ادامه — تأیید با تلگرام</button>
+      <div class="ab-meta" style="text-align:center;margin-top:10px">با ثبت‌نام، <a href="/terms" target="_blank" style="color:var(--gold-light)">شرایط استفاده و بازپرداخت</a> و <a href="/privacy" target="_blank" style="color:var(--gold-light)">حریم خصوصی</a> را می‌پذیری.</div>
       <div class="su-link"><button type="button" onclick="BILLING.closeSignup()">حساب دارم — ورود</button></div>`;
     document.getElementById('su-name').focus();
   }
@@ -457,7 +466,7 @@
     if (!/^\d{4}$/.test(pin)) return fail('⚠️ PIN باید چهار رقم باشد.');
     if (pin !== pin2) return fail('⚠️ دو PIN با هم یکی نیستند.');
     const b = document.getElementById('su-go'); b.disabled = true; b.textContent = 'لطفاً صبر کن…';
-    const r = await jfetch('/api/signup/start', { method: 'POST', body: JSON.stringify({ phone, name, pin }) });
+    const r = await jfetch('/api/signup/start', { method: 'POST', body: JSON.stringify({ phone, name, pin, source: signupSource() }) });
     if (!r.ok) return fail({ cip_student: '⚠️ تو دانشجوی دوره‌ای و حساب ژورنالت از قبل ساخته شده؛ با همان شماره و PIN وارد شو.',
       account_exists: '⚠️ این شماره از قبل حساب دارد؛ «ورود» را بزن.', capacity_full: '⚠️ ظرفیت ژورنال فعلاً تکمیل است؛ به‌زودی دوباره باز می‌شود.', rate_limited: '⚠️ الان درخواست زیاد است؛ چند دقیقه‌ی دیگر دوباره امتحان کن.',
       telegram_not_configured: '⚠️ ثبت‌نام موقتاً در دسترس نیست.', offline: '⚠️ اتصال به سرور برقرار نشد.' }[r.body?.error] || '⚠️ ثبت‌نام انجام نشد؛ دوباره امتحان کن.');
@@ -527,11 +536,11 @@
   function drawAdmin(el = adminEl()) {
     if (!el || !st.admin) return;
     const a = st.admin, s = a.stats;
-    const tabs = [['overview', 'خلاصه'], ['members', 'مشترکین'], ['payments', 'پرداخت‌ها', s.review + s.unmatched], ['plans', 'پلن‌ها و قیمت'], ['settings', 'تنظیمات پرداخت']];
+    const tabs = [['overview', 'خلاصه'], ['members', 'مشترکین'], ['payments', 'پرداخت‌ها', s.review + s.unmatched], ['funnel', 'قیف و منبع'], ['plans', 'پلن‌ها و قیمت'], ['settings', 'تنظیمات پرداخت']];
     el.innerHTML = `<div class="card">
       <div class="card-title">💳 اشتراک ژورنال (غیر CIP)</div>
       <div class="ab-tabs">${tabs.map(([k, l, n]) => `<button class="${st.tab === k ? 'on' : ''}" onclick="BILLING.adminTab('${k}')">${l}${n ? `<em>${faNum(n)}</em>` : ''}</button>`).join('')}</div>
-      <div id="ab-body">${({ overview: abOverview, members: abMembers, payments: abPayments, plans: abPlans, settings: abSettings })[st.tab]()}</div></div>`;
+      <div id="ab-body">${({ overview: abOverview, members: abMembers, payments: abPayments, funnel: abFunnel, plans: abPlans, settings: abSettings })[st.tab]()}</div></div>`;
   }
   function abOverview() {
     const a = st.admin, s = a.stats, c = a.config;
@@ -554,6 +563,36 @@
         ${c.academyVip === 'off' ? '' : check(academyOk(), academyLine(), "BILLING.adminTab('settings')")}
       </div>
       <button class="btn btn-ghost" onclick="BILLING.scanNow(this)">🔄 اسکن زنجیره همین حالا</button>`;
+  }
+  // v25.20: قیف — بازدید ← شروعِ ثبت‌نام ← ثبت‌نامِ کامل ← پرداخت، به تفکیکِ منبع
+  const SRC_FA = { direct: 'مستقیم', unknown: 'پیش از اندازه‌گیری', instagram: 'اینستاگرام', telegram: 'تلگرام', google: 'گوگل',
+    search: 'جست‌وجوی دیگر', x: 'ایکس', youtube: 'یوتیوب', linkedin: 'لینکدین', samadicapital: 'سایت آکادمی', other: 'سایت‌های دیگر' };
+  async function loadFunnel(days) {
+    st.funnelDays = days; st.funnel = null; drawAdmin();
+    const r = await jfetch('/api/mentor/billing/funnel?days=' + days);
+    st.funnel = r.ok ? r.body : { error: true }; if (st.tab === 'funnel') drawAdmin();
+  }
+  function abFunnel() {
+    const days = st.funnelDays || 30;
+    if (st.funnel === undefined) { setTimeout(() => loadFunnel(days)); return '<div class="ab-meta">در حال بارگذاری…</div>'; }
+    const f = st.funnel;
+    const pick = [7, 30, 90].map(d => `<button class="${d === days ? 'on' : ''}" onclick="BILLING.funnelDays(${d})">${faNum(d)} روز</button>`).join('');
+    const pct = (a, b) => b ? faNum(Math.round(a / b * 100)) + '٪' : '—';
+    const body = !f ? '<div class="ab-meta">در حال بارگذاری…</div>' : f.error ? '<div class="err-msg" style="display:block">بارگذاری نشد.</div>'
+      : !f.rows.length ? '<div class="ab-meta" style="padding:10px 0">هنوز در این بازه چیزی ثبت نشده.</div>'
+      : `<div style="overflow-x:auto"><table class="ab-funnel" style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr style="color:var(--muted);text-align:start"><th style="text-align:start;padding:6px 4px">منبع</th><th>بازدید</th><th>شروع ثبت‌نام</th><th>ثبت‌نام کامل</th><th>پرداخت</th><th>درآمد (USDT)</th></tr></thead>
+          <tbody>${f.rows.concat([{ ...f.total, source: '__total' }]).map(r => `<tr style="border-top:1px solid var(--border);${r.source === '__total' ? 'font-weight:700' : ''}">
+            <td style="padding:7px 4px">${r.source === '__total' ? 'جمع' : esc(SRC_FA[r.source] || r.source)}</td>
+            <td style="text-align:center">${faNum(r.visits)}</td><td style="text-align:center">${faNum(r.starts)}</td>
+            <td style="text-align:center">${faNum(r.signups)} <small style="color:var(--muted)">${pct(r.signups, r.visits)}</small></td>
+            <td style="text-align:center">${faNum(r.paid)} <small style="color:var(--muted)">${pct(r.paid, r.signups)}</small></td>
+            <td style="text-align:center"><bdi dir="ltr">${n2(r.usdt)}</bdi></td></tr>`).join('')}</tbody></table></div>`;
+    return `<div class="ab-tabs" style="margin-bottom:10px">${pick}</div>${body}
+      <div class="ab-meta" style="margin-top:12px;line-height:2">درصدِ زیر «ثبت‌نام کامل» = از بازدیدها؛ زیر «پرداخت» = از ثبت‌نام‌ها. بازدید بی‌نام شمرده می‌شود (بی‌کوکی و بی‌IP). «پیش از اندازه‌گیری» = عضوهایی که قبل از این قابلیت ثبت‌نام کرده‌اند.</div>
+      <div class="fg" style="margin-top:14px"><div class="fl">ساختِ لینکِ کمپین — برای هر کانال یا اینفلوئنسر یک اسم انگلیسی کوتاه</div>
+        <input class="fi" id="ab-ref" dir="ltr" placeholder="مثلاً kanal-ali" maxlength="40" oninput="BILLING.refLink(this.value)"></div>
+      <div id="ab-reflink" class="ab-meta" dir="ltr" style="margin-top:6px;word-break:break-all"></div>`;
   }
   const academyOk = () => { const ac = st.admin.academy || {}; return !!(ac.binding && ac.at && !ac.error); };
   function academyLine() {
@@ -619,7 +658,7 @@
         <div class="fgrid tf-gap"><div class="fg"><div class="fl">هشدار قیمت</div><input class="fi" data-k="alerts" type="number" min="0" max="200" value="${p.alerts}"></div>
           <div class="fg"><div class="fl">چه کسی می‌بیند</div><select class="fi" data-k="audience"><option value="public" ${p.audience === 'public' ? 'selected' : ''}>همه</option><option value="vip" ${p.audience === 'vip' ? 'selected' : ''}>فقط VIP</option></select></div></div>
         <div class="fg tf-gap"><div class="fl">نکته‌های اضافه روی کارت (هر خط یکی)</div><textarea class="fi" data-k="bullets" rows="2">${esc((p.bullets || []).join('\n'))}</textarea></div>
-        <div class="ab-tg"><label><input type="checkbox" data-k="ai" ${p.ai ? 'checked' : ''}> مربی هوشمند (AI)</label><label><input type="checkbox" data-k="featured" ${p.featured ? 'checked' : ''}> «محبوب‌ترین»</label>
+        <div class="ab-tg"><label><input type="checkbox" data-k="ai" ${p.ai ? 'checked' : ''}> تحلیلگر خودکار عملکرد</label><label><input type="checkbox" data-k="featured" ${p.featured ? 'checked' : ''}> «محبوب‌ترین»</label>
           <label><input type="checkbox" data-k="active" ${p.active ? 'checked' : ''}> فعال (در فروش)</label>
           <button class="btn btn-ghost" style="width:auto;min-height:32px;padding:0 10px;font-size:11px" onclick="BILLING.delPlan(${i})">حذف پلن</button></div></div>`).join('')}
       ${abFeatures(plans)}
@@ -629,7 +668,7 @@
   function abFeatures(plans) {
     const feats = st.admin.config.features || [];
     return `<div class="ab-feats"><div class="ab-fl">امکاناتِ پلن‌ها</div>
-      <div class="ab-meta">همین فهرست در جدول مقایسه‌ی برنامه و کارت‌های صفحه‌ی معرفی دیده می‌شود. تیک یعنی آن پلن این امکان را دارد. «هشدار قیمت» و «مربی هوشمند» از تنظیمات خود پلن می‌آیند.</div>
+      <div class="ab-meta">همین فهرست در جدول مقایسه‌ی برنامه و کارت‌های صفحه‌ی معرفی دیده می‌شود. تیک یعنی آن پلن این امکان را دارد. «هشدار قیمت» و «تحلیلگر خودکار عملکرد» از تنظیمات خود پلن می‌آیند.</div>
       ${feats.map((f, i) => `<div class="ab-feat">
         <div class="ab-fh"><input class="fi" data-f="label" value="${esc(f.label)}" maxlength="80" placeholder="عنوان امکان">
           <button type="button" class="icon-btn" onclick="BILLING.moveFeat(${i},-1)" ${i ? '' : 'disabled'} aria-label="بالا">↑</button>
@@ -637,7 +676,7 @@
           <button type="button" class="icon-btn danger" onclick="BILLING.delFeat(${i})" aria-label="حذف">×</button></div>
         <input class="fi ab-en" data-f="en" value="${esc(f.en || '')}" maxlength="80" dir="ltr" placeholder="English (optional) — for the English landing page">
         <div class="ab-tg">${plans.map((p, pi) => `<label><input type="checkbox" data-pi="${pi}" ${(f.off || []).includes(p.id) ? '' : 'checked'}> ${esc(p.name)}</label>`).join('')}</div></div>`).join('')
-        || '<div class="ab-meta" style="padding:8px 0">هنوز امکانی نیست — فقط هشدار و مربی هوشمند نشان داده می‌شود.</div>'}
+        || '<div class="ab-meta" style="padding:8px 0">هنوز امکانی نیست — فقط هشدار و تحلیلگر خودکار نشان داده می‌شود.</div>'}
       <button type="button" class="btn btn-ghost" onclick="BILLING.addFeat()">+ امکان تازه</button></div>`;
   }
   function abSettings() {
@@ -693,6 +732,14 @@
     term: setTerm, pick, checkout, submitTx, signupLinkHTML, openSignup, closeSignup, signupStart,
     openSignupAgain: () => { clearInterval(st.suPoll); st.signup = null; openSignup(); },
     renderAdmin, adminTab: k => { st.tab = k; drawAdmin(); },
+    funnelDays: d => loadFunnel(d),
+    refLink(v) {
+      const s = String(v || '').trim().toLowerCase(), el = document.getElementById('ab-reflink'); if (!el) return;
+      if (!s) { el.textContent = ''; return; }
+      if (!/^[a-z0-9][a-z0-9_.-]{0,39}$/.test(s)) { el.textContent = 'فقط حروف انگلیسی کوچک، عدد، خط تیره و نقطه.'; return; }
+      const link = 'https://journal.samadicapital.com/?ref=' + s;
+      el.innerHTML = `<code>${link}</code> <button class="bl-copy" onclick="BILLING.copy('${link}','لینک کپی شد')">کپی</button>`;
+    },
     memSearch: q => { st.memQ = q; const b = document.getElementById('ab-body'); const pos = document.activeElement?.selectionStart; if (b) b.innerHTML = abMembers(); const i = b?.querySelector('.ab-search'); if (i) { i.focus(); try { i.setSelectionRange(pos, pos); } catch (_) {} } },
     toggleMem: uid => { st.openMem = st.openMem === uid ? null : uid; drawAdmin(); },
     invFilter: f => { st.invFilter = f; drawAdmin(); },
