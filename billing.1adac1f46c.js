@@ -351,7 +351,7 @@
         <div class="bl-hint">سه رقمِ بعد از ممیز (<bdi dir="ltr">${n2(inv.amount)}</bdi>) واریزت را از بقیه جدا می‌کند و تأیید را خودکار می‌کند. اگر صرافی کارمزد را از مبلغ کم می‌کند، کارمزد را اضافه کن تا <b>مبلغِ دریافتی</b> همین باشد.</div>
       </div>
       <div class="bl-net"><b>BEP20 — BNB Smart Chain</b><span>⚠️ فقط همین شبکه — واریز روی شبکه‌ی دیگر برنمی‌گردد</span></div>
-      <div class="ab-meta" style="margin:-2px 0 10px">پیش از پرداخت، <a href="/terms#refund" target="_blank" style="color:var(--gold-light)">سیاست بازپرداخت</a> را بخوان.</div>
+      <div class="ab-meta" style="margin:-2px 0 10px"><b>پرداخت قطعی است و برگشت داده نمی‌شود</b> — <a href="/terms#refund" target="_blank" style="color:var(--gold-light)">شرایط پرداخت</a>.</div>
       <div class="bl-box">
         <div class="bl-lbl">آدرس ولت (تتر USDT)</div>
         <div class="bl-addr"><div class="bl-qr" id="bl-qr"></div><div><code>${esc(inv.address)}</code><button class="bl-copy" onclick="BILLING.copy('${esc(inv.address)}','آدرس کپی شد')">کپی آدرس</button></div></div>
@@ -443,7 +443,7 @@
       </div>
       <div id="su-err" class="err-msg" style="display:none"></div>
       <button class="btn btn-primary lg-go" id="su-go" onclick="BILLING.signupStart()">ادامه — تأیید با تلگرام</button>
-      <div class="ab-meta" style="text-align:center;margin-top:10px">با ثبت‌نام، <a href="/terms" target="_blank" style="color:var(--gold-light)">شرایط استفاده و بازپرداخت</a> و <a href="/privacy" target="_blank" style="color:var(--gold-light)">حریم خصوصی</a> را می‌پذیری.</div>
+      <div class="ab-meta" style="text-align:center;margin-top:10px">با ثبت‌نام، <a href="/terms" target="_blank" style="color:var(--gold-light)">شرایط استفاده و پرداخت</a> و <a href="/privacy" target="_blank" style="color:var(--gold-light)">حریم خصوصی</a> را می‌پذیری.</div>
       <div class="su-link"><button type="button" onclick="BILLING.closeSignup()">حساب دارم — ورود</button></div>`;
     document.getElementById('su-name').focus();
   }
