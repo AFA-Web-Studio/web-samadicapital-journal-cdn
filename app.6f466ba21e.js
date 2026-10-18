@@ -5458,9 +5458,22 @@ async function updateAlertEditorPrice(){
 
 // قیمت هدف را با قیمت زنده می‌سنجد. فرم قیمت لحظه‌ای را از قبل نشان می‌داد
 // ولی با آن مقایسه نمی‌کرد — و همین شکاف بود که پنج هشدارِ مرده ساخت.
-async function confirmAlertScale(symbol, target){
+// v25.23: هشدارِ «عبور» وقتی ساخته شود که قیمت همین الان آن طرفِ هدف است، هرگز نمی‌آید مگر قیمت اول برگردد
+// و دوباره عبور کند (گزارش مالک ۱۴۰۵-۰۷-۲۶: «رسیده ولی پیامی نیومده»). پیش از ذخیره صریح بگو.
+function alertAlreadyPassed(condition, price, target){
+  if(!(price > 0) || !(target > 0)) return false;
+  return (condition === 'above' && price >= target) || (condition === 'below' && price <= target);
+}
+async function confirmAlertScale(symbol, target, condition){
   let price = null;
   try{ price = alertDemoMode() ? ALERT_PRICE_DEMO[symbol] : await livePrice(symbol) }catch(_){ }
+  if(alertAlreadyPassed(condition, price, target)){
+    const up = condition === 'above';
+    if(!confirm(`⚠️ قیمت فعلی ${symbol} (${alertPrice(price)}) همین الان ${up ? 'بالای' : 'زیر'} هدف تو (${alertPrice(target)}) است.` + '\n\n'
+      + `هشدارِ «عبور رو به ${up ? 'بالا' : 'پایین'}» فقط وقتی می‌آید که قیمت از هدف عبور کند؛ پس این هشدار تا قیمت اول ${up ? 'زیر' : 'بالای'} ${alertPrice(target)} نرود و دوباره برنگردد، نمی‌آید.` + '\n\n'
+      + `اگر می‌خواهی وقتی قیمت به ${alertPrice(target)} برگشت خبردار شوی، شرط را «عبور رو به ${up ? 'پایین' : 'بالا'}» بگذار.` + '\n\n'
+      + 'با همین شرط ثبت شود؟')) return false;
+  }
   const off = alertScaleOff(price, target);
   if(!off) return true;   // قیمت در دسترس نبود یا فاصله منطقی است — مزاحم نمی‌شویم
   return confirm('⚠️ این هدف با قیمت فعلی جور در نمی‌آید.' + '\n\n'
@@ -5473,7 +5486,7 @@ async function confirmAlertScale(symbol, target){
 async function savePriceAlert(){
   const target=Number(ALERT_EDITOR?.targetPrice),tol=Number(ALERT_EDITOR?.tolerance||.5);if(!ALERT_EDITOR||!/^[A-Z0-9]{2,12}$/.test(ALERT_EDITOR.symbol)){showToast('Symbol معتبر رمزارز را وارد کنید');document.getElementById('al-custom-symbol')?.focus();return}if(!Number.isFinite(target)||target<=0){showToast('قیمت هدف معتبر وارد کنید');document.getElementById('al-target')?.focus();return}if(ALERT_EDITOR.condition==='zone'&&(tol<.05||tol>5)){showToast('تلرانس باید بین ۰٫۰۵ تا ۵ درصد باشد');return}
   const channels=ALERT_EDITOR.channels||{};if(!channels.telegram&&!channels.push&&!channels.inApp){showToast('حداقل یک کانال اعلان را انتخاب کنید');return}
-  if(!(await confirmAlertScale(ALERT_EDITOR.symbol, target))) return;
+  if(!(await confirmAlertScale(ALERT_EDITOR.symbol, target, ALERT_EDITOR.condition))) return;
   const payload={symbol:ALERT_EDITOR.symbol,targetPrice:target,condition:ALERT_EDITOR.condition,tolerance:tol,deliveryMode:ALERT_EDITOR.deliveryMode,frequency:ALERT_EDITOR.frequency,severity:ALERT_EDITOR.severity||'normal',telegramEnabled:!!channels.telegram,pushEnabled:!!channels.push,inAppEnabled:!!channels.inApp,note:String(ALERT_EDITOR.note||'').slice(0,500),expiresAt:ALERT_EDITOR.expiresAt||null};const btn=document.getElementById('al-save');if(btn)btn.disabled=true;
   if(alertDemoMode()){
     const id=ALERT_EDITOR.id||`demo-${Date.now()}`;const old=(ALERT_STATE.alerts||[]).find(a=>a.id===id);const record={...old,...payload,channels:{telegram:payload.telegramEnabled,push:payload.pushEnabled,inApp:payload.inAppEnabled},id,status:old?.status==='paused'?'paused':'active',lastPrice:ALERT_PRICE_DEMO[payload.symbol]||null,createdAt:old?.createdAt||new Date().toISOString()};ALERT_STATE.alerts=old?ALERT_STATE.alerts.map(a=>a.id===id?record:a):[record,...ALERT_STATE.alerts];ALERT_STATE.stats.active=ALERT_STATE.alerts.filter(a=>a.status==='active'||a.status==='triggered').length;ALERT_EDITOR=null;showToast(old?'هشدار بروزرسانی شد':'هشدار جدید وارد چرخه پایش شد');renderPriceAlerts();return;
