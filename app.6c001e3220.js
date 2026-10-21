@@ -5219,7 +5219,7 @@ async function loadAlertDashboard(force=false){
     const endpoint=SESSION?.role==='mentor'?'/api/mentor/alert-control-center':'/api/alerts/dashboard';
     const r=await apiFetch(endpoint);
     if(!r||!r.ok)throw new Error(r?.status===402?'subscription_required':'load_failed');
-    const data=await r.json();ALERT_STATE={...ALERT_EMPTY_STATE(),...data,scopeUid:SESSION?.uid,loaded:true,loading:false};
+    const data=await r.json();ALERT_STATE={...ALERT_EMPTY_STATE(),...data,scopeUid:SESSION?.uid,loaded:true,loading:false,loadedAt:Date.now()};
     if(data.channels?.settings){const s=data.channels.settings;ALERT_STATE.pricing={price:s.subscriptionPrice,currency:s.subscriptionCurrency,days:s.subscriptionDays,instructions:s.subscriptionInstructions};}if(hadLoaded&&Number(ALERT_STATE.unread||0)>previousUnread){const latest=(ALERT_STATE.inbox||[]).find(x=>x.status==='unread');playInAppAlert(latest?.severity||'normal',ALERT_STATE.channels?.policy?.soundProfile||'signal',ALERT_STATE.channels?.policy?.vibrationEnabled!==false)}setTimeout(handlePendingAlertRoute,0);
   }catch(e){ALERT_STATE={...ALERT_STATE,scopeUid:SESSION?.uid,loaded:true,loading:false,error:'دریافت اطلاعات هشدارها ممکن نشد. اتصال Staging را بررسی کنید.'}}
   renderPriceAlerts();
@@ -5274,7 +5274,7 @@ function _renderPriceAlerts(el){
   const e=ALERT_STATE.entitlement||{};
   const alerts=ALERT_STATE.alerts||[],active=alerts.filter(a=>a.status==='active'||a.status==='triggered').length,devices=ALERT_STATE.push?.devices||[];
   el.innerHTML=`<div class="alert-shell fade-up">
-    <section class="alert-hero"><div class="alert-hero-top"><div><div class="alert-kicker">MULTICHANNEL PRICE INTELLIGENCE</div><h1 class="alert-title">هشدار هوشمند قیمت</h1><p class="alert-sub">بازار مستقل از بازبودن سایت پایش می‌شود؛ هنگام رسیدن قیمت، اعلان هم‌زمان در تلگرام، گوشی یا دسکتاپ و صندوق داخل ژورنال نمایش داده می‌شود—بدون پیامک و بدون هزینه ارسال هر هشدار.</p><div class="alert-live">Telegram + Direct Push + In-App · بدون سرویس پیامکی</div>${alertDemoMode()?`<button class="btn btn-ghost" style="margin-top:12px" onclick="toggleDemoAlertEntitlement()">${e.active?'مشاهده حالت اشتراک غیرفعال':'بازگشت به اشتراک فعال'}</button>`:''}</div><div class="alert-orbit" aria-hidden="true">${ALERT_ICONS.bell}</div></div></section>
+    <section class="alert-hero"><div class="alert-hero-top"><div><div class="alert-kicker">MULTICHANNEL PRICE INTELLIGENCE</div><h1 class="alert-title">هشدار هوشمند قیمت</h1><p class="alert-sub">بازار مستقل از بازبودن سایت پایش می‌شود؛ هنگام رسیدن قیمت، اعلان هم‌زمان در تلگرام، گوشی یا دسکتاپ و صندوق داخل ژورنال نمایش داده می‌شود—بدون پیامک و بدون هزینه ارسال هر هشدار.</p><div class="alert-live">Telegram + Direct Push + In-App · بدون سرویس پیامکی</div>${alertEngineBadge()}${alertDemoMode()?`<button class="btn btn-ghost" style="margin-top:12px" onclick="toggleDemoAlertEntitlement()">${e.active?'مشاهده حالت اشتراک غیرفعال':'بازگشت به اشتراک فعال'}</button>`:''}</div><div class="alert-orbit" aria-hidden="true">${ALERT_ICONS.bell}</div></div></section>
     ${ALERT_STATE.error?`<div class="err-msg" style="display:block">${esc(ALERT_STATE.error)}</div>`:''}
     ${!e.active?(isMember()&&window.BILLING?BILLING.alertsLock():isMember()?(loadBilling().then(()=>renderPriceAlerts()).catch(()=>{}),''):renderPremiumLock()):`<div class="alert-kpis"><div class="alert-kpi"><small>هشدارهای در حال پایش</small><strong class="gold">${faNum(active)}</strong><span>از سقف ${faNum(ALERT_STATE.channels?.policy?.maxAlerts||20)} هشدار</span></div><div class="alert-kpi"><small>فعال‌شده در این ماه</small><strong class="green">${faNum(ALERT_STATE.stats?.triggeredMonth||0)}</strong><span>با ثبت زمان و نتیجه تحویل</span></div><div class="alert-kpi"><small>اعلان خوانده‌نشده</small><strong class="${ALERT_STATE.unread?'gold':''}">${faNum(ALERT_STATE.unread||0)}</strong><span>${faNum(devices.filter(d=>d.status==='active').length)} دستگاه Push فعال</span></div></div>
     ${alarmPrefCard()}
@@ -5342,7 +5342,7 @@ function renderPriceAlertCard(a){
   const id=alertSafeId(a.id),status=String(a.status||'active');
   const channels=a.channels||{telegram:true,push:true,inApp:true},severity=a.severity||'normal';
   const channelNames=[channels.telegram?'Telegram':'',channels.push?'Push':'',channels.inApp?'In-App':''].filter(Boolean).join(' + ');
-  return`<article class="price-alert ${status==='paused'?'paused':''} ${status==='triggered'?'triggered':''}"><div class="pa-main"><div class="coin-mark">${esc(String(a.symbol||'?').slice(0,5))}</div><div class="pa-info"><div class="pa-name">${esc(a.symbol)}/USDT <span class="badge ${status==='triggered'?'b-win':status==='paused'?'b-be':'b-open'}">${alertStatusLabel(status)}</span><span class="badge ${severity==='critical'?'b-loss':severity==='important'?'b-be':'b-open'}">${severity==='critical'?'بحرانی':severity==='important'?'مهم':'عادی'}</span></div><div class="pa-meta">${alertConditionLabel(a.condition,a.tolerance)} · ${esc(channelNames)} · ${alertDeliveryLabel(a.deliveryMode)}</div></div><div class="pa-price"><strong>${alertPrice(a.targetPrice)}</strong><small data-live-price="${esc(String(a.symbol||''))}">${alertLastPriceLabel(a)}</small></div></div><div class="pa-distance" title="میزان نزدیکی قیمت"><i style="width:${alertCloseness(a)}%"></i></div>${alertScaleOff(a.lastPrice,a.targetPrice)?`<div class="pa-warn">⚠️ هدف حدود ${faNum(Math.round(alertScaleOff(a.lastPrice,a.targetPrice)))} برابرِ قیمت فعلی است — این هشدار عملاً هرگز فعال نمی‌شود. ویرایشش کن.</div>`:''}${a.note?`<div style="font-size:9.5px;color:var(--text2);line-height:1.8;margin-top:9px">${esc(a.note)}</div>`:''}<div class="pa-foot"><div style="font-size:9px;color:var(--muted)">${a.frequency==='cross'?'فعال در هر عبور مجدد':'یک‌بار اجرا'}${a.lastTriggeredAt?' · آخرین ارسال ثبت شد':''}</div><div class="pa-actions"><button class="switch ${status!=='paused'&&status!=='fired'?'on':''}" onclick="togglePriceAlert('${id}')" aria-label="توقف یا فعال‌سازی"></button><button class="icon-btn" onclick="testPriceAlert('${id}')" title="آزمایش هشدار">↗</button><button class="icon-btn" onclick="openAlertEditor('${id}')" title="ویرایش">✎</button><button class="icon-btn danger" onclick="deletePriceAlert('${id}')" title="حذف">×</button></div></div></article>`;
+  return`<article class="price-alert ${status==='paused'?'paused':''} ${status==='triggered'?'triggered':''}"><div class="pa-main"><div class="coin-mark">${esc(String(a.symbol||'?').slice(0,5))}</div><div class="pa-info"><div class="pa-name">${esc(a.symbol)}/USDT <span class="badge ${status==='triggered'?'b-win':status==='paused'?'b-be':'b-open'}">${alertStatusLabel(status)}</span><span class="badge ${severity==='critical'?'b-loss':severity==='important'?'b-be':'b-open'}">${severity==='critical'?'بحرانی':severity==='important'?'مهم':'عادی'}</span></div><div class="pa-meta">${alertConditionLabel(a.condition,a.tolerance)} · ${esc(channelNames)} · ${alertDeliveryLabel(a.deliveryMode)}</div></div><div class="pa-price"><strong>${alertPrice(a.targetPrice)}</strong><small data-live-price="${esc(String(a.symbol||''))}">${alertLastPriceLabel(a)}</small></div></div><div class="pa-distance" title="میزان نزدیکی قیمت"><i style="width:${alertCloseness(a)}%"></i></div>${alertScaleOff(a.lastPrice,a.targetPrice)?`<div class="pa-warn">⚠️ هدف حدود ${faNum(Math.round(alertScaleOff(a.lastPrice,a.targetPrice)))} برابرِ قیمت فعلی است — این هشدار عملاً هرگز فعال نمی‌شود. ویرایشش کن.</div>`:''}${a.note?`<div style="font-size:9.5px;color:var(--text2);line-height:1.8;margin-top:9px">${esc(a.note)}</div>`:''}<div class="pa-foot"><div style="font-size:9px;color:var(--muted)">${a.frequency==='cross'?'فعال در هر عبور مجدد':'یک‌بار اجرا'}${a.lastTriggeredAt?' · آخرین ارسال ثبت شد':''}</div><div class="pa-actions"><button class="switch ${status!=='paused'&&status!=='fired'?'on':''}" onclick="togglePriceAlert('${id}')" aria-label="توقف یا فعال‌سازی"></button><button class="icon-btn" onclick="testPriceAlert('${id}')" title="آزمایش هشدار">↗</button><button class="icon-btn" onclick="openAlertHistory('${id}')" title="تاریخچه">🕘</button><button class="icon-btn" onclick="openAlertEditor('${id}')" title="ویرایش">✎</button><button class="icon-btn danger" onclick="deletePriceAlert('${id}')" title="حذف">×</button></div></div></article>`;
 }
 
 // کارت تنظیم آلارم — دانشجویی که صدا نمی‌خواهد باید بتواند خاموشش کند،
@@ -5704,6 +5704,19 @@ function alarmTitleFlash(title){
   let k = 0;
   ALARM.titleTimer = setInterval(() => { document.title = (k++ % 2) ? ALARM.titleBase : '🔔 ' + (title || 'هشدار قیمت'); }, 900);
 }
+// v25.28: «دیدم» = تأیید روی سرور ⇒ یادآورهای تلگرام و گوشی هم خاموش می‌شوند (نه فقط صدای همین دستگاه)
+async function alarmAck(){
+  const m = ALARM.meta; stopAlarm();
+  if(!m || !m.inboxId || alertDemoMode()) return;
+  const r = await apiFetch(`/api/alerts/inbox/${encodeURIComponent(m.inboxId)}/ack`, { method:'POST', body:'{}' }).catch(() => null);
+  if(r && r.ok){ showToast('✓ ثبت شد — یادآوری‌ها در همه‌جا متوقف شد'); ALERT_STATE.loaded = false; if(document.getElementById('screen-alerts')?.classList.contains('active')) loadAlertDashboard(true); }
+}
+async function alarmSnooze(){
+  const m = ALARM.meta; stopAlarm();
+  if(!m || !m.inboxId || alertDemoMode()) return;
+  const r = await apiFetch(`/api/alerts/inbox/${encodeURIComponent(m.inboxId)}/snooze`, { method:'POST', body:'{}' }).catch(() => null);
+  showToast(r && r.ok ? '⏰ ۱۵ دقیقهٔ دیگر دوباره خبرت می‌کنیم' : 'تعویق ثبت نشد؛ دوباره امتحان کن');
+}
 function stopAlarm(){
   if(ALARM.timer) clearInterval(ALARM.timer);
   ALARM.timer = null; ALARM.on = false;
@@ -5713,7 +5726,7 @@ function stopAlarm(){
   if(bar) bar.classList.remove('on');
 }
 
-function startAlarm(severity, title, body){
+function startAlarm(severity, title, body, meta){
   if(!alarmEnabled()) { return }
   unlockAlarmAudio();
   stopAlarm();
@@ -5724,6 +5737,8 @@ function startAlarm(severity, title, body){
     bar.classList.add('on');
   }
   ALARM.on = true;
+  ALARM.meta = meta && meta.inboxId ? { inboxId: meta.inboxId } : null;
+  const sz = document.getElementById('alarm-snooze'); if(sz) sz.style.display = ALARM.meta ? '' : 'none';
   ALARM.stopAt = alarmStopAt();
   const tm = document.getElementById('alarm-time');
   if(tm) try{ tm.textContent = new Date().toLocaleTimeString('fa-IR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) }catch(_){}
@@ -5740,6 +5755,50 @@ function startAlarm(severity, title, body){
 // v25.27: وقتی اپ باز است، آلارم نباید به نوتیفیکیشنِ مرورگر وابسته باشد. هر ۴۰ ثانیه صندوقِ اعلانِ
 // خوانده‌نشده پرسیده می‌شود؛ اعلانِ تازه (که قبلاً دیده نشده) ⇒ آلارم. اعلان‌های قدیمی در اولین پرسش «دیده» می‌شوند.
 ALARM.seen = ALARM.seen || new Set();
+// v25.28: «آخرین بررسی قیمت: … پیش» — سن را از ساعتِ سرور حساب می‌کند (ساعتِ گوشی ممکن است جلو/عقب باشد)
+function alertEngineAge(){
+  const e = ALERT_STATE.engine; if(!e || !e.lastRunAt || !ALERT_STATE.serverNow || !ALERT_STATE.loadedAt) return null;
+  return Math.max(0, Math.round((Date.parse(ALERT_STATE.serverNow) - Date.parse(e.lastRunAt)) / 1000 + (Date.now() - ALERT_STATE.loadedAt) / 1000));
+}
+function alertEngineText(){
+  const a = alertEngineAge(); if(a == null) return { cls:'', txt:'وضعیت پایش قیمت…' };
+  const ago = a < 60 ? `${faNum(a)} ثانیه پیش` : `${faNum(Math.round(a / 60))} دقیقه پیش`;
+  if(a < 180) return { cls:'ok', txt:`پایش زنده · آخرین بررسی قیمت: ${ago}` };
+  if(a < 720) return { cls:'warn', txt:`آخرین بررسی قیمت: ${ago} — کمی تأخیر` };
+  return { cls:'bad', txt:`آخرین بررسی قیمت: ${ago} — اختلال؛ تیم در جریان است` };
+}
+function alertEngineBadge(){ const t = alertEngineText(); return `<div class="alarm-engine ${t.cls}" id="alert-engine"><i></i><span>${esc(t.txt)}</span></div>`; }
+setInterval(() => { const el = document.getElementById('alert-engine'); if(!el) return; const t = alertEngineText();
+  el.className = 'alarm-engine ' + t.cls; el.querySelector('span').textContent = t.txt; }, 5000);
+
+// v25.28: تاریخچهٔ یک هشدار
+const AH_EVENT = { triggered:'🔔 فعال شد', reminder_sent:'↻ یادآوری فرستاده شد', acknowledged:'✓ دیده شد', snoozed:'⏰ به تعویق افتاد',
+  created:'ساخته شد', updated:'ویرایش شد', paused:'متوقف شد', resumed:'دوباره فعال شد', delivery_failed:'✗ ارسال ناموفق', delivery_gave_up:'✗ ارسال متوقف شد' };
+const AH_CH = { telegram:'تلگرام', push:'گوشی', in_app:'داخل ژورنال' };
+const AH_ERR = { quiet_hours:'ساعت سکوت', push_not_connected:'گوشی وصل نیست', telegram_not_linked:'تلگرام وصل نیست', push_subscription_expired:'اتصال گوشی منقضی' };
+async function openAlertHistory(id){
+  document.getElementById('det-content').innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted)">در حال بارگذاری…</div>';
+  document.getElementById('det-sheet').classList.add('open');
+  const r = await apiFetch(`/api/alerts/${encodeURIComponent(id)}/history`).catch(() => null);
+  const d = r && r.ok ? await r.json().catch(() => null) : null;
+  if(!d){ document.getElementById('det-content').innerHTML = '<div style="padding:24px;text-align:center">بارگذاری نشد.</div>'; return; }
+  const fmt = iso => { try{ const t = new Date(String(iso).replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(iso) ? '' : 'Z')); return fmtDateFa(t.toISOString().slice(0,10)) + ' · ' + t.toLocaleTimeString('fa-IR', { hour:'2-digit', minute:'2-digit' }); }catch(_){ return iso; } };
+  const near = (a, b) => Math.abs(Date.parse(String(a).replace(' ','T') + 'Z') - Date.parse(String(b).replace(' ','T') + 'Z')) < 120000;
+  const items = d.events.filter(e => AH_EVENT[e.event_type]).map(e => {
+    const chips = ['triggered','reminder_sent'].includes(e.event_type)
+      ? d.deliveries.filter(x => near(x.created_at, e.created_at)).map(x => {
+          const cls = ['sent','delivered','acknowledged'].includes(x.status) ? 'ok' : x.status === 'skipped' ? 'skip' : 'bad';
+          const why = x.status === 'skipped' || x.status === 'failed' ? ` (${AH_ERR[x.error_code] || x.error_code || x.status})` : '';
+          return `<span class="${cls}">${cls === 'ok' ? '✓' : cls === 'skip' ? '⏸' : '✗'} ${AH_CH[x.channel] || x.channel}${esc(why)}</span>`; }).join('')
+      : '';
+    return `<div class="ah-item"><b>${AH_EVENT[e.event_type]}</b>${e.price != null ? ` · <span dir="ltr">${esc(String(e.price))}</span>` : ''}<time>${fmt(e.created_at)}</time>${chips ? `<div class="ah-ch">${chips}</div>` : ''}</div>`;
+  });
+  document.getElementById('det-content').innerHTML = `<div style="padding:4px 2px 14px"><div class="card-title">🕘 تاریخچهٔ هشدار</div>
+    <div class="ab-meta" style="margin-bottom:8px">هر بار که هشدار فعال شد، از کدام مسیر رسید و کِی دیده شد.</div>
+    ${items.length ? `<div class="ah-list">${items.join('')}</div>` : '<div class="ab-meta">هنوز رویدادی ثبت نشده.</div>'}
+    <button class="btn btn-ghost" style="margin-top:14px" onclick="closeSheet()">بستن</button></div>`;
+}
+
 async function alarmWatchTick(){
   try{
     if(!SESSION || SESSION.role !== 'student' || SESSION.isViewOnly || !isOnline() || !alarmEnabled()) return;
@@ -5748,7 +5807,7 @@ async function alarmWatchTick(){
     const fresh = d.items.filter(x => x && x.id && !ALARM.seen.has(x.id));
     d.items.forEach(x => x && x.id && ALARM.seen.add(x.id));
     if(!ALARM.watchPrimed){ ALARM.watchPrimed = true; return; }
-    if(fresh.length && !ALARM.on){ const x = fresh[0]; startAlarm(x.severity || 'normal', x.title, x.body); }
+    if(fresh.length && !ALARM.on){ const x = fresh[0]; startAlarm(x.severity || 'normal', x.title, x.body, { inboxId: x.id }); }
   }catch(_){}
 }
 function startAlarmWatch(){
@@ -5917,7 +5976,7 @@ function nav(name,btn){
 function handlePendingAlertRoute(){if(!SESSION||SESSION.role!=='student')return;const q=new URLSearchParams(location.search);if(q.get('open')==='alerts'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}const ack=q.get('ack');if(ack&&/^in_[0-9a-f]{24}$/.test(ack)){markInbox(ack,'ack');q.delete('ack');history.replaceState(null,'',`${location.pathname}${q.toString()?'?'+q.toString():''}`)}}
 if('serviceWorker'in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-  navigator.serviceWorker.addEventListener('message',event=>{const msg=event.data||{};if(msg.type==='SC_PUSH_ALERT'){if(msg.payload?.inboxId)ALARM.seen.add(msg.payload.inboxId);startAlarm(msg.payload?.severity||'normal', msg.payload?.title, msg.payload?.body);playInAppAlert(msg.payload?.severity||'normal',msg.payload?.sound||'signal',msg.payload?.vibrate!==false);if(SESSION?.role==='student'&&!ALERT_EDITOR){loadAlertDashboard(true)}}else if(msg.type==='SC_PUSH_ACK'&&msg.inboxId){markInbox(msg.inboxId,'ack')}else if(msg.type==='SC_PUSH_OPEN'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}});
+  navigator.serviceWorker.addEventListener('message',event=>{const msg=event.data||{};if(msg.type==='SC_PUSH_ALERT'){if(msg.payload?.inboxId)ALARM.seen.add(msg.payload.inboxId);startAlarm(msg.payload?.severity||'normal', msg.payload?.title, msg.payload?.body,{inboxId:msg.payload?.inboxId});playInAppAlert(msg.payload?.severity||'normal',msg.payload?.sound||'signal',msg.payload?.vibrate!==false);if(SESSION?.role==='student'&&!ALERT_EDITOR){loadAlertDashboard(true)}}else if(msg.type==='SC_PUSH_ACK'&&msg.inboxId){markInbox(msg.inboxId,'ack')}else if(msg.type==='SC_PUSH_OPEN'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}});
 }
 startAlarmWatch();   // v25.27: آلارم وقتی اپ باز است، حتی بی‌نوتیفیکیشنِ مرورگر (و حتی بی‌سرویس‌ورکر)
 setInterval(()=>{
