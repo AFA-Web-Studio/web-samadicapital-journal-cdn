@@ -5351,8 +5351,8 @@ function alarmPrefCard(){
   const on = alarmEnabled(), cur = alarmSound().id;
   return `<div class="alarm-pref">
     <div class="alarm-pref-b"><b>آلارم صوتی</b>
-      <em>وقتی اپ باز است، هشدار تا وقتی خاموشش نکنی زنگ می‌زند.
-        وقتی اپ بسته است، صدا همان صدای نوتیفیکیشن گوشی است.</em></div>
+      <em>وقتی ژورنال باز است، هشدار با پنجرهٔ تمام‌صفحه و صدای بلند زنگ می‌زند — حتی بدون نوتیفیکیشن مرورگر.
+        وقتی بسته است، صدا همان صدای اعلانِ گوشی است؛ برای صدای بلند، صدای مخصوصِ تلگرام را پایین فعال کن.</em></div>
     <button class="alarm-try" type="button" onclick="startAlarm('important','امتحان آلارم','همین‌طور می‌شنوی')">امتحان</button>
     <button class="sw${on?' on':''}" type="button" role="switch" aria-checked="${on}"
       aria-label="آلارم صوتی" onclick="toggleAlarmPref(this)"></button>
@@ -5361,6 +5361,15 @@ function alarmPrefCard(){
       ${ALARM_SOUNDS.map(x => `<button type="button" role="radio" aria-checked="${x.id===cur}"
         class="asnd${x.id===cur?' on':''}" onclick="pickAlarmSound('${x.id}',this)">${x.label}</button>`).join('')}
     </div>
+    <div class="alarm-opts">
+      <label>بلندی صدا: <b id="alarm-vol-v">${faNum(Math.round(alarmVolume()*100))}٪</b>
+        <input type="range" min="10" max="100" step="5" value="${Math.round(alarmVolume()*100)}" oninput="setAlarmVolume(this.value)"></label>
+      <label>مدت زنگ
+        <select onchange="L.s('sc_alarm_dur',this.value)">${ALARM_DURATIONS.map(([v,t]) => `<option value="${v}"${v===alarmDuration()?' selected':''}>${t}</option>`).join('')}</select></label>
+    </div>
+    <div class="alarm-tg">📱 <b>وقتی ژورنال بسته است:</b> تلگرام اجازه می‌دهد برای ربات هشدار، صدای مخصوص بگذاری.
+      دکمهٔ زیر صدای آلارمِ بلند را در تلگرام برایت می‌فرستد؛ روی آن نگه دار ← «Save for Notifications»، بعد در اعلان‌های همان ربات انتخابش کن.
+      <br><button type="button" onclick="sendTelegramAlarmSound(this)">🔔 فرستادن صدای آلارم به تلگرامم</button></div>
   </div>`;
 }
 
@@ -5571,6 +5580,25 @@ function unlockAlarmAudio(){
 addEventListener('pointerdown', unlockAlarmAudio, { once:false, passive:true });
 addEventListener('keydown', unlockAlarmAudio, { passive:true });
 
+// v25.27: همهٔ نت‌ها از یک خروجیِ مشترک می‌گذرند: بلندیِ انتخابیِ دانشجو + کمپرسور (تا بلند ولی بی‌اعوجاج باشد)
+const ALARM_LOUD = 2.9;    // نت‌ها قبلاً با بهرهٔ ~۰٫۲۶ ساخته می‌شدند — عملاً یک‌چهارمِ بلندیِ ممکن
+function alarmVolume(){ const v = Number(L.g('sc_alarm_vol')); return Number.isFinite(v) && v >= 0.1 && v <= 1 ? v : 1; }
+function alarmOut(ctx){
+  if(!ALARM.out || ALARM.outCtx !== ctx){
+    const g = ctx.createGain(); let tail = g;
+    if(ctx.createDynamicsCompressor){
+      const c = ctx.createDynamicsCompressor();
+      try{ c.threshold.value = -12; c.knee.value = 6; c.ratio.value = 10; c.attack.value = 0.003; c.release.value = 0.12; }catch(_){}
+      g.connect(c); tail = c;
+    }
+    tail.connect(ctx.destination);
+    ALARM.out = g; ALARM.outCtx = ctx;
+  }
+  try{ ALARM.out.gain.value = alarmVolume(); }catch(_){}
+  return ALARM.out;
+}
+const loud = p => Math.min(0.9, (p || 0.26) * ALARM_LOUD);
+
 // یک نتِ ساده با پاکتِ صدا — آجرِ ساختِ همه‌ی آلارم‌ها
 function alarmTone(ctx, t, freq, dur, type, peak){
   if(!(freq > 0) || !(dur > 0)) return;
@@ -5578,9 +5606,9 @@ function alarmTone(ctx, t, freq, dur, type, peak){
   osc.type = type || 'sine';
   osc.frequency.setValueAtTime(freq, t);
   g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(peak || 0.26, t + 0.02);
+  g.gain.exponentialRampToValueAtTime(loud(peak), t + 0.02);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g); g.connect(ctx.destination);
+  osc.connect(g); g.connect(alarmOut(ctx));
   osc.start(t); osc.stop(t + dur + 0.02);
 }
 
@@ -5603,13 +5631,34 @@ const ALARM_SOUNDS = [
       osc.frequency.setValueAtTime(base * 0.6, t);
       osc.frequency.exponentialRampToValueAtTime(base * 1.9, t + 0.42);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.26, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(loud(0.26), t + 0.05);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.46);
-      osc.connect(g); g.connect(ctx.destination);
+      osc.connect(g); g.connect(alarmOut(ctx));
       osc.start(t); osc.stop(t + 0.48);
     } },
   { id:'pulse', label:'ضربان', play(ctx, t, base){
       [0, 0.2, 0.4].forEach(o => alarmTone(ctx, t + o, base * 0.62, 0.15, 'square', 0.2));
+    } },
+  // v25.27: سه صدای بلند و تیز، مثل آلارم‌های تریدینگ‌ویو
+  { id:'siren', label:'آژیر', play(ctx, t, base){
+      [0, 0.6].forEach(o => {
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(base * 0.9, t + o);
+        osc.frequency.exponentialRampToValueAtTime(base * 1.8, t + o + 0.28);
+        osc.frequency.exponentialRampToValueAtTime(base * 0.9, t + o + 0.55);
+        g.gain.setValueAtTime(0.0001, t + o);
+        g.gain.exponentialRampToValueAtTime(loud(0.3), t + o + 0.03);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + o + 0.56);
+        osc.connect(g); g.connect(alarmOut(ctx));
+        osc.start(t + o); osc.stop(t + o + 0.58);
+      });
+    } },
+  { id:'horn', label:'بوق', play(ctx, t, base){
+      [0, 0.55].forEach(o => [0.5, 0.63].forEach(m => alarmTone(ctx, t + o, base * m, 0.42, 'square', 0.22)));
+    } },
+  { id:'beacon', label:'سه بوقِ تیز', play(ctx, t, base){
+      [0, 0.17, 0.34].forEach(o => alarmTone(ctx, t + o, base * 1.85, 0.12, 'square', 0.24));
     } }
 ];
 function alarmSound(){
@@ -5617,6 +5666,21 @@ function alarmSound(){
   return ALARM_SOUNDS.find(x => x.id === id) || ALARM_SOUNDS[0];
 }
 function setAlarmSound(id){ if(ALARM_SOUNDS.some(x => x.id === id)) L.s('sc_alarm_sound', id); }
+function setAlarmVolume(pct){
+  const v = Math.min(1, Math.max(0.1, Number(pct) / 100)); L.s('sc_alarm_vol', v);
+  const o = document.getElementById('alarm-vol-v'); if(o) o.textContent = faNum(Math.round(v * 100)) + '٪';
+  try{ if(ALARM.out) ALARM.out.gain.value = v; }catch(_){}
+}
+async function sendTelegramAlarmSound(btn){
+  if(!isOnline()){ showToast('برای این کار باید آنلاین باشی'); return; }
+  if(btn) btn.disabled = true;
+  const r = await apiFetch('/api/alerts/telegram-sound', { method:'POST', body:'{}' });
+  if(btn) btn.disabled = false;
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if(r && r.ok) showToast('✅ فرستاده شد — تلگرامِ ربات هشدار را باز کن');
+  else if(d.error === 'telegram_not_linked') showToast('اول تلگرامت را در همین صفحه به هشدارها وصل کن');
+  else showToast('فرستاده نشد؛ کمی بعد دوباره امتحان کن');
+}
 
 function alarmBeat(severity){
   const ctx = ALARM.ctx; if(!ctx || ctx.state !== 'running') return;
@@ -5624,9 +5688,26 @@ function alarmBeat(severity){
   alarmSound().play(ctx, ctx.currentTime, base);
 }
 
+// v25.27: مدتِ زنگ — انتخابِ دانشجو؛ پیش‌فرض «تا خاموشش کنم» (با سقفِ ۱۰ دقیقه برای زبانه‌ای که فراموش شده)
+const ALARM_DURATIONS = [['once','یک بار'],['10','۱۰ ثانیه'],['30','۳۰ ثانیه'],['60','۱ دقیقه'],['loop','تا خاموشش کنم']];
+function alarmDuration(){ const d = L.g('sc_alarm_dur'); return ALARM_DURATIONS.some(x => x[0] === d) ? d : 'loop'; }
+function alarmStopAt(){ const d = alarmDuration(); return Date.now() + (d === 'once' ? 300 : d === 'loop' ? 600000 : Number(d) * 1000); }
+// صدا قطع می‌شود ولی پنجره تا «خاموش کن» می‌ماند (مثل تریدینگ‌ویو)
+function stopAlarmSound(){
+  if(ALARM.timer) clearInterval(ALARM.timer);
+  ALARM.timer = null;
+  try{ navigator.vibrate && navigator.vibrate(0) }catch(_){}
+}
+function alarmTitleFlash(title){
+  if(ALARM.titleTimer) clearInterval(ALARM.titleTimer);
+  ALARM.titleBase = ALARM.titleBase || document.title;
+  let k = 0;
+  ALARM.titleTimer = setInterval(() => { document.title = (k++ % 2) ? ALARM.titleBase : '🔔 ' + (title || 'هشدار قیمت'); }, 900);
+}
 function stopAlarm(){
   if(ALARM.timer) clearInterval(ALARM.timer);
   ALARM.timer = null; ALARM.on = false;
+  if(ALARM.titleTimer){ clearInterval(ALARM.titleTimer); ALARM.titleTimer = null; if(ALARM.titleBase) document.title = ALARM.titleBase; ALARM.titleBase = null; }
   try{ navigator.vibrate && navigator.vibrate(0) }catch(_){}
   const bar = document.getElementById('alarm-bar');
   if(bar) bar.classList.remove('on');
@@ -5643,14 +5724,37 @@ function startAlarm(severity, title, body){
     bar.classList.add('on');
   }
   ALARM.on = true;
-  ALARM.stopAt = Date.now() + (ALARM_MAX_MS[severity] || ALARM_MAX_MS.normal);
+  ALARM.stopAt = alarmStopAt();
+  const tm = document.getElementById('alarm-time');
+  if(tm) try{ tm.textContent = new Date().toLocaleTimeString('fa-IR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) }catch(_){}
+  alarmTitleFlash(title);
   const tick = () => {
-    if(Date.now() > ALARM.stopAt) { stopAlarm(); return }
+    if(Date.now() > ALARM.stopAt) { stopAlarmSound(); return }
     alarmBeat(severity);
     try{ navigator.vibrate && navigator.vibrate(severity === 'critical' ? [220,90,220] : [150]) }catch(_){}
   };
   tick();
   ALARM.timer = setInterval(tick, 1400);
+}
+
+// v25.27: وقتی اپ باز است، آلارم نباید به نوتیفیکیشنِ مرورگر وابسته باشد. هر ۴۰ ثانیه صندوقِ اعلانِ
+// خوانده‌نشده پرسیده می‌شود؛ اعلانِ تازه (که قبلاً دیده نشده) ⇒ آلارم. اعلان‌های قدیمی در اولین پرسش «دیده» می‌شوند.
+ALARM.seen = ALARM.seen || new Set();
+async function alarmWatchTick(){
+  try{
+    if(!SESSION || SESSION.role !== 'student' || SESSION.isViewOnly || !isOnline() || !alarmEnabled()) return;
+    const r = await apiFetch('/api/alerts/unread'); if(!r || !r.ok) return;
+    const d = await r.json().catch(() => null); if(!d || !Array.isArray(d.items)) return;
+    const fresh = d.items.filter(x => x && x.id && !ALARM.seen.has(x.id));
+    d.items.forEach(x => x && x.id && ALARM.seen.add(x.id));
+    if(!ALARM.watchPrimed){ ALARM.watchPrimed = true; return; }
+    if(fresh.length && !ALARM.on){ const x = fresh[0]; startAlarm(x.severity || 'normal', x.title, x.body); }
+  }catch(_){}
+}
+function startAlarmWatch(){
+  if(ALARM.watch) return;
+  alarmWatchTick();
+  ALARM.watch = setInterval(alarmWatchTick, 40000);
 }
 
 // دانشجویی که صدا نمی‌خواهد باید بتواند خاموشش کند
@@ -5813,8 +5917,9 @@ function nav(name,btn){
 function handlePendingAlertRoute(){if(!SESSION||SESSION.role!=='student')return;const q=new URLSearchParams(location.search);if(q.get('open')==='alerts'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}const ack=q.get('ack');if(ack&&/^in_[0-9a-f]{24}$/.test(ack)){markInbox(ack,'ack');q.delete('ack');history.replaceState(null,'',`${location.pathname}${q.toString()?'?'+q.toString():''}`)}}
 if('serviceWorker'in navigator){
   window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
-  navigator.serviceWorker.addEventListener('message',event=>{const msg=event.data||{};if(msg.type==='SC_PUSH_ALERT'){startAlarm(msg.payload?.severity||'normal', msg.payload?.title, msg.payload?.body);playInAppAlert(msg.payload?.severity||'normal',msg.payload?.sound||'signal',msg.payload?.vibrate!==false);if(SESSION?.role==='student'&&!ALERT_EDITOR){loadAlertDashboard(true)}}else if(msg.type==='SC_PUSH_ACK'&&msg.inboxId){markInbox(msg.inboxId,'ack')}else if(msg.type==='SC_PUSH_OPEN'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}});
+  navigator.serviceWorker.addEventListener('message',event=>{const msg=event.data||{};if(msg.type==='SC_PUSH_ALERT'){if(msg.payload?.inboxId)ALARM.seen.add(msg.payload.inboxId);startAlarm(msg.payload?.severity||'normal', msg.payload?.title, msg.payload?.body);playInAppAlert(msg.payload?.severity||'normal',msg.payload?.sound||'signal',msg.payload?.vibrate!==false);if(SESSION?.role==='student'&&!ALERT_EDITOR){loadAlertDashboard(true)}}else if(msg.type==='SC_PUSH_ACK'&&msg.inboxId){markInbox(msg.inboxId,'ack')}else if(msg.type==='SC_PUSH_OPEN'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}});
 }
+startAlarmWatch();   // v25.27: آلارم وقتی اپ باز است، حتی بی‌نوتیفیکیشنِ مرورگر (و حتی بی‌سرویس‌ورکر)
 setInterval(()=>{
   const screen=document.getElementById('screen-alerts');
   if(document.visibilityState!=='visible')return;
