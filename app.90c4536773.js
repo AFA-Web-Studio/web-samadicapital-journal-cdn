@@ -724,6 +724,14 @@ function showDailyQuote(){
 // STATE
 // ══════════════════════════════════════════════════════
 let SESSION=null, TRADES=[], STUDENTS={}, ALL_TRADES={};
+// v25.29: اعضای VIPِ آکادمی — فقط برای نمایش در پنل منتور؛ هرگز در STUDENTS/sc_students ذخیره نمی‌شوند
+let VIPS={};
+const ROSTER=()=>({...VIPS,...STUDENTS});          // اگر شماره‌ای هر دو بود، CIP برنده است
+async function loadAcademyVips(){
+  try{ const r=await apiFetch('/api/mentor/billing/academy-vips'); if(!r||!r.ok) return {}; const d=await r.json(); return d&&d.members||{}; }catch(_){ return {}; }
+}
+async function loadVipTrades(){ VIPS=await loadAcademyVips(); for(const uid of Object.keys(VIPS)){ ALL_TRADES[uid]=await loadTrades(uid); } }
+const vipTag=st=>st&&st.type==='vip'?' <span class="vip-tag">VIP</span>':'';
 let dashRange='all';   // all | month | 30 | 90
 let dashBreak='coin';  // بُعدِ فعالِ ماژول تحلیل
 let dashPhase='all';   // all | pre | pro — فاز نسبت به پله‌ی آخرِ نردبان
@@ -3821,7 +3829,7 @@ function cohortMentorCard(){
   const d=COHORT.data;
   if(!d||!d.available||!Array.isArray(d.perStudent)) return '';
   const med=k=>d.metrics[k]?d.metrics[k].median:null;
-  const name=uid=>(STUDENTS&&STUDENTS[uid]&&STUDENTS[uid].name)?STUDENTS[uid].name:uid;
+  const name=uid=>{const r=ROSTER();return r[uid]&&r[uid].name?r[uid].name:uid;};
 
   // هر برچسب عدد خودش را همراه دارد، وگرنه معلوم نیست «نمی‌نویسد» یعنی چقدر
   const pc=v=>faNum(Math.round(v))+'٪';
@@ -4228,6 +4236,7 @@ function renderMentorDashboard(){
     loadStudents().then(async st=>{
       STUDENTS=st;
       for(const uid of Object.keys(st)){ALL_TRADES[uid]=await loadTrades(uid);}
+      await loadVipTrades();
       _renderMentorDashboard();
     });
     document.getElementById('dash-content').innerHTML='<div style="text-align:center;padding:60px;color:var(--muted)"><div style="width:36px;height:36px;border:2px solid var(--border2);border-top-color:var(--gold);border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px"></div>در حال بارگذاری...</div>';
@@ -4271,7 +4280,7 @@ function mentorSignals(uid){
 function setMentorSort(k){ mentorSort = k; _renderMentorDashboard(); }
 
 function mentorRows(){
-  return Object.entries(STUDENTS).map(([uid, st]) => {
+  return Object.entries(ROSTER()).map(([uid, st]) => {
     const sig = mentorSignals(uid);
     return { uid, st, sig, pnl: sig.st?.total || 0,
              disc: sig.st?.discipline?.score ?? null, count: sig.all.length };
@@ -4332,7 +4341,7 @@ function _renderMentorDashboard(){
   const flat=Object.values(ALL_TRADES).flat();
   const s=computeStats(flat);
   const el=document.getElementById('dash-content');
-  const sorted=Object.entries(STUDENTS).map(([uid,st])=>{
+  const sorted=Object.entries(ROSTER()).map(([uid,st])=>{
     const tr=(ALL_TRADES[uid]||[]).filter(t=>t.exit);
     const ss=computeStats(tr,ALL_TRADES[uid]||[]);
     return{uid,st,ss,count:ALL_TRADES[uid]?.length||0,pnl:ss?.total||0};
@@ -4350,10 +4359,10 @@ function _renderMentorDashboard(){
   // ترتیب تازه: اول «چه کسی به کمک نیاز دارد»، بعد وضعیت کلی آکادمی.
   el.innerHTML=`
     <div class="mhero fade-up">
-      <div class="mh"><u>دانشجو</u><b>${faNum(Object.keys(STUDENTS).length)}</b>
-        <s>${faNum(flat.length)} معامله‌ی کل</s></div>
+      <div class="mh"><u>دانشجو</u><b>${faNum(Object.keys(ROSTER()).length)}</b>
+        <s>CIP ${faNum(Object.keys(STUDENTS).length)} · VIP ${faNum(Object.keys(VIPS).filter(u=>!STUDENTS[u]).length)} · ${faNum(flat.length)} معامله</s></div>
       <div class="mh"><u>فعال این هفته</u><b style="color:${active7?'var(--green)':'var(--muted)'}">${faNum(active7)}</b>
-        <s>از ${faNum(Object.keys(STUDENTS).length)} نفر</s></div>
+        <s>از ${faNum(Object.keys(ROSTER()).length)} نفر</s></div>
       <div class="mh"><u>دیسیپلین آکادمی</u><b style="color:${discAvg>=75?'var(--green)':discAvg>=45?'var(--gold)':'var(--red)'}">${faNum(discAvg)}</b>
         <s>میانگین از ۱۰۰</s></div>
       <div class="mh"><u>نیازمند توجه</u><b style="color:${needing?'var(--red)':'var(--green)'}">${faNum(needing)}</b>
@@ -4409,7 +4418,7 @@ function renderMentorMain(){
         if(MENTOR_FB._uid===mentorSelected){MENTOR_FB={_uid:mentorSelected,_loaded:true,data:fb};renderMentorMain();}
       });
     }
-    const st=STUDENTS[mentorSelected];
+    const st=ROSTER()[mentorSelected];
     const trades=ALL_TRADES[mentorSelected]||[];
     const s=computeStats(trades);
     if(MENTOR_HIST.uid!==mentorSelected) MENTOR_HIST={uid:mentorSelected,n:20};
@@ -4419,7 +4428,7 @@ function renderMentorMain(){
     el.innerHTML=`
       <div class="ms-head">
         <button class="btn btn-ghost btn-sm ms-back" onclick="mentorSelected=null;renderMentorMain()">← بازگشت</button>
-        <div class="ms-id"><b>${esc(st?.name)}</b><span dir="ltr">${esc(uid)}</span></div>
+        <div class="ms-id"><b>${esc(st?.name)}${vipTag(st)}</b><span dir="ltr">${esc(uid)}</span></div>
         <span class="ms-budget">💵 ${faNum(currentBudget(trades.length))}$</span>
       </div>
       ${renderXPBar(trades.length)}
@@ -4484,7 +4493,7 @@ function renderMentorMain(){
 }
 
 function renderStudentCards(){
-  const sorted=Object.entries(STUDENTS).map(([uid,st])=>{
+  const sorted=Object.entries(ROSTER()).map(([uid,st])=>{
     const ss=computeStats((ALL_TRADES[uid]||[]).filter(t=>t.exit),ALL_TRADES[uid]||[]);
     return{uid,st,ss,count:ALL_TRADES[uid]?.length||0};
   }).sort((a,b)=>(b.ss?.total||0)-(a.ss?.total||0));
@@ -4495,7 +4504,7 @@ function renderStudentCards(){
       <div onclick="mentorSelected='${uid}';renderMentorMain()" style="cursor:pointer">
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
           <div>
-            <div style="font-weight:700;font-size:13px">${esc(st.name)}</div>
+            <div style="font-weight:700;font-size:13px">${esc(st.name)}${vipTag(st)}</div>
             <div style="font-size:10.5px;color:var(--muted);margin-top:2px">${faNum(count)} ترید · <span style="color:${xp.levelColor}">${xp.levelTitle}</span></div>
             <div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--f-mono)">${uid}</div>
           </div>
@@ -4682,6 +4691,7 @@ async function addStudent(){
   if(!name){alert('نام دانشجو را وارد کنید');return}
   if(code.length!==11||!code.startsWith('09')){alert('شماره موبایل معتبر نیست (مثلاً: 09123456789)');return}
   if(STUDENTS[code]){alert('این شماره قبلاً ثبت شده');return}
+  if(VIPS[code]&&!confirm(`این شماره عضو VIP آکادمی است و خودش در ژورنال ثبت‌نام کرده.\nثبت به‌عنوان CIP حساب او را به CIP تبدیل نمی‌کند و دو حساب می‌سازد. ادامه؟`))return;
   showToast('⏳ در حال ذخیره...');
   const pin=String(Math.floor(Math.random()*10000)).padStart(4,'0');
   const r=await apiFetch('/api/students',{method:'POST',body:JSON.stringify({uid:code,name,pin})});
@@ -4817,6 +4827,7 @@ async function startMentorSession(){
   STUDENTS=await loadStudents();
   ALL_TRADES={};
   for(const uid of Object.keys(STUDENTS)){ALL_TRADES[uid]=await loadTrades(uid);}
+  await loadVipTrades();
   await loadAllSettings();              // تنظیمات مشترک را از سرور بگیر
   await pushMentorSettingsToCloud();    // سفارشی‌سازی‌های محلیِ ادمین را به سرور مهاجرت بده
   autoBackupLocal(); // عکس فوری از کل داده‌ها هنگام ورود منتور (در پس‌زمینه)
@@ -4843,6 +4854,7 @@ function startSession(s){
       loadStudents().then(async st=>{
         STUDENTS=st;
         for(const uid of Object.keys(st)){ALL_TRADES[uid]=await loadTrades(uid);}
+        await loadVipTrades();
         renderMentorDashboard();
       });
     } else {
@@ -4881,7 +4893,7 @@ function startSession(s){
 
 
 async function mentorViewAs(uid){
-  const st = STUDENTS[uid];
+  const st = ROSTER()[uid];
   if(!st) return;
   if(!confirm(`ورود به حساب «${st.name}» (${uid}) به عنوان ناظر؟\n\nبرای بازگشت به پنل منتور از دکمه خروج استفاده کنید.`)) return;
   // save mentor session to restore later
@@ -4890,7 +4902,7 @@ async function mentorViewAs(uid){
   TRADES = studentTrades;
   FEEDBACK = await loadFeedback(uid); // v13: نظرها در حالت ناظر هم دیده شوند
   dashRange='all';calOffset=0;
-  SESSION = {role:'student', uid, name: st.name + ' (ناظر)', isViewOnly: true};
+  SESSION = {role:'student', uid, name: st.name + ' (ناظر)', isViewOnly: true, ...(st.type==='vip'?{accountType:'vip'}:{})};
   // update UI
   document.getElementById('u-av').textContent = st.name.slice(0,2);
   document.getElementById('u-nm').textContent = st.name + ' 👁️';
@@ -4921,6 +4933,7 @@ async function mentorViewBack(){
   STUDENTS = await loadStudents();
   ALL_TRADES = {};
   for(const uid of Object.keys(STUDENTS)){ ALL_TRADES[uid] = await loadTrades(uid); }
+  await loadVipTrades();
   document.getElementById('u-av').textContent = saved.name.slice(0,2);
   document.getElementById('u-nm').textContent = saved.name;
   document.getElementById('nav-mentor').style.display = 'flex';
@@ -5979,6 +5992,28 @@ if('serviceWorker'in navigator){
   navigator.serviceWorker.addEventListener('message',event=>{const msg=event.data||{};if(msg.type==='SC_PUSH_ALERT'){if(msg.payload?.inboxId)ALARM.seen.add(msg.payload.inboxId);startAlarm(msg.payload?.severity||'normal', msg.payload?.title, msg.payload?.body,{inboxId:msg.payload?.inboxId});playInAppAlert(msg.payload?.severity||'normal',msg.payload?.sound||'signal',msg.payload?.vibrate!==false);if(SESSION?.role==='student'&&!ALERT_EDITOR){loadAlertDashboard(true)}}else if(msg.type==='SC_PUSH_ACK'&&msg.inboxId){markInbox(msg.inboxId,'ack')}else if(msg.type==='SC_PUSH_OPEN'){const btn=document.getElementById('nav-alerts');nav('alerts',btn)}});
 }
 startAlarmWatch();   // v25.27: آلارم وقتی اپ باز است، حتی بی‌نوتیفیکیشنِ مرورگر (و حتی بی‌سرویس‌ورکر)
+// v25.30: نسخهٔ تازه بی‌نیاز به بستنِ اپ (گزارش مالک ۱۴۰۵-۰۷-۲۹: آپشن‌های آلارم برای بعضی‌ها نیامده بود). اپی که روی
+// گوشی باز می‌ماند، کدِ قدیم را تا بارگذاریِ دوباره نگه می‌داشت. حالا وقتی اپ به جلو می‌آید نسخهٔ تازه را می‌پرسد و
+// وقتی سرویس‌ورکرِ تازه فعال شد، خودش تازه می‌شود — ولی هرگز وسطِ کار (فرمِ ترید، ویرایشِ هشدار، برگهٔ باز، آلارم).
+(function autoUpdate(){
+  if(!('serviceWorker' in navigator)) return;
+  const hadController = !!navigator.serviceWorker.controller;   // نصبِ اولِ سرویس‌ورکر نباید تازه‌سازی کند
+  let pending = false, lastCheck = Date.now();
+  const busy = () => !!((typeof ALERT_EDITOR !== 'undefined' && ALERT_EDITOR) || (typeof QC_STATE !== 'undefined' && QC_STATE) ||
+    document.getElementById('screen-add')?.classList.contains('active') || document.querySelector('.bottom-sheet.open') || (typeof ALARM !== 'undefined' && ALARM.on));
+  const reloadNow = () => {
+    if(busy()){ pending = true; return; }
+    try{ if(sessionStorage.getItem('sc_upd_reload')) return; sessionStorage.setItem('sc_upd_reload', '1'); }catch(_){}
+    location.reload();
+  };
+  try{ setTimeout(() => sessionStorage.removeItem('sc_upd_reload'), 60000); }catch(_){}
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if(hadController) reloadNow(); });
+  const check = () => { if(Date.now() - lastCheck < 5 * 60e3) return; lastCheck = Date.now();
+    navigator.serviceWorker.getRegistration().then(r => r && r.update()).catch(() => {}); };
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible'){ if(pending) reloadNow(); check(); } });
+  setInterval(() => { if(pending && !busy()) reloadNow(); }, 15000);
+  setInterval(check, 30 * 60e3);
+})();
 setInterval(()=>{
   const screen=document.getElementById('screen-alerts');
   if(document.visibilityState!=='visible')return;

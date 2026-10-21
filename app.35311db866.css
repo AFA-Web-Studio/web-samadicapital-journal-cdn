@@ -859,6 +859,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   background:var(--red);color:#fff;font-family:var(--f-body);font-size:15px;font-weight:800}
 .alarm-v{flex:1;padding:15px;border-radius:13px;border:1px solid var(--border);background:none;color:var(--text);
   cursor:pointer;font-family:var(--f-body);font-size:13px}
+.vip-tag{display:inline-block;margin-inline-start:6px;padding:1px 7px;border-radius:999px;font:700 9.5px/1.6 var(--f-mono);letter-spacing:.06em;color:#0b0b0b;background:var(--gold);vertical-align:middle}
 .alarm-l{margin-top:12px;background:none;border:0;color:var(--muted);font-family:var(--f-body);font-size:12px;cursor:pointer;text-decoration:underline;text-underline-offset:4px}
 .alarm-engine{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--border);font-size:11.5px;color:var(--text2)}
 .alarm-engine i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
