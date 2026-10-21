@@ -423,9 +423,9 @@ const EMOTIONS_FA = {
 };
 const emoLabel = v => EMOTIONS_FA[v] ? `${v} — ${EMOTIONS_FA[v]}` : v;
 const TIMEFRAMES = ['1m','3m','5m','15m','30m','1H','2H','4H','6H','12H','1D','1W'];
-const COINS      = ['BTC','ETH','BNB','SOL','HYPE','XRP','ADA','DOGE','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','ARB','OP','INJ','TIA','SUI','APT','Other'];
+const COINS      = ['BTC','ETH','BNB','SOL','HYPE','PAXG','XAUT','XRP','ADA','DOGE','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','ARB','OP','INJ','TIA','SUI','APT','Other'];
 // لیست کامل آفلاین رمزارزها (پشتیبان وقتی CoinGecko در دسترس نیست) — بدون شلوغی، فقط نماد
-const COINS_FULL = ['BTC','ETH','BNB','SOL','HYPE','XRP','ADA','DOGE','AVAX','DOT','TRX','LINK','MATIC','TON','SHIB','LTC','BCH','UNI','ATOM','XLM','ETC','FIL','HBAR','APT','ARB','OP','NEAR','VET','ICP','INJ','TIA','SUI','SEI','RNDR','GRT','AAVE','MKR','ALGO','QNT','FTM','EGLD','SAND','MANA','AXS','THETA','FLOW','XTZ','CHZ','EOS','KAVA','ZEC','DASH','NEO','IOTA','GALA','PEPE','WIF','BONK','FLOKI','JUP','PYTH','STRK','ENA','ORDI','BLUR','LDO','CRV','SNX','COMP','1INCH','DYDX','RUNE','KAS','CFX','WLD','FET','AGIX','OCEAN','ROSE','CELO','ZIL','ENJ','BAT','ANKR','SUSHI','YFI','UMA','BAL','REN','KSM','WAVES','DCR','XMR','TWT','GMT','APE','LRC','IMX','MINA','CAKE','Other'];
+const COINS_FULL = ['BTC','ETH','BNB','SOL','HYPE','PAXG','XAUT','XRP','ADA','DOGE','AVAX','DOT','TRX','LINK','MATIC','TON','SHIB','LTC','BCH','UNI','ATOM','XLM','ETC','FIL','HBAR','APT','ARB','OP','NEAR','VET','ICP','INJ','TIA','SUI','SEI','RNDR','GRT','AAVE','MKR','ALGO','QNT','FTM','EGLD','SAND','MANA','AXS','THETA','FLOW','XTZ','CHZ','EOS','KAVA','ZEC','DASH','NEO','IOTA','GALA','PEPE','WIF','BONK','FLOKI','JUP','PYTH','STRK','ENA','ORDI','BLUR','LDO','CRV','SNX','COMP','1INCH','DYDX','RUNE','KAS','CFX','WLD','FET','AGIX','OCEAN','ROSE','CELO','ZIL','ENJ','BAT','ANKR','SUSHI','YFI','UMA','BAL','REN','KSM','WAVES','DCR','XMR','TWT','GMT','APE','LRC','IMX','MINA','CAKE','Other'];
 
 // ── شخصی‌سازی هر دانشجو: پیش‌فرض کوین/تایم‌فریم/لوریج بر اساس آخرین ترید ──
 function _prefsKey(){ return 'sc_prefs_' + (SESSION?.uid || 'guest'); }
@@ -448,6 +448,7 @@ function saveStudentPrefs(t){
 // COINGECKO — لوگو و قیمت زنده (با fallback آفلاین، تمیز و بدون شلوغی)
 // ══════════════════════════════════════════════════════
 const CG_IDS = {
+  PAXG:'pax-gold',XAUT:'tether-gold',
   BTC:'bitcoin',ETH:'ethereum',BNB:'binancecoin',SOL:'solana',HYPE:'hyperliquid',XRP:'ripple',ADA:'cardano',DOGE:'dogecoin',
   AVAX:'avalanche-2',DOT:'polkadot',TRX:'tron',LINK:'chainlink',MATIC:'matic-network',TON:'the-open-network',
   SHIB:'shiba-inu',LTC:'litecoin',BCH:'bitcoin-cash',UNI:'uniswap',ATOM:'cosmos',XLM:'stellar',ETC:'ethereum-classic',
