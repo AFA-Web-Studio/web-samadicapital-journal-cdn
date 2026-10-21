@@ -581,7 +581,7 @@ function getDynList(key,def){return S.g(key)||def;}
 // XP milestones — قابل تنظیم توسط منتور
 // v14.2: نردبان بودجه دلاری — نام، آیکون، تعداد و بودجه هر پله (ادمین-ویرایش‌پذیر)
 const XP_DEFAULTS=[
-  {n:30,  label:'۳۰',  title:'رصدگر بازار',  icon:'🌱', color:'#6B7A8F', budget:100},
+  {n:30,  label:'۳۰',  title:'رصدگر بازار',  icon:'🌱', color:'#887f72', budget:100},
   {n:50,  label:'۵۰',  title:'شکارچی ستاپ', icon:'🎯', color:'#3B82F6', budget:200},
   {n:80,  label:'۸۰',  title:'مدیر ریسک',   icon:'🛡️', color:'#8B5CF6', budget:300},
   {n:100, label:'۱۰۰', title:'تریدر منضبط', icon:'🔥', color:'#F59E0B', budget:400},
@@ -1217,7 +1217,7 @@ function getXP(count){
   const ms=getXPMilestones();
   const total=ms[ms.length-1].n;
   const pct=Math.min(count/total*100,100);
-  let level=0,levelTitle='شروع مسیر',levelColor='#6B7A8F',levelIcon='🚀';
+  let level=0,levelTitle='شروع مسیر',levelColor='#887f72',levelIcon='🚀';
   for(const m of ms){if(count>=m.n){level=m.n;levelTitle=m.title;levelColor=m.color;levelIcon=m.icon}}
   return{pct,level,levelTitle,levelColor,levelIcon,count,budget:currentBudget(count)};
 }
@@ -1394,7 +1394,7 @@ function equityChart(data,w=320,h=80){
     ${zeroY!==null?`<line x1="${P}" x2="${w-P}" y1="${zeroY}" y2="${zeroY}" stroke="rgba(255,255,255,.14)" stroke-dasharray="3 4"/>`:''}
     <polyline points="${pLine}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
     ${data.length<=30?pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="2.2" fill="${data[i].pnl>=0?'#22C97A':'#E8505B'}"/>`).join(''):''}
-    <circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="4" fill="${col}" stroke="#07101d" stroke-width="2"/>
+    <circle cx="${pts[pts.length-1][0]}" cy="${pts[pts.length-1][1]}" r="4" fill="${col}" stroke="#141210" stroke-width="2"/>
   </svg>`;
 }
 
@@ -1760,7 +1760,7 @@ function renderXPBar(count, animate=true){
   // گره شروع (بودجه پایه)
   const startNode=`
     <div class="xp2-node">
-      <div class="xp2-medal done" style="--c:#5B6B7F"><span class="xp2-ico">🚀</span><span class="xp2-check">✓</span></div>
+      <div class="xp2-medal done" style="--c:#776f63"><span class="xp2-ico">🚀</span><span class="xp2-check">✓</span></div>
       <div class="xp2-name" style="color:var(--text2)">شروع مسیر</div>
       <div class="xp2-count">۰ ترید</div>
       <div class="xp2-bdg on">💵 ${faNum(getBaseBudget())}$</div>
@@ -1773,7 +1773,7 @@ function renderXPBar(count, animate=true){
     const prevN=i===0?0:ms[i-1].n;
     let fill=0;
     if(done)fill=100; else if(count>prevN)fill=(count-prevN)/(m.n-prevN)*100;
-    const prevColor=i===0?'#5B6B7F':ms[i-1].color;
+    const prevColor=i===0?'#776f63':ms[i-1].color;
     const conn=`<div class="xp2-conn"><div class="xp2-connfill ${fill>0&&fill<100?'xpfill':''}" style="width:${fill.toFixed(1)}%;background:linear-gradient(270deg,${prevColor},${m.color})">${fill>0&&fill<100?`<span class="xp-livedot" style="color:${m.color}"></span>`:''}</div></div>`;
     const node=`
       <div class="xp2-node">
@@ -1801,7 +1801,7 @@ function renderXPBar(count, animate=true){
         <div class="xp2-sub">${faNum(count)} ترید ثبت‌شده · ${faNum(Math.round(overall))}٪ مسیر</div>
       </div>
       <div class="xp2-levelbox">
-        <div class="xp2-level" style="background:linear-gradient(135deg,${cur?cur.color:'#5B6B7F'},${cur?cur.color:'#5B6B7F'}99)">${esc(cur?cur.icon:'🚀')} ${esc(cur?cur.title:'شروع مسیر')}</div>
+        <div class="xp2-level" style="background:linear-gradient(135deg,${cur?cur.color:'#776f63'},${cur?cur.color:'#776f63'}99)">${esc(cur?cur.icon:'🚀')} ${esc(cur?cur.title:'شروع مسیر')}</div>
         <div class="xp2-curbudget">بودجه فعلی: <b>${faNum(budget)}$</b></div>
       </div>
     </div>
@@ -1820,7 +1820,7 @@ function renderXPBar(count, animate=true){
         <span class="xp2-remain">${faNum(next.n-count)} ترید مانده → بودجه ${faNum(next.budget)}$</span>
       </div>
       <div class="xp2-barrow">
-        <div class="xp2-nextbar"><div class="xpfill" style="width:${segPct.toFixed(0)}%;background:linear-gradient(270deg,${cur?cur.color:'#5B6B7F'},${next.color})">${segPct>3&&segPct<100?`<span class="xp-livedot" style="color:${next.color}"></span>`:''}</div></div>
+        <div class="xp2-nextbar"><div class="xpfill" style="width:${segPct.toFixed(0)}%;background:linear-gradient(270deg,${cur?cur.color:'#776f63'},${next.color})">${segPct>3&&segPct<100?`<span class="xp-livedot" style="color:${next.color}"></span>`:''}</div></div>
         <span class="xp2-pct" style="color:${next.color}">${faNum(segPct.toFixed(0))}٪</span>
       </div>
     </div>`}
@@ -2044,7 +2044,7 @@ function renderStudentDashboard(){
   const el=document.getElementById('dash-content');
   if(!TRADES.length){
     el.innerHTML=`
-      <div style="background:linear-gradient(135deg,var(--card),#0a1020);border:1px solid var(--border);border-radius:16px;padding:20px 18px;margin-bottom:14px" class="fade-up">
+      <div style="background:linear-gradient(135deg,var(--card),#171513);border:1px solid var(--border);border-radius:16px;padding:20px 18px;margin-bottom:14px" class="fade-up">
         <div style="font-family:var(--f-display);font-size:20px;color:var(--gold)">سلام، ${esc(SESSION.name)} 👋</div>
         <div style="color:var(--muted);font-size:12px;margin-top:4px">موبایل: <span style="font-family:var(--f-mono);color:var(--gold-dim)">${SESSION.uid}</span></div>
       </div>

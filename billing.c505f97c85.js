@@ -35,7 +35,7 @@
     function fallback() { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); try { document.execCommand('copy'); done(); } catch (_) {} t.remove(); }
   }
   async function qrSvg(text) {
-    try { const QR = await loadQR(); return await new Promise(res => QR.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#0b1422', light: '#ffffff' } }, (e, s) => res(e ? '' : s))); }
+    try { const QR = await loadQR(); return await new Promise(res => QR.toString(text, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#191714', light: '#ffffff' } }, (e, s) => res(e ? '' : s))); }
     catch (_) { return ''; }
   }
 
@@ -50,7 +50,7 @@
   // ══════════ استایل ══════════
   const css = `
   .bl-num{font-family:var(--f-mono);unicode-bidi:isolate}
-  .bl-ov{position:fixed;inset:0;z-index:900;background:rgba(2,6,14,.86);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);overflow-y:auto;overscroll-behavior:contain}
+  .bl-ov{position:fixed;inset:0;z-index:900;background:rgba(9,8,7,.86);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);overflow-y:auto;overscroll-behavior:contain}
   .bl-sheet{max-width:760px;margin:0 auto;padding:18px 16px calc(120px + var(--safe-bottom,0px));min-height:100%}
   .bl-top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
   .bl-top h2{flex:1;margin:0;font-family:var(--f-display);font-size:20px;font-weight:900;color:var(--gold-light)}
@@ -60,7 +60,7 @@
   .bl-status b{color:var(--text)}
   .bl-status.warn{border-color:rgba(232,80,91,.35);background:rgba(232,80,91,.07)}
   .bl-status.ok{border-color:rgba(34,201,122,.3);background:rgba(34,201,122,.06)}
-  .bl-terms{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:14px;background:#060d18;border:1px solid var(--border);margin-bottom:14px}
+  .bl-terms{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:14px;background:#110f0d;border:1px solid var(--border);margin-bottom:14px}
   .bl-terms button{position:relative;min-height:46px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
   .bl-terms button.on{background:rgba(200,168,75,.15);color:var(--gold-light);box-shadow:inset 0 0 0 1px rgba(200,168,75,.5)}
   .bl-terms small{font-size:9.5px;font-weight:700;color:var(--green);background:rgba(34,201,122,.12);padding:1px 7px;border-radius:99px}
@@ -98,7 +98,7 @@
   .bl-cmp .no{color:var(--muted)}
   .bl-cmp tr:last-child td{border-bottom:0}
   .bl-note{font-size:10.5px;color:var(--muted);line-height:1.9;text-align:center;margin:6px 4px 0}
-  .bl-cta{position:fixed;inset-inline:0;bottom:0;z-index:5;padding:10px 16px calc(12px + var(--safe-bottom,0px));background:linear-gradient(0deg,rgba(4,8,16,.98) 70%,transparent)}
+  .bl-cta{position:fixed;inset-inline:0;bottom:0;z-index:5;padding:10px 16px calc(12px + var(--safe-bottom,0px));background:linear-gradient(0deg,rgba(11,10,9,.98) 70%,transparent)}
   .bl-cta .btn{max-width:728px;margin:0 auto;display:flex;min-height:52px;font-size:14.5px;font-weight:800}
   .bl-box{border:1px solid var(--border2);border-radius:16px;padding:14px;background:var(--surface);margin-bottom:12px}
   .bl-lbl{font-size:11px;color:var(--muted);margin-bottom:6px}
