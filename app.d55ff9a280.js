@@ -425,7 +425,7 @@ const emoLabel = v => EMOTIONS_FA[v] ? `${v} — ${EMOTIONS_FA[v]}` : v;
 const TIMEFRAMES = ['1m','3m','5m','15m','30m','1H','2H','4H','6H','12H','1D','1W'];
 const COINS      = ['BTC','ETH','BNB','SOL','HYPE','PAXG','XAUT','XRP','ADA','DOGE','AVAX','DOT','MATIC','LINK','UNI','LTC','ATOM','ARB','OP','INJ','TIA','SUI','APT','Other'];
 // لیست کامل آفلاین رمزارزها (پشتیبان وقتی CoinGecko در دسترس نیست) — بدون شلوغی، فقط نماد
-const COINS_FULL = ['BTC','ETH','BNB','SOL','HYPE','PAXG','XAUT','XRP','ADA','DOGE','AVAX','DOT','TRX','LINK','MATIC','TON','SHIB','LTC','BCH','UNI','ATOM','XLM','ETC','FIL','HBAR','APT','ARB','OP','NEAR','VET','ICP','INJ','TIA','SUI','SEI','RNDR','GRT','AAVE','MKR','ALGO','QNT','FTM','EGLD','SAND','MANA','AXS','THETA','FLOW','XTZ','CHZ','EOS','KAVA','ZEC','DASH','NEO','IOTA','GALA','PEPE','WIF','BONK','FLOKI','JUP','PYTH','STRK','ENA','ORDI','BLUR','LDO','CRV','SNX','COMP','1INCH','DYDX','RUNE','KAS','CFX','WLD','FET','AGIX','OCEAN','ROSE','CELO','ZIL','ENJ','BAT','ANKR','SUSHI','YFI','UMA','BAL','REN','KSM','WAVES','DCR','XMR','TWT','GMT','APE','LRC','IMX','MINA','CAKE','Other'];
+const COINS_FULL = ['BTC','ETH','BNB','SOL','HYPE','PAXG','XAUT','XRP','ADA','DOGE','AVAX','DOT','TRX','LINK','MATIC','TON','SHIB','LTC','BCH','UNI','ATOM','XLM','ETC','FIL','HBAR','APT','ARB','OP','NEAR','VET','ICP','INJ','TIA','SUI','SEI','RNDR','GRT','AAVE','MKR','ALGO','QNT','FTM','EGLD','SAND','MANA','AXS','THETA','FLOW','XTZ','CHZ','EOS','KAVA','ZEC','DASH','NEO','IOTA','GALA','PEPE','WIF','BONK','FLOKI','JUP','PYTH','STRK','ENA','ORDI','BLUR','LDO','CRV','SNX','COMP','1INCH','DYDX','RUNE','KAS','CFX','WLD','FET','AGIX','OCEAN','ROSE','CELO','ZIL','ENJ','BAT','ANKR','SUSHI','YFI','UMA','BAL','REN','KSM','WAVES','DCR','XMR','TWT','GMT','APE','LRC','IMX','MINA','CAKE','USDT','USDC','USDS','WBT','LEO','RAIN','USDE','DAI','CC','USD1','GRAM','USDG','TAO','CRO','PYUSD','OKB','BTW','USYC','RLUSD','USDY','ONDO','BUIDL','PUMP','ASTER','USDF','MNT','WLFI','SKY','USDD','M','EURSAFO','MORPHO','U','HTX','BGB','BFUSD','USDGO','VVV','JST','GT','KCS','POL','RENDER','PI','PEARL','LIT','AERO','OUSD','NEXO','ZRO','USTB','GHO','STX','ETHFI','XDC','NIGHT','AKE','BDX','JAAA','FLR','Q','USD0','KAU','RAY','EUTBL','TRUMP','PENGU','EURC','YLDS','TUSD','STABLE','A7A5','VIRTUAL','GRASS','HASH','DRV','PENDLE','BSV','BTT','XPL','FF','SPX','SOFID','REUSD','UB','JTRSY','OUSG','SUN','CARDS','APXUSD','FDUSD','GNO','OHM','PIEVERSE','KITE','BP','KAIA','MON','USDAI','JTO','LUNC','AR','APEPE','CVX','ENS','SHFL','KMNO','ZBCN','SYRUP','SAFO','JASMY','NFT','EIGEN','PC0000031','AKT','S','FRAX','KOGE','CRVUSD','KAG','USX','FLUID','GRX','MET','ZAMA','PONS','EURCV','USAT','BR','TRAC','AUSD','ANVL','BTSE','USTBL','ZK','SENT','2Z','PC0000033','XCN','BORG','STRCX','CRCLB','A','BEAM','USELESS','APYUSD','COCO','MX','VSN','NPC','SPCXB','GOMINING','FARTCOIN','GUSD','SN51','RAIL','0G','AIOZ','B','AWE','DGAI','XEC','JPYC','PC0000097','SUPER','SFP','JPYSC','CASH','ONYC','GEOD','MSTRX','OZO','H','PLUME','ATH','ULTIMA','BC','AVUSD','RSR','MGLO','META','KNTQ','THBILL','GLM','NOPAL','CASHCAT','ZEN','DBR','PC0000023','ALFW','RLB','SKR','SN64','ORCA','CRCLX','PC0000085','SOON','USDAT','AUTO','PC0000015','SOSO','SHX','CAP','EDGE','STAC','GENIUS','W','WAL','USD3','FRXUSD','CRCLON','PROM','UUSD','NXM','BGBTC','PEAQ','STONK','FUN','QRL','FORM','ZRX','ACRED','CHEEMS','USDA','QTUM','DOG','BABYCLAW','WEMIX','ARKM','CHIP','GMX','MELANIA','AI','YZY','SN4','SAFE','GGBR','HNT','CUSD','LPT','GAS','RED','PROS','NMR','PGOLD','MARSCOIN','FXUSD','PC0000019','COW','USDSUI','WM','OMI','ADI','PC0000101','MTBILL','CKB','RIF','CGUSD','LISUSD','FEUSD','VELO','DOLA','UNT','TSLAX','APES','BRLV','UAI','FXSAVE','ALT','NOXO','AMP','TRUSD','UNP','ZETA','PC0000049','DIEM','XAUM','TEMPLE','O','MCAT','BABYDOGE','TFUEL','IUSD','LINEA','VTHO','KAITO','HOODINU','BABY','HOT','SPYX','FT','ZIG','USDX','IO','DUSK','GAL','PRIZE','MAGMA','SPK','NILA','AXL','USDON','ELG','QUBIC','SNDKB','SPCXX','BANANAS31','DEXE','ZANO','ORE','DGB','BERA','RE','REUR','RLC','EDU','AP3X','ESP','TURBO','IVVON','SWOP','STRCON','PC0000027','PURR','PC0000081','IOST','PC0016245','BAN','ALEO','AZTEC','NOCK','EARNUSD','ONE','ZCAT','MUB','DATA','ARC','SN44','T','WIN','ASTR','FONQ','MUBARAK','HUMA','BRZ','ONT','BIO','XPR','TAG','EXOD','USDU','MSTRB','NUSD','SNEK','TOSHI','ALLO','GBPSAFO','NXPC','NOS','METAL','AB','XVS','JCT','LCX','PMUSD','TRB','ARIAX','JELLYJELLY','MEME','ID','ELF','TPT','PHA','SN120','FIDD','GPS','BRETT','ACRDX','CX','INTCB','ICNT','BRSRV','SN53','CTC','MHORSE','MEGA','AUSDT','USDKG','RNT','POD','DEEP','COAI','CHFAU','MOOLAH','HOLO','VBILL','UMXM','BIM','FIUSD','VEREM','ARX','ARRR','POLYX','OZA','Other'];
 
 // ── شخصی‌سازی هر دانشجو: پیش‌فرض کوین/تایم‌فریم/لوریج بر اساس آخرین ترید ──
 function _prefsKey(){ return 'sc_prefs_' + (SESSION?.uid || 'guest'); }
@@ -463,7 +463,59 @@ const CG_IDS = {
   WLD:'worldcoin-wld',FET:'fetch-ai',AGIX:'singularitynet',OCEAN:'ocean-protocol',ROSE:'oasis-network',CELO:'celo',
   ZIL:'zilliqa',ENJ:'enjincoin',BAT:'basic-attention-token',ANKR:'ankr',SUSHI:'sushi',YFI:'yearn-finance',
   UMA:'uma',BAL:'balancer',REN:'republic-protocol',KSM:'kusama',WAVES:'waves',DCR:'decred',XMR:'monero',
-  TWT:'trust-wallet-token',GMT:'stepn',APE:'apecoin',LRC:'loopring',IMX:'immutable-x',MINA:'mina-protocol'
+  TWT:'trust-wallet-token',GMT:'stepn',APE:'apecoin',LRC:'loopring',IMX:'immutable-x',MINA:'mina-protocol',
+  // v25.32: بقیهٔ ۵۰۰ رمزارزِ اولِ بازار (CoinGecko، ۲۹ مهر ۱۴۰۵)
+  USDT:'tether',USDC:'usd-coin',USDS:'usds',WBT:'whitebit',LEO:'leo-token',RAIN:'rain',USDE:'ethena-usde',DAI:'dai',
+  CC:'canton-network',USD1:'usd1-wlfi',GRAM:'the-open-network',USDG:'global-dollar',TAO:'bittensor',CRO:'crypto-com-chain',PYUSD:'paypal-usd',OKB:'okb',
+  BTW:'bitway',USYC:'hashnote-usyc',RLUSD:'ripple-usd',USDY:'ondo-us-dollar-yield',ONDO:'ondo-finance',BUIDL:'blackrock-usd-institutional-digital-liquidity-fund',PUMP:'pump-fun',ASTER:'aster-2',
+  USDF:'falcon-finance',MNT:'mantle',WLFI:'world-liberty-financial',SKY:'sky',USDD:'usdd',M:'memecore',EURSAFO:'spiko-amundi-overnight-swap-fund-eur',MORPHO:'morpho',
+  U:'united-stables',HTX:'htx-dao',BGB:'bitget-token',BFUSD:'bfusd',USDGO:'usdgo',VVV:'venice-token',JST:'just',GT:'gatechain-token',
+  KCS:'kucoin-shares',POL:'polygon-ecosystem-token',RENDER:'render-token',PI:'pi-network',PEARL:'pearl-2',LIT:'lighter',AERO:'aerodrome-finance',OUSD:'open-usd',
+  NEXO:'nexo',ZRO:'layerzero',USTB:'superstate-short-duration-us-government-securities-fund-ustb',CAKE:'pancakeswap-token',GHO:'gho',STX:'blockstack',ETHFI:'ether-fi',XDC:'xdce-crowd-sale',
+  NIGHT:'midnight-3',AKE:'akedo',BDX:'beldex',JAAA:'janus-henderson-anemoy-aaa-clo-fund',FLR:'flare-networks',Q:'quack-ai',USD0:'usual-usd',KAU:'kinesis-gold',
+  RAY:'raydium',EUTBL:'eutbl',TRUMP:'official-trump',PENGU:'pudgy-penguins',EURC:'euro-coin',YLDS:'ylds',TUSD:'true-usd',STABLE:'stable-2',
+  A7A5:'a7a5',VIRTUAL:'virtual-protocol',GRASS:'grass',HASH:'hash-2',DRV:'derive',PENDLE:'pendle',BSV:'bitcoin-cash-sv',BTT:'bittorrent',
+  XPL:'plasma',FF:'falcon-finance-ff',SPX:'spx6900',SOFID:'sofiusd',REUSD:'re-protocol-reusd',UB:'unibase',JTRSY:'janus-henderson-anemoy-treasury-fund',OUSG:'ousg',
+  SUN:'sun-token',CARDS:'collector-crypt',APXUSD:'apxusd',FDUSD:'first-digital-usd',GNO:'gnosis',OHM:'olympus',PIEVERSE:'pieverse',KITE:'kite-2',
+  BP:'backpack',KAIA:'kaia',MON:'monad',USDAI:'usdai',JTO:'jito-governance-token',LUNC:'terra-luna',AR:'arweave',APEPE:'ape-and-pepe',
+  CVX:'convex-finance',ENS:'ethereum-name-service',SHFL:'shuffle-2',KMNO:'kamino',ZBCN:'zebec-network',SYRUP:'syrup',SAFO:'safo',JASMY:'jasmycoin',
+  NFT:'apenft',EIGEN:'eigenlayer',PC0000031:'tradable-na-rent-financing-platform-sstn',AKT:'akash-network',S:'sonic-3',FRAX:'frax',KOGE:'bnb48-club-token',CRVUSD:'crvusd',
+  KAG:'kinesis-silver',USX:'usx',FLUID:'instadapp',GRX:'grx-chain',MET:'meteora',ZAMA:'zama',PONS:'pons',EURCV:'societe-generale-forge-eurcv',
+  USAT:'usa',BR:'bedrock-token',TRAC:'origintrail',AUSD:'agora-dollar',ANVL:'anvil',BTSE:'btse-token',USTBL:'spiko-us-t-bills-money-market-fund',ZK:'zksync',
+  SENT:'sentient','2Z':'doublezero',PC0000033:'tradable-apac-diversified-finance-provider-sstn',XCN:'chain-2',BORG:'swissborg',STRCX:'strategy-pp-variable-xstock',CRCLB:'circle-internet-group-bstock',A:'vaulta',
+  BEAM:'beam-2',USELESS:'useless-3',APYUSD:'apyusd',COCO:'coco-2',MX:'mx-token',VSN:'vision-3',NPC:'non-playable-coin',SPCXB:'spacex-bstocks-tokenized-stock',
+  GOMINING:'gmt-token',FARTCOIN:'fartcoin',GUSD:'gusd',SN51:'celium',RAIL:'railgun','0G':'zero-gravity',AIOZ:'aioz-network',B:'build-on',
+  AWE:'stp-network',DGAI:'dgrid-ai',XEC:'ecash',JPYC:'jpycoin',PC0000097:'tradable-latam-fintech-sstn',SUPER:'superfarm',SFP:'safepal',JPYSC:'jpysc',
+  CASH:'cash-4',ONYC:'onyc',GEOD:'geodnet',MSTRX:'microstrategy-xstock',OZO:'ozone-chain',H:'humanity',PLUME:'plume',ATH:'aethir',
+  ULTIMA:'ultima',BC:'bc-token',AVUSD:'avant-usd',RSR:'reserve-rights-token',MGLO:'midas-fasanara-global-open',META:'meta-2-2',KNTQ:'kinetiq',THBILL:'theo-short-duration-us-treasury-fund',
+  GLM:'golem',NOPAL:'nest-blackopal-liquidstone-ii-vault',CASHCAT:'cash-cat',ZEN:'zencash',DBR:'debridge',PC0000023:'tradable-singapore-fintech-ssl-2',ALFW:'alpha-bulgaria-warrants',RLB:'rollbit-coin',
+  SKR:'seeker',SN64:'chutes',ORCA:'orca',CRCLX:'circle-xstock',PC0000085:'tradable-latam-middle-market-lender-sstl',SOON:'soon-2',USDAT:'saturn-dollar',AUTO:'hastra-auto',
+  PC0000015:'tradable-na-third-party-online-merchant-sstn',SOSO:'sosovalue',SHX:'stronghold-token',CAP:'cap-4',EDGE:'edgex',STAC:'securitize-tokenized-aaa-clo-fund',GENIUS:'genius-3',W:'wormhole',
+  WAL:'walrus-2',USD3:'3jane-usd3',FRXUSD:'frax-usd',CRCLON:'circle-internet-group-ondo-tokenized-stock',PROM:'prometeus',UUSD:'unity-usd',NXM:'nxm',BGBTC:'bitget-wrapped-btc',
+  PEAQ:'peaq-2',STONK:'stonk-3',FUN:'funfair',QRL:'quantum-resistant-ledger',FORM:'four',ZRX:'0x',ACRED:'apollo-diversified-credit-securitize-fund',CHEEMS:'cheems-token',
+  USDA:'usda-2',QTUM:'qtum',DOG:'dog-go-to-the-moon-rune',BABYCLAW:'baby-claw',WEMIX:'wemix-token',ARKM:'arkham',CHIP:'chip-2',GMX:'gmx',
+  MELANIA:'melania-meme',AI:'artificial-inu-3',YZY:'yzy',SN4:'targon',SAFE:'safe',GGBR:'goldfish-gold',HNT:'helium',CUSD:'cap-usd',
+  LPT:'livepeer',GAS:'gas',RED:'redstone-oracles',PROS:'pharos-network',NMR:'numeraire',PGOLD:'pleasing-gold',MARSCOIN:'marscoin-4',FXUSD:'f-x-protocol-fxusd',
+  PC0000019:'tradable-north-america-pos-lender-sstn',COW:'cow-protocol',USDSUI:'usdsui',WM:'wrappedm-by-m0',OMI:'ecomi',ADI:'adi-token',PC0000101:'na-post-settlement-legal-financing-receivables',MTBILL:'midas-mtbill',
+  CKB:'nervos-network',RIF:'rif-token',CGUSD:'cygnus-finance-global-usd',LISUSD:'helio-protocol-hay',FEUSD:'felix-feusd',VELO:'velo',DOLA:'dola-usd',UNT:'unitywallet-token',
+  TSLAX:'tesla-xstock',APES:'apes-2-2',BRLV:'crown-brlv',UAI:'unifai-network',FXSAVE:'fx-usd-saving',ALT:'altlayer',NOXO:'noxo',AMP:'amp-token',
+  TRUSD:'tori-trusd',UNP:'unipoly',ZETA:'zetachain',PC0000049:'tradable-eu-latam-pos-financing-sstl',DIEM:'diem',XAUM:'matrixdock-gold',TEMPLE:'temple',O:'o1-exchange',
+  MCAT:'marscat-token',BABYDOGE:'baby-doge-coin',TFUEL:'theta-fuel',IUSD:'infinifi-usd',LINEA:'linea',VTHO:'vethor-token',KAITO:'kaito',HOODINU:'hood-sword-inu',
+  BABY:'babylon',HOT:'holotoken',SPYX:'sp500-xstock',FT:'flying-tulip',ZIG:'zignaly',USDX:'axis-usd',IO:'io',DUSK:'dusk-network',
+  GAL:'project-galaxy',PRIZE:'prize-protocol',MAGMA:'magma-finance',SPK:'spark-2',NILA:'mindwavedao',AXL:'axelar',USDON:'ondo-u-s-dollar-token',ELG:'escoin-token',
+  QUBIC:'qubic-network',SNDKB:'sandisk-bstocks-tokenized-stock',SPCXX:'spacex-xstocks',BANANAS31:'banana-for-scale-2',DEXE:'dexe',ZANO:'zano',ORE:'ore',DGB:'digibyte',
+  BERA:'berachain-bera',RE:'re',REUR:'royal-euro',RLC:'iexec-rlc',EDU:'edu-coin',AP3X:'apex-4',ESP:'espresso',TURBO:'turbo',
+  IVVON:'ishares-core-s-p-500-etf-ondo-tokenized-etf',SWOP:'swop-2',STRCON:'strategy-stretch-preferred-ondo-tokenized',PC0000027:'tradable-latam-bnpl-sstn',PURR:'purr-2',PC0000081:'tradable-na-legal-receivables-ssl',IOST:'iostoken',PC0016245:'na-capital-as-a-service-sstn',
+  BAN:'comedian',ALEO:'aleo',AZTEC:'aztec',NOCK:'nockchain',EARNUSD:'lido-earnusd',ONE:'cross-2',ZCAT:'anonymous-cat',MUB:'micron-technology-bstock',
+  DATA:'story-2',ARC:'ai-rig-complex',SN44:'score',T:'threshold-network-token',WIN:'wink',ASTR:'astar',FONQ:'fonq',MUBARAK:'mubarak',
+  HUMA:'huma-finance',BRZ:'brz',ONT:'ontology',BIO:'bio-protocol',XPR:'proton',TAG:'tagger',EXOD:'exod',USDU:'usdu',
+  MSTRB:'strategy-tokenized-bstocks',NUSD:'nusd-2',SNEK:'snek',TOSHI:'toshi',ALLO:'allora',GBPSAFO:'spiko-amundi-overnight-swap-fund-gbp',NXPC:'nexpace',NOS:'nosana',
+  METAL:'metal-blockchain',AB:'newton-project',XVS:'venus',JCT:'janction',LCX:'lcx',PMUSD:'precious-metals-usd',TRB:'tellor',ARIAX:'aria-chain',
+  JELLYJELLY:'jelly-my-jelly',MEME:'memetoon',ID:'space-id',ELF:'aelf',TPT:'token-pocket',PHA:'pha',SN120:'affine',FIDD:'fidelity-digital-dollar',
+  GPS:'goplus-security',BRETT:'based-brett',ACRDX:'anemoy-tokenized-apollo-diversified-credit-fund',CX:'cortex-2',INTCB:'intel-tokenized-bstocks',ICNT:'impossible-cloud-network-token',BRSRV:'blackrock-daily-reinvestment-stablecoin-reserve-vehicle',SN53:'efficientfrontier',
+  CTC:'creditcoin-2',MHORSE:'meme-horse',MEGA:'megaeth',AUSDT:'alloy-tether',USDKG:'usdkg',RNT:'reental',POD:'dolphin-2',DEEP:'deep',
+  COAI:'chainopera-ai',CHFAU:'allunity-chf',MOOLAH:'moolah',HOLO:'holoworld',VBILL:'vaneck-treasury-fund',UMXM:'manadia',BIM:'bim-2',FIUSD:'sygnum-fiusd-liquidity-fund',
+  VEREM:'verified-emeralds',ARX:'arcium',ARRR:'pirate-chain',POLYX:'polymesh',OZA:'ozapay'
 };
 const CG_CACHE = {};
 async function fetchCoinInfo(sym){
@@ -5452,7 +5504,7 @@ function handleAlertSymbolSelect(value){
 }
 function setCustomAlertSymbol(value){if(!ALERT_EDITOR)return;ALERT_EDITOR.symbol=String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);updateAlertEditorPrice()}
 function renderAlertEditor(){
-  const d=ALERT_EDITOR,knownCoins=COINS_FULL.filter(x=>x!=='Other'),custom=!knownCoins.includes(d.symbol),channels=d.channels||{telegram:true,push:true,inApp:true};
+  const d=ALERT_EDITOR,knownCoins=COINS_FULL.filter(x=>x!=='Other'&&/^[A-Z0-9]{2,12}$/.test(x)),custom=!knownCoins.includes(d.symbol),channels=d.channels||{telegram:true,push:true,inApp:true};
   const allowed=ALERT_STATE.channels?.policy||{},system=ALERT_STATE.channels?.settings||{};
   const canTelegram=allowed.telegramAllowed!==false&&system.telegramEnabled!==false,canPush=allowed.pushAllowed!==false&&system.pushEnabled!==false,canInApp=allowed.inAppAllowed!==false&&system.inAppEnabled!==false;
   return`<section class="alert-panel alert-editor"><div class="alert-panel-head"><div><div class="alert-panel-title">${d.id?'ویرایش هشدار':'ساخت هشدار جدید'}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">قیمت مرجع: بازار لحظه‌ای جفت USDT · کانال‌ها زیر کنترل سیاست مدیر هستند</div></div><button class="icon-btn" onclick="cancelAlertEditor()" aria-label="بستن">×</button></div>
