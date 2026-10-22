@@ -2353,7 +2353,7 @@ function refreshPrinciplesMeter(){
   refreshFormBar();
 }
 
-// کارت ماشین‌حساب — فقط برای تریدِ فاز حرفه‌ای در حساب دوره
+// کارت ماشین‌حساب — تریدِ فاز حرفه‌ای در حساب دوره، و همیشه در ژورنال شخصی مدیر (هر سه حالت، بی‌قفل؛ مالک ۱۴۰۵-۰۷-۳۰)
 let PRO_CALC_MODE = 1;      // حالتِ فعالِ کارتِ باز
 let PRO_CALC_APPLIED = 0;   // حالتی که «اعمال در فرم» با آن زده شد؛ ۰ یعنی هنوز نه
 function proCalcCard(editId, forceMode){
@@ -2592,7 +2592,7 @@ function renderTradeForm(t){
         <div class="fg"><div class="fl"><i class="fdot green"></i>حد سود</div>${num('f-tp', d.takeProfit, ' oninput="updateRRPreview()"')}</div>
       </div>
       <div id="rr-prev"></div>
-      ${FORM_NEED===PRO_PRINCIPLES?proCalcCard(isEdit?d.id:null):''}
+      ${FORM_NEED===PRO_PRINCIPLES||ownerJournal()?proCalcCard(isEdit?d.id:null):''}
       <div class="fgrid tf-gap">
         <div class="fg"><div class="fl">مارجین $ <span class="req">*</span></div>${num('f-size', d.size, ' oninput="updatePnlPreview()"')}</div>
         <div class="fg"><div class="fl">لوریج ×${isCourseAccount()&&!ownerJournal()?` <span class="fl-note">حداکثر ${faNum(LEVERAGE_MAX)}×</span>`:''}</div><input id="f-lev" class="fi" type="number" inputmode="decimal" min="1" step="any"${isCourseAccount()&&!ownerJournal()?` max="${LEVERAGE_MAX}"`:''} value="${esc(d.leverage||1)}" oninput="updatePnlPreview()" placeholder="1"/></div>
