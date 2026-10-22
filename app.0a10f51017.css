@@ -1566,3 +1566,32 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
   .pa2-list.rows .pa2-id,.pa2-list.rows .pa2-col{min-width:0}.pa2-list.rows .pa2-id{overflow:hidden}.pa2-list.rows .pa2-cond{display:flex;white-space:nowrap;font-size:10.5px}
   .pa2-list.rows .pa2-col small,.pa2-list.rows .pa2-cond{overflow:hidden;text-overflow:ellipsis}
 }
+
+/* v26.6 — محافظ روز بد، برچسب‌ها، نمودار TradingView، اطلاعیه‌ی تلگرام */
+.tilt-sheet{text-align:center;padding:6px 2px 4px}
+.tilt-mark{width:64px;height:64px;margin:0 auto 12px;display:grid;place-items:center;border-radius:20px;font-size:28px;color:var(--red);background:radial-gradient(circle at 50% 0,rgba(255,107,120,.18),rgba(255,107,120,.04) 70%);border:1px solid rgba(255,107,120,.28)}
+.tilt-sheet h3{margin:0;font-family:var(--f-display);font-size:22px;font-weight:800;color:var(--text)}
+.tilt-why{margin:6px 0 0;font-size:13px;color:var(--red);font-weight:600}
+.tilt-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}
+.tilt-stats div{padding:11px;border-radius:14px;background:rgba(255,246,228,.03);border:1px solid var(--border)}
+.tilt-stats u{display:block;text-decoration:none;font-size:10.5px;color:var(--muted)}.tilt-stats b{display:block;margin-top:5px;font:700 18px/1 var(--f-mono)}
+.tilt-msg{font-size:13px;line-height:2;color:var(--text2);margin:0 0 16px}
+.tilt-sheet .btn{width:100%;margin-top:8px}
+.tilt-foot{margin-top:12px;font-size:10.5px;line-height:1.9;color:var(--muted)}
+.tilt-banner{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;padding:12px 14px;border-radius:14px;background:linear-gradient(160deg,rgba(255,107,120,.1),rgba(255,107,120,.03));border:1px solid rgba(255,107,120,.3)}
+.tilt-banner b{font-size:13px;color:var(--red)}.tilt-banner span{font-size:11.5px;line-height:1.9;color:var(--text2)}
+.tl-badge{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;color:var(--red);background:rgba(255,107,120,.08);border:1px solid rgba(255,107,120,.3);vertical-align:middle}
+.tl-chart{font-size:11px;vertical-align:middle;color:var(--gold-light)}
+.tv-box{margin:0 0 14px;padding:12px;border-radius:14px;background:rgba(255,246,228,.025);border:1px solid var(--border)}
+.tv-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}.tv-head b{font-size:12px;color:var(--text)}
+.tv-head a{font-size:11.5px;font-weight:700;color:var(--gold-light);text-decoration:none}
+.tv-img{position:relative;display:block;text-decoration:none;border-radius:10px;overflow:hidden;background:#0c0a09;border:1px solid var(--border)}
+.tv-img img{display:block;width:100%;height:auto}.tv-img span{display:none;padding:22px 10px;text-align:center;font-size:11px;color:var(--muted)}
+.tv-img.off img{display:none}.tv-img.off span{display:block}
+.tgl-ex{display:flex;flex-direction:column;gap:6px;margin:4px 0 12px}
+.tgl-ex u{text-decoration:none;font-size:11px;font-weight:700;color:var(--text2);margin-top:6px}
+.tgl-ex code{display:block;padding:9px 11px;border-radius:10px;background:rgba(0,0,0,.3);border:1px solid var(--border);font:600 12px/1.6 var(--f-mono);color:var(--gold-light);text-align:start;overflow-x:auto;white-space:nowrap}
+.ms-tilt{padding:14px;border-radius:14px;background:rgba(255,107,120,.04);border:1px solid rgba(255,107,120,.2)}
+.ms-tilt-h{display:flex;align-items:center;justify-content:space-between}.ms-tilt-h b{font-size:13px}
+.ms-tilt-on{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.ms-tilt p{margin:8px 0 10px;font-size:11.5px;line-height:1.9;color:var(--text2)}

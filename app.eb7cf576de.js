@@ -73,6 +73,8 @@ const LINE_ICONS = (() => {
     globe: C(12, 12, 10) + P('M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20', 'M2 12h20'),
     gift: R(3, 8, 18, 4, 1) + P('M12 8v13', 'M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7', 'M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5'),
     pause: R(6, 4, 4, 16, 1.2) + R(14, 4, 4, 16, 1.2),
+    send: P('m22 2-7 20-4-9-9-4z', 'M22 2 11 13'),
+    stop: P('M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86z', 'M8 12h8'),
     note: P('M12 20h9', 'M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z'),
     radar: P('M19.07 4.93A10 10 0 0 0 6.99 3.34', 'M4 6h.01', 'M2.29 9.62A10 10 0 1 0 21.31 8.35', 'M16.24 7.76A6 6 0 1 0 8.23 16.67', 'M12 18h.01', 'M17.99 11.66A6 6 0 0 1 15.77 16.67') + C(12, 12, 2) + P('m13.41 10.59 5.66-5.66')
   };
@@ -86,7 +88,7 @@ const LINE_ICONS = (() => {
     '⏰': ['alarm'], '📥': ['download'], '⬇': ['down'], '🔗': ['link'], '⏱': ['timer'], '🧠': ['brain'], '🎓': ['cap'], '🧮': ['calc'], '➕': ['plus'],
     '📋': ['clipboard'], '🎉': ['party', 'gold'], '📄': ['file'], '📘': ['book'], '📖': ['book'], '🔄': ['refresh'], '📱': ['phone'], '⭐': ['star', 'gold'],
     '🕘': ['history'], '📐': ['ruler'], '✨': ['sparkles', 'gold'], '🎖': ['award', 'gold'], '📣': ['megaphone', 'gold'], '👋': ['hand'], '❔': ['help'],
-    '📡': ['radio'], '💳': ['card'], '🔧': ['wrench'], '🌐': ['globe'], '🎁': ['gift', 'gold'], '⏸': ['pause']
+    '📡': ['radio'], '💳': ['card'], '🔧': ['wrench'], '🌐': ['globe'], '🎁': ['gift', 'gold'], '⏸': ['pause'], '🛑': ['stop', 'bad'], '✈': ['send', 'gold']
   };
   const keys = Object.keys(MAP).sort((a, b) => b.length - a.length);
   const RE = new RegExp('(' + keys.join('|') + ')\\uFE0F?', 'gu');
@@ -513,7 +515,7 @@ async function loadAllSettings(){
   const keys=[
     'sc_reasons_entry','sc_reasons_sl_long','sc_reasons_sl_short','sc_reasons_tp_long','sc_reasons_tp_short',
     'sc_coins','sc_strategies','sc_sessions','sc_emotions','sc_timeframes',
-    'sc_xp_milestones','sc_academy_name','sc_base_budget'
+    'sc_xp_milestones','sc_academy_name','sc_base_budget','sc_tilt'
   ];
   await Promise.all(keys.map(async k=>{
     const v = await cloudGetRaw(k);
@@ -524,7 +526,7 @@ async function loadAllSettings(){
 async function loadReasonLists(){ return loadAllSettings(); }
 const SETTINGS_KEYS=[
   'sc_reasons_entry','sc_reasons_sl_long','sc_reasons_sl_short','sc_reasons_tp_long','sc_reasons_tp_short',
-  'sc_coins','sc_strategies','sc_sessions','sc_emotions','sc_timeframes','sc_xp_milestones','sc_academy_name','sc_base_budget'
+  'sc_coins','sc_strategies','sc_sessions','sc_emotions','sc_timeframes','sc_xp_milestones','sc_academy_name','sc_base_budget','sc_tilt'
 ];
 // مهاجرتِ تنظیماتِ محلیِ ادمین به سرور (وقتی سرور هنوز آن کلید را ندارد)
 // تا سفارشی‌سازی‌های قبلیِ منتور برای دانشجوها هم اعمال شود.
@@ -2233,8 +2235,117 @@ const ANNOUNCEMENTS = [
     teaser: v => v >= 3 ? ['🔓 حالت ۳ باز شد — مارجین ایزوله', 'هر سه ابزار مدیریت سرمایه حالا در فرم ثبت ترید است']
                : v === 2 ? ['🔓 حالت ۲ باز شد — مارجین ثابت', 'از این به بعد اهرم را هم ماشین‌حساب برایت حساب می‌کند']
                : ['💎 به فاز حرفه‌ای خوش آمدی', 'سه ابزار مدیریت سرمایه، قدم‌به‌قدم برایت باز می‌شود'],
-    render: proModesAnnouncement }
+    render: proModesAnnouncement },
+  // v26.6: یک بار، برای هر کسی که خودش ترید ثبت می‌کند
+  { id: 'tg-log', audience: () => SESSION?.role === 'student' && !SESSION.isViewOnly && !annIsRead('tg-log', 1),   // خوانده شد ⇒ دیگر نمی‌آید
+    version: () => 1, teaser: () => ['✈️ ثبت ترید با یک پیام تلگرام', 'بدون باز کردن ژورنال، همان وسطِ معامله'], render: tgLogAnnouncement }
 ];
+// ══════════════════════════════════════════════════════
+// v26.6: محافظ روز بد — «امروز کافی است». همان قاعده‌ی سرور (worker: tiltState)؛ تستِ هم‌سانی دارد.
+// ══════════════════════════════════════════════════════
+const TILT_DEFAULT = { enabled: true, streak: 2, dailyPct: 3 };
+function tiltConfig(raw){
+  const c = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+  const num = (v, lo, hi, d) => { const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : d; };
+  return { enabled: c.enabled !== false, streak: Math.round(num(c.streak, 1, 10, TILT_DEFAULT.streak)), dailyPct: num(c.dailyPct, 0.5, 50, TILT_DEFAULT.dailyPct) };
+}
+function tiltState(trades, cfg, day){
+  const out = { hit: false, reason: null, streak: 0, loss: 0, pct: null };
+  if (!cfg.enabled || !Array.isArray(trades)) return out;
+  const key = t => String(t.date || '') + ' ' + String(t.time || '');
+  const today = trades.filter(t => t && !t._deleted && t.date === day && Number(t.exit) > 0 && calcPnl(t) != null).sort((a, b) => key(a).localeCompare(key(b)));
+  for (let i = today.length - 1; i >= 0 && calcPnl(today[i]) < 0; i--) out.streak++;
+  const net = today.reduce((a, t) => a + calcPnl(t), 0);
+  out.loss = net < 0 ? -net : 0;
+  const cap = [...trades].filter(t => t && !t._deleted && Number(t.capital) > 0).sort((a, b) => key(a).localeCompare(key(b))).map(t => Number(t.capital)).pop();
+  if (cap) out.pct = out.loss / cap * 100;
+  if (out.streak >= cfg.streak) { out.hit = true; out.reason = 'streak'; }
+  else if (out.pct != null && out.pct >= cfg.dailyPct) { out.hit = true; out.reason = 'daily'; }
+  return out;
+}
+const tiltDay = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function tiltNow(list){ return tiltState(list || TRADES, tiltConfig(S.g('sc_tilt')), tiltDay()); }
+function tiltWhy(st){
+  const cfg = tiltConfig(S.g('sc_tilt'));
+  return st.reason === 'streak' ? `${faNum(st.streak)} ضررِ پشت‌سرِهم در امروز`
+    : `ضررِ امروز ${faNum(st.pct.toFixed(1)).replace('.', '٫')}٪ موجودی — سقف ${faNum(cfg.dailyPct).replace('.', '٫')}٪`;
+}
+// بعد از ثبتِ یک معامله‌ی بسته‌ی زیان‌ده: یک بار در روز برگه‌ی آرام + پیامِ تلگرام (سرور خودش دوباره حساب می‌کند)
+function tiltAfterSave(){
+  if (!SESSION || SESSION.isViewOnly) return;
+  const st = tiltNow(); if (!st.hit) return;
+  const k = 'sc_tilt_shown_' + SESSION.uid, day = tiltDay();
+  if (L.g(k) === day) return;
+  L.s(k, day);
+  apiFetch('/api/tilt', { method: 'POST', body: '{}' }).catch(() => {});
+  const todays = TRADES.filter(t => !t._deleted && t.date === day && +t.exit > 0);
+  const net = todays.reduce((a, t) => a + (calcPnl(t) || 0), 0);
+  document.getElementById('det-content').innerHTML = `<div class="tilt-sheet">
+    <div class="tilt-mark">🛑</div>
+    <h3>امروز کافی است</h3>
+    <p class="tilt-why">${tiltWhy(st)}</p>
+    <div class="tilt-stats"><div><u>معامله‌های امروز</u><b>${faNum(todays.length)}</b></div><div><u>نتیجه‌ی امروز</u><b style="color:${net >= 0 ? 'var(--green)' : 'var(--red)'}"><bdi dir="ltr">${fmtUSD(net)}</bdi></b></div></div>
+    <p class="tilt-msg">بازار فردا هم هست. بهترین تصمیمِ امروز، تریدی است که گرفته نمی‌شود. صفحه را ببند، کمی از چارت دور شو و فردا با ذهنِ تازه برگرد.</p>
+    <button class="btn btn-primary" onclick="closeSheet();nav('dashboard',document.querySelector('[data-screen=dashboard]'))">باشه، امروز تمام</button>
+    <button class="btn btn-ghost" onclick="closeSheet()">فقط برای ثبت باز کردم</button>
+    <div class="tilt-foot">اگر امروز تریدِ تازه‌ای ثبت شود، با برچسبِ «بعد از سقف روزانه» ذخیره می‌شود و استاد هم آن را می‌بیند.</div>
+  </div>`;
+  document.getElementById('det-sheet').classList.add('open');
+}
+// نوارِ بالای فرمِ ترید تازه، وقتی امروز به سقف رسیده
+function tiltFormBanner(){
+  const st = tiltNow(); if (!st.hit) return '';
+  return `<div class="tilt-banner"><b>🛑 امروز به سقفِ روزانه رسیده‌ای</b><span>${tiltWhy(st)}. اگر ثبت کنی، این ترید با برچسبِ «بعد از سقف روزانه» ذخیره می‌شود.</span></div>`;
+}
+const tiltBadge = t => t && t.afterLimit ? ' <span class="tl-badge" title="بعد از رسیدن به سقف روزانه ثبت شده">بعد از سقف</span>' : '';
+
+// ── v26.6: لینک نمودار TradingView ──
+// اسنپ‌شاتِ tradingview.com/x/<id> ⇒ تصویرِ مستقیم؛ لینک‌های دیگرِ TradingView فقط دکمه
+const TV_RE = /^https?:\/\/(?:[a-z]{2,3}\.)?tradingview\.com\/(?:x|chart)\/[A-Za-z0-9_\-\/?=&.]+$/i;
+function tvSnapshot(url){ const m = String(url || '').match(/tradingview\.com\/x\/([A-Za-z0-9]+)/i); return m ? `https://s3.tradingview.com/snapshots/${m[1][0].toLowerCase()}/${m[1]}.png` : null; }
+function tvBlock(url){
+  if (!url || !TV_RE.test(url)) return '';
+  const img = tvSnapshot(url);
+  return `<div class="tv-box"><div class="tv-head"><b>نمودار TradingView</b><a href="${esc(url)}" target="_blank" rel="noopener">باز کردن ↗</a></div>
+    ${img ? `<a href="${esc(url)}" target="_blank" rel="noopener" class="tv-img"><img src="${esc(img)}" alt="نمودار ترید" loading="lazy" onerror="this.closest('.tv-img').classList.add('off')"><span>تصویر بارگذاری نشد — «باز کردن» را بزن</span></a>` : ''}</div>`;
+}
+
+// ── v26.6: لینکِ «تکمیل در ژورنال» از ربات ⇒ همان ترید در حالتِ ویرایش ──
+function handleEditRoute(){
+  const q = new URLSearchParams(location.search), id = q.get('edit');
+  if (!id || !/^[a-z0-9]{6,40}$/i.test(id)) return;
+  q.delete('edit'); history.replaceState(null, '', `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`);
+  if (TRADES.find(t => t.id === id)) editTrade(id); else showToast('این ترید پیدا نشد — شاید هنوز همگام نشده؛ صفحه را تازه کن');
+}
+// ترید از تلگرام ثبت شده و اپ در پس‌زمینه باز بوده ⇒ با برگشتن، بی‌صدا تازه شود (فقط داشبورد و ژورنال، نه وسطِ فرم)
+let TRADES_SYNCED_AT = Date.now();
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible' || !SESSION || SESSION.role !== 'student' || SESSION.isViewOnly) return;
+  if (Date.now() - TRADES_SYNCED_AT < 60000) return;
+  const scr = document.querySelector('.screen.active')?.id;
+  if (scr !== 'screen-dashboard' && scr !== 'screen-trades') return;
+  TRADES_SYNCED_AT = Date.now();
+  loadTrades(SESSION.uid).then(t => {
+    const sig = l => l.map(x => x.id + ':' + (x.updatedAt || '')).sort().join();
+    if (!Array.isArray(t) || sig(t) === sig(TRADES)) return;
+    TRADES = t;
+    if (document.querySelector('.screen.active')?.id === 'screen-dashboard') renderStudentDashboard(); else renderTrades();
+    showToast('🔄 ژورنال به‌روز شد');
+  }).catch(() => {});
+});
+
+// ── v26.6: اطلاعیه‌ی ثبت با تلگرام ──
+function tgLogAnnouncement(){
+  return `<div class="ann-sheet">
+    <div class="ann-hero"><span class="ann-badge">✈️ تازه</span><h3>ثبت ترید با یک پیام تلگرام</h3>
+      <p>وسطِ معامله لازم نیست ژورنال را باز کنی. به ربات هشدارِ ژورنال یک پیام بده؛ ترید ثبت می‌شود و بعداً دلایل را کامل می‌کنی.</p></div>
+    <div class="tgl-ex"><u>باز کردن</u><code dir="rtl">لانگ BTC 65000 حدضرر 64000 حدسود 68000</code>
+      <code dir="ltr">ETH short 3200 sl 3260 tp 3050 x2 margin 150</code>
+      <u>بستن</u><code dir="rtl">بستم 66500</code><code dir="rtl">بستم BTC 66500</code></div>
+    <div class="ann-foot">مارجین و اهرم را اگر ننویسی، از آخرین تریدت برداشته می‌شود. ربات بعد از ثبت یک دکمه می‌دهد: «تکمیل در ژورنال». فقط کافی است تلگرامت یک بار از بخش «هشدار قیمت ← اتصال امن تلگرام» وصل شده باشد.</div>
+    <button class="btn btn-primary" onclick="closeSheet();nav('alerts',document.getElementById('nav-alerts'))">رفتن به اتصال تلگرام</button>
+  </div>`;
+}
 function annCardHTML(a){
   const v = a.version(), read = annIsRead(a.id, v), [title, sub] = a.teaser(v);
   return `<div class="card ann-card fade-up ${read ? 'read' : ''}" data-ann="${a.id}" role="button" tabindex="0" onclick="openAnnouncement('${a.id}')">
@@ -2447,7 +2558,7 @@ function renderTrades(){
       <span class="t-q" style="background:${tradeQualityBar(t)}" title="کیفیت ورود بر پایه‌ی استاندارد ۳+۲+۲"></span>
       ${coinLogo(t.coin)}
       <div class="t-info">
-        <div class="t-coin">${esc(t.coin)}/${esc(t.pair)} <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span>${FEEDBACK[t.id]?' <span title="نظر استاد">💬</span>':''}</div>
+        <div class="t-coin">${esc(t.coin)}/${esc(t.pair)} <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span>${FEEDBACK[t.id]?' <span title="نظر استاد">💬</span>':''}${tiltBadge(t)}${t.chartUrl?' <span class="tl-chart" title="نمودار TradingView دارد">📈</span>':''}</div>
         <div class="t-meta">${fmtDateFa(t.date)}${t.strategy?` · ${esc(t.strategy)}`:''}${rr?` · <span class="t-rr">R:R ${rr}</span>`:''}</div>
         ${er.length?`<div class="t-reasons">${er.map(r=>`<span class="t-reason-tag">${esc(r)}</span>`).join('')}</div>`:''}
       </div>
@@ -2472,7 +2583,7 @@ function showDetail(id){
         <div class="dt-pair">${esc(t.coin)}/${esc(t.pair)}</div>
         <div class="dt-badges">
           <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span>
-          <span class="badge ${badgeCls(tradeResult(t))}">${esc(tradeResult(t))}</span>
+          <span class="badge ${badgeCls(tradeResult(t))}">${esc(tradeResult(t))}</span>${tiltBadge(t)}
           ${resultDrifted(t)?`<span class="badge b-drift" title="در این ترید «${esc(t.result)}» ثبت شده بود، ولی قیمت ورود و خروج چیز دیگری می‌گوید. نتیجه از روی قیمت اصلاح شد.">✎ اصلاح‌شده</span>`:''}
           <span class="badge" style="background:var(--dim);color:var(--muted)">${esc(t.timeframe||'—')}</span>
           <span class="badge" style="background:var(--dim);color:var(--muted)">${esc(t.session)}</span>
@@ -2491,6 +2602,7 @@ function showDetail(id){
     ${er.length?`<div class="reason-section"><div class="reason-label">دلایل ورود</div><div class="reason-tags">${er.map(r=>`<span class="reason-tag rt-entry">${esc(r)}</span>`).join('')}</div></div>`:''}
     ${sl.length?`<div class="reason-section"><div class="reason-label">دلیل حد ضرر</div><div class="reason-tags">${sl.map(r=>`<span class="reason-tag rt-sl">${esc(r)}</span>`).join('')}</div></div>`:''}
     ${tp.length?`<div class="reason-section"><div class="reason-label">دلیل حد سود</div><div class="reason-tags">${tp.map(r=>`<span class="reason-tag rt-tp">${esc(r)}</span>`).join('')}</div></div>`:''}
+    ${tvBlock(t.chartUrl)}
     ${exitQualityForTrade(t)}
     ${playbookForTrade(t)}
 
@@ -2808,6 +2920,7 @@ function renderTradeForm(t){
       <div class="tf-sub">${isEdit?`${esc(d.coin||'')}${d.date?' · '+fmtDateFa(d.date):''}`:'چهار قدم کوتاه — فیلدهای ستاره‌دار لازم‌اند'}</div>
     </div>
 
+    ${isEdit?'':tiltFormBanner()}
     <div class="pmeter" id="pmeter">${principlesLiveHTML()}</div>
 
     <section class="tf-sec">
@@ -2869,6 +2982,7 @@ function renderTradeForm(t){
         <div class="fg"><div class="fl">احساس</div>${sel('f-emot', getDynList('sc_emotions',EMOTIONS), d.emotion, '', x=>esc(emoLabel(x)))}</div>
         <div class="fg"><div class="fl">کارمزد $</div>${num('f-fees', d.fees, ' oninput="updatePnlPreview()"')}</div>
         <div class="fg full"><div class="fl">تگ‌ها</div><input id="f-tags" class="fi" value="${esc(d.tags||'')}" placeholder="فاندامنتال, خبر"/></div>
+        <div class="fg full"><div class="fl">لینک نمودار TradingView <span class="fl-note">اختیاری</span></div><input id="f-chart" class="fi" type="url" inputmode="url" dir="ltr" value="${esc(d.chartUrl||'')}" placeholder="https://www.tradingview.com/x/…"/><div class="tf-hint">در TradingView: دکمه‌ی دوربین ← «کپی لینک تصویر». استاد هم همین نمودار را می‌بیند.</div></div>
       </div>
       <input id="f-res" class="sr-only" value="${esc(d.result)}" readonly aria-readonly="true" tabindex="-1" aria-hidden="true"/>
       <div class="fg tf-gap"><div class="fl">${+d.exit>0?'یک جمله بعد از خروج':'یک جمله پیش از ورود'}</div><textarea id="f-notes" class="fi" rows="2" placeholder="${+d.exit>0?'دفعه‌ی بعد چه چیزی را متفاوت انجام می‌دهی؟':'اگر این ترید ضرر بدهد، احتمالاً به چه دلیلی بوده؟'}">${esc(d.notes||'')}</textarea>
@@ -2984,7 +3098,7 @@ function saveTrade(id){
     takeProfit:g('f-tp')?.value,size:g('f-size')?.value,leverage:g('f-lev')?.value,
     timeframe:g('f-tf')?.value,strategy:g('f-strat')?.value,session:g('f-sess')?.value,
     emotion:g('f-emot')?.value,result:g('f-res')?.value,fees:g('f-fees')?.value,
-    notes:g('f-notes')?.value,tags:g('f-tags')?.value,
+    notes:g('f-notes')?.value,tags:g('f-tags')?.value,chartUrl:(g('f-chart')?.value||'').trim(),
     entryReasons:getSelected('er'),
     slReasons:getSelected('slr'),
     tpReasons:getSelected('tpr')
@@ -2992,7 +3106,8 @@ function saveTrade(id){
   // موجودیِ مبنای لحظه‌ی ورود روی ترید می‌ماند تا بعداً ریسک واقعی سنجیده شود
   // فیلدهای ماشین‌حساب با ویرایشِ ترید از دست نروند — t از نو از فرم ساخته می‌شود
   const prevT=TRADES.find(x=>x.id===id);
-  if(prevT) for(const k of ['capital','sizeMode','marginType','feeReserve']) if(prevT[k]!=null&&prevT[k]!=='') t[k]=prevT[k];
+  if(prevT) for(const k of ['capital','sizeMode','marginType','feeReserve','afterLimit','source']) if(prevT[k]!=null&&prevT[k]!=='') t[k]=prevT[k];
+  if(!t.chartUrl) delete t.chartUrl;
   if(document.getElementById('pro-calc')){
     const cap=+document.getElementById('pc-b')?.value; if(cap>0) t.capital=cap;
     // حالتی که ترید با آن اندازه گرفته شد: فقط اگر «اعمال در فرم» زده شده، یا
@@ -3007,6 +3122,8 @@ function saveTrade(id){
     }
   }
   if(!t.date||!t.coin||!t.entry||!t.size){alert('لطفاً فیلدهای ستاره‌دار را پر کنید.');return}
+  if(t.chartUrl&&!TV_RE.test(t.chartUrl)){alert('لینک نمودار باید لینکِ TradingView باشد (tradingview.com/x/...).');document.getElementById('f-chart')?.focus();return}
+  if(!prevT&&tiltNow().hit) t.afterLimit=true;   // v26.6: ترید تازه بعد از رسیدن به سقفِ امروز
   if(isCourseAccount() && !ownerJournal() && (+t.leverage||1) > LEVERAGE_MAX){
     const old=TRADES.find(x=>x.id===t.id);
     if(!old || (+old.leverage||1) !== (+t.leverage||1)){
@@ -3027,6 +3144,7 @@ function saveTrade(id){
   showToast('⏳ در حال ذخیره...');
   saveTrades(SESSION.uid,TRADES).then((res)=>{
     if(res===true) showToast(exists?'✅ ترید ویرایش شد':'✅ ترید ثبت شد');
+    if(+t.exit>0&&calcPnl(t)<0) setTimeout(tiltAfterSave,500);
     else if(res?.paywall){ showToast('⛔ اشتراک لازم است — ترید روی همین دستگاه ماند'); loadBilling().then(B=>B.openPlans('write')).catch(()=>{}); }
     else showToast('💾 روی این دستگاه ذخیره شد — در اولین اتصال همگام می‌شود');
   });
@@ -4574,6 +4692,10 @@ function mentorSignals(uid){
   // بایگانیِ دوره‌ی دفتر علامتِ بی‌انضباطی نیست و نباید دانشجو را
   // در فهرست «نیازمند توجه» ببرد؛ پس اینجا دیگر پرچم نمی‌شود.
   if(st && st.maxLossStreak >= 5) flags.push({ t:`${faNum(st.maxLossStreak)} باخت پشت‌سرهم`, hard:false });
+  // v26.6: ترید بعد از رسیدن به سقفِ روزانه، در ۷ روزِ اخیر
+  const since = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
+  const over = all.filter(t => t.afterLimit && (t.date || '') >= since).length;
+  if(over) flags.push({ t:`${faNum(over)} ترید بعد از سقف روزانه`, hard: over >= 2 });
 
   return { all, closed, st, days, flags,
            weight: flags.reduce((a,f) => a + (f.hard ? 10 : 3), 0) };
@@ -5172,7 +5294,8 @@ function startSession(s){
     setTimeout(()=>healPushSubscription(),6000);
     // اول تنظیماتِ ادمین را از سرور بگیر (دلایل/کوین/تایم‌فریم/XP...) بعد تریدها
     loadAllSettings().then(()=>loadTrades(s.uid)).then(t=>{
-      TRADES=t;renderStudentDashboard();
+      TRADES=t;TRADES_SYNCED_AT=Date.now();renderStudentDashboard();
+      setTimeout(handleEditRoute,300);
       // v13: فیدبک استاد + اعلان نظرهای دیده‌نشده
       loadFeedback(s.uid).then(fb=>{
         FEEDBACK=fb||{};
@@ -5294,6 +5417,12 @@ function renderMSGeneral(){
       <div class="fl">نام آکادمی</div>
       <input id="ms-academy" class="fi" value="${esc(academyName)}" placeholder="SamadiCapital"/>
     </div>
+    ${(()=>{ const c = tiltConfig(S.g('sc_tilt')); return `<div class="ms-tilt">
+      <div class="ms-tilt-h"><b>🛑 محافظ روز بد</b><label class="ms-tilt-on"><input id="ms-tilt-on" type="checkbox" ${c.enabled?'checked':''}> فعال</label></div>
+      <p>وقتی دانشجو امروز به یکی از این دو سقف برسد، اپ و تلگرام می‌گویند «امروز کافی است» و تریدهای بعدیِ آن روز برچسب می‌خورند و در «نیازمند توجه» می‌آیند. جلوی ثبت گرفته نمی‌شود.</p>
+      <div class="fgrid"><div class="fg"><div class="fl">ضررِ پشت‌سرِهم در یک روز</div><input id="ms-tilt-streak" class="fi" type="number" min="1" max="10" step="1" value="${c.streak}"></div>
+        <div class="fg"><div class="fl">ضررِ روزانه (٪ موجودی)</div><input id="ms-tilt-pct" class="fi" type="number" min="0.5" max="50" step="0.5" value="${c.dailyPct}"></div></div>
+      <div class="tf-hint">سقفِ درصدی فقط برای کسی سنجیده می‌شود که موجودی‌اش را در ماشین‌حساب وارد کرده باشد.</div></div>`; })()}
     <div class="fg">
       <div class="fl">رمز عبور فعلی</div>
       <input id="ms-pass0" class="fi" type="password" placeholder="برای تغییر رمز لازم است"/>
@@ -5324,6 +5453,11 @@ async function saveMSGeneral(){
   const pass = document.getElementById('ms-pass')?.value;
   const pass2 = document.getElementById('ms-pass2')?.value;
   if(name){ S.s('sc_academy_name', name); await cloudSet('sc_academy_name', name); }
+  if(document.getElementById('ms-tilt-streak')){
+    const tilt = tiltConfig({ enabled: document.getElementById('ms-tilt-on').checked,
+      streak: document.getElementById('ms-tilt-streak').value, dailyPct: document.getElementById('ms-tilt-pct').value });
+    S.s('sc_tilt', tilt); await cloudSet('sc_tilt', tilt);
+  }
   if(pass){
     if(pass !== pass2){ alert('رمز عبور و تکرار آن یکسان نیستند'); return; }
     if(pass.length < 8){ alert('رمز باید حداقل ۸ کاراکتر باشد'); return; }
