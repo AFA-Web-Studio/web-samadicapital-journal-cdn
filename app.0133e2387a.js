@@ -1431,7 +1431,7 @@ function computeStats(trades,discList){
 
   // equity curve
   let eq=0;const equity=[];
-  closed.forEach((t,i)=>{eq+=pnls[i]||0;equity.push({date:t.date,eq:+eq.toFixed(2),pnl:pnls[i]||0})});
+  closed.forEach((t,i)=>{eq+=pnls[i]||0;equity.push({date:t.date,eq:+eq.toFixed(2),pnl:pnls[i]||0,coin:t.coin||''})});
 
   // streaks
   let maxWS=0,maxLS=0,cur=0;
@@ -1529,6 +1529,83 @@ function equityChart(data,w=320,h=80){
   </svg>`;
 }
 
+// ══════════════════════════════════════════════════════
+// v26.4: منحنیِ سرمایه‌ی تعاملی — محور، تاریخ، افت از اوج، و برچسبِ هر نقطه با لمس یا ماوس
+// ══════════════════════════════════════════════════════
+const EQP = {};                                   // داده‌ی هر نمودار، با شناسه‌اش (رندرِ دوباره رونویسی می‌کند)
+function eqpNice(span){ const p = Math.pow(10, Math.floor(Math.log10(span || 1))), f = span / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; }
+function eqpMoney(v){
+  const a = Math.abs(v), s = v < 0 ? '-' : '';
+  return s + '$' + (a >= 1e6 ? +(a / 1e6).toFixed(1) + 'M' : a >= 1e4 ? +(a / 1e3).toFixed(0) + 'k' : a >= 1e3 ? +(a / 1e3).toFixed(1) + 'k' : +a.toFixed(a < 10 ? 1 : 0));
+}
+function equityPro(data, id, title){
+  if (!data || data.length < 2) return `<div class="chart-wrap fade-up"><div class="chart-title">${title}</div>${equityChart(data)}</div>`;
+  // نقطه‌ی صفر (پیش از اولین معامله) تا منحنی از مبدأ شروع شود
+  const pts = [{ date: data[0].date, eq: 0, pnl: 0, start: true }, ...data];
+  let peak = 0, peakI = 0, maxDD = 0, maxDDI = 0;
+  const dd = pts.map((p, i) => { if (p.eq > peak) { peak = p.eq; peakI = i; } const d = p.eq - peak; if (-d > maxDD) { maxDD = -d; maxDDI = i; } return d; });
+  const vals = pts.map(p => p.eq);
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  const step = eqpNice((hi - lo) / 4 || 1); lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step; if (hi === lo) hi = lo + step;
+  const W = 1000, H = 300, n = pts.length - 1;
+  const X = i => i / n * W, Y = v => (hi - v) / (hi - lo) * H, f = v => +v.toFixed(1);
+  // با صدها نقطه، خطِ نمایش آخرینِ هر دسته (~۲۴۰) است؛ برچسبِ لمسی همیشه نقطه‌ی واقعی را نشان می‌دهد
+  const k = Math.max(1, Math.ceil(pts.length / 240));
+  const show = pts.map((p, i) => [i, p]).filter(([i]) => i === 0 || i === n || i % k === 0).map(([i, p]) => [X(i), Y(p.eq)]);
+  let d = `M${f(show[0][0])},${f(show[0][1])}`;
+  for (let i = 0; i < show.length - 1; i++) {
+    const a = show[i - 1] || show[i], b = show[i], c = show[i + 1], e = show[i + 2] || c;
+    d += ` C${f(b[0] + (c[0] - a[0]) / 6)},${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)},${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])},${f(c[1])}`;
+  }
+  const up = pts[n].eq >= 0, col = up ? 'var(--green)' : 'var(--red)', gid = 'eqg' + id;
+  const ticks = []; for (let v = hi; v >= lo - 1e-9; v -= step) ticks.push(+v.toFixed(6));
+  // زیرِ آب: افت از اوج، مقیاسِ خودش
+  const ddH = 60, ddMax = maxDD || 1;
+  const ddPath = `M0,0 ${pts.map((p, i) => `L${f(X(i))},${f(-dd[i] / ddMax * ddH)}`).join(' ')} L${W},0 Z`;
+  const xl = [0, .25, .5, .75, 1].map(q => Math.round(q * n));
+  EQP[id] = { pts, dd, n, lo, hi, col };
+  return `<div class="chart-wrap eqp fade-up" id="${id}">
+    <div class="eqp-head"><div class="chart-title">${title}</div>
+      <div class="eqp-sum"><span><u>فعلی</u><b style="color:${col}"><bdi dir="ltr">${eqpMoney(pts[n].eq)}</bdi></b></span>
+        <span><u>اوج</u><b style="color:var(--gold-light)"><bdi dir="ltr">${eqpMoney(peak)}</bdi></b></span>
+        <span><u>بیشترین افت</u><b style="color:var(--red)"><bdi dir="ltr">${maxDD ? '-' + eqpMoney(maxDD) : '$0'}</bdi></b></span></div></div>
+    <div class="eqp-plot" onpointermove="eqpMove(event,'${id}')" onpointerdown="eqpMove(event,'${id}')" onpointerleave="eqpHide('${id}')">
+      <div class="eqp-y">${ticks.map(v => `<span style="top:${f(Y(v) / H * 100)}%"${v === 0 ? ' class="z"' : ''}><bdi dir="ltr">${eqpMoney(v)}</bdi></span>`).join('')}</div>
+      <svg class="eqp-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="${title}" role="img">
+        <defs><linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${col};stop-opacity:.24"/><stop offset="1" style="stop-color:${col};stop-opacity:0"/></linearGradient></defs>
+        ${ticks.map(v => `<line x1="0" x2="${W}" y1="${f(Y(v))}" y2="${f(Y(v))}" class="${v === 0 ? 'eqp-zero' : 'eqp-grid'}" vector-effect="non-scaling-stroke"/>`).join('')}
+        <path d="${d} L${W},${f(Y(lo))} L0,${f(Y(lo))} Z" fill="url(#${gid})"/>
+        <path d="${d}" fill="none" style="stroke:${col}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      ${peak > 0 ? `<span class="eqp-peak" style="left:${f(X(peakI) / W * 100)}%;top:${f(Y(peak) / H * 100)}%" title="اوج"></span>` : ''}
+      <span class="eqp-end" style="left:100%;top:${f(Y(pts[n].eq) / H * 100)}%;--c:${col}"></span>
+      <i class="eqp-vl"></i><i class="eqp-dot"></i><div class="eqp-tip" role="status"></div>
+    </div>
+    <div class="eqp-x">${xl.map(i => `<span>${fmtDateFaShort(pts[i].date)}</span>`).join('')}</div>
+    ${maxDD > 0 ? `<div class="eqp-dd"><u>افت از اوج</u>
+      <svg viewBox="0 0 ${W} ${ddH}" preserveAspectRatio="none" aria-hidden="true"><path d="${ddPath}" class="eqp-ddp"/><line x1="0" x2="${W}" y1="0" y2="0" class="eqp-zero" vector-effect="non-scaling-stroke"/></svg>
+      <span class="eqp-ddmax" style="left:${f(X(maxDDI) / W * 100)}%"><bdi dir="ltr">-${eqpMoney(maxDD)}</bdi></span></div>` : ''}
+  </div>`;
+}
+function eqpMove(ev, id){
+  const box = document.getElementById(id), D = EQP[id]; if (!box || !D) return;
+  const plot = box.querySelector('.eqp-plot'), r = plot.getBoundingClientRect();
+  const q = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)), i = Math.round(q * D.n), p = D.pts[i];
+  const x = i / D.n * r.width, y = (D.hi - p.eq) / (D.hi - D.lo) * r.height;
+  const vl = plot.querySelector('.eqp-vl'), dot = plot.querySelector('.eqp-dot'), tip = plot.querySelector('.eqp-tip');
+  vl.style.left = x + 'px'; dot.style.left = x + 'px'; dot.style.top = y + 'px'; dot.style.background = D.col;
+  const money = v => `<bdi dir="ltr">${fmtUSD(v)}</bdi>`, clr = v => v >= 0 ? 'var(--green)' : 'var(--red)';
+  tip.innerHTML = p.start ? `<b>شروع</b><span>سرمایه‌ی تجمعی از صفر</span>`
+    : `<b>${fmtDateFa(p.date)}</b><span>معامله‌ی ${faNum(i)}${p.coin ? ` · <bdi dir="ltr">${esc(p.coin)}</bdi>` : ''}</span>
+       <dl><dt>این معامله</dt><dd style="color:${clr(p.pnl)}">${money(p.pnl)}</dd>
+       <dt>سرمایه‌ی تجمعی</dt><dd style="color:${clr(p.eq)}">${money(p.eq)}</dd>
+       <dt>افت از اوج</dt><dd style="color:${D.dd[i] < 0 ? 'var(--red)' : 'var(--muted)'}">${D.dd[i] < 0 ? money(D.dd[i]) : 'در اوج'}</dd></dl>`;
+  box.classList.add('on');
+  const tw = tip.offsetWidth, left = Math.max(tw / 2 + 2, Math.min(r.width - tw / 2 - 2, x));
+  tip.style.left = left + 'px';
+  tip.style.top = (y > r.height * .45 ? 6 : r.height - tip.offsetHeight - 6) + 'px';   // برچسب جایی که خط نیست
+}
+function eqpHide(id){ document.getElementById(id)?.classList.remove('on'); }
 // ══════════════════════════════════════════════════════
 // v13: فیلتر بازه زمانی داشبورد
 // ══════════════════════════════════════════════════════
@@ -2247,10 +2324,7 @@ function renderStudentDashboard(){
     <div class="empty" style="padding:34px 20px"><span class="empty-ico">🗓️</span><div class="empty-t">در این بازه تریدی ثبت نشده</div><div class="empty-s">بازه دیگری را انتخاب کنید</div></div>`:`
     ${kpiGrid(fs, true)}
 
-    <div class="chart-wrap fade-up" style="animation-delay:.1s">
-      <div class="chart-title">📈 منحنی سرمایه</div>
-      ${equityChart(fs.equity,340,100)}
-    </div>
+    ${equityPro(fs.equity, 'eqp-dash', '📈 منحنی سرمایه')}
 
     ${exitQualityCard()}
     ${playbookCard()}
@@ -4603,7 +4677,7 @@ function _renderMentorDashboard(){
 
     ${mentorPersonalCard()}
     ${cohortMentorCard()}
-    ${s?`<div class="chart-wrap fade-up"><div class="chart-title">منحنی کل آکادمی</div>${equityChart(s.equity,340,85)}</div>`:''}
+    ${s?equityPro(s.equity, 'eqp-academy', 'منحنی کل آکادمی'):''}
     ${s?`${reasonWRSection(s.byEntryReason,'🔍 وین‌ریت هر دلیل ورود (کل)')}
     ${breakdownModule(s, () => Object.values(ALL_TRADES).flat())}`:''}`;
 }
@@ -4668,7 +4742,7 @@ function renderMentorMain(){
         <div class="mh"><u>انتظار هر ترید</u><b style="color:${s.expectancy>=0?'var(--green)':'var(--red)'}">${fmtUSD(s.expectancy)}</b><s>فاکتور سود <bdi dir="ltr">${esc(s.profitFactor)}</bdi></s></div>
       </div>
       ${insightsCard(s)}
-      ${s.equity?.length>1?`<div class="chart-wrap fade-up"><div class="chart-title">📈 منحنی سرمایه</div>${equityChart(s.equity,340,90)}</div>`:''}
+      ${s.equity?.length>1?`${equityPro(s.equity, 'eqp-student', '📈 منحنی سرمایه')}`:''}
       ${kpiGrid(s)}
       ${disciplineCard(s)}
       ${withTrades(trades, playbookCard)}

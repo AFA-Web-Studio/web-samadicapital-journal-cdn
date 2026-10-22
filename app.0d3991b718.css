@@ -1466,3 +1466,35 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 .ph-leak{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding-top:13px;border-top:1px solid var(--border);font-size:12px;line-height:1.9;color:var(--text2)}
 .ph-leak em{font-style:normal;color:var(--gold-light);font-weight:700}.ph-leak span:first-child{flex:none;color:var(--gold);opacity:.7}
 @media(max-width:430px){.ph-seg{width:100%}.ph-seg button{flex:1;padding:0 6px}.ph-main{margin-top:16px}.ph-pnl{width:100%}.ph-k{padding:10px 10px 9px}}
+
+/* v26.4 — منحنیِ سرمایه‌ی تعاملی (equityPro) */
+.eqp{padding:clamp(16px,2.2vw,24px)}
+.eqp-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.eqp-head .chart-title{margin:0;font-size:14px;font-weight:800;color:var(--text)}
+.eqp-sum{display:flex;gap:16px}.eqp-sum span{text-align:left}.eqp-sum u{display:block;text-decoration:none;font-size:10px;color:var(--muted);text-align:right}
+.eqp-sum b{display:block;margin-top:3px;font:700 14px/1 var(--f-mono);font-variant-numeric:tabular-nums}
+.eqp-plot{position:relative;height:210px;margin-left:46px;touch-action:pan-y;cursor:crosshair;-webkit-user-select:none;user-select:none}
+@media(min-width:900px){.eqp-plot{height:270px}}
+.eqp-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.eqp-grid{stroke:rgba(255,246,228,.055)}.eqp-zero{stroke:rgba(255,246,228,.2);stroke-dasharray:3 5}
+.eqp-y{position:absolute;inset-block:0;right:100%;width:46px;pointer-events:none}
+.eqp-y span{position:absolute;right:8px;transform:translateY(-50%);font:500 10px/1 var(--f-mono);color:var(--muted);white-space:nowrap}.eqp-y span.z{color:var(--text2)}
+.eqp-x{display:flex;justify-content:space-between;margin:9px 0 0 46px;direction:ltr;font-size:10px;color:var(--muted)}
+.eqp-x span{direction:rtl;white-space:nowrap}
+@media(max-width:520px){.eqp-x span:nth-child(2),.eqp-x span:nth-child(4){display:none}}
+.eqp-peak{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--gold-light);transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(236,211,145,.18);pointer-events:none}
+.eqp-end{position:absolute;width:9px;height:9px;border-radius:50%;background:var(--c);transform:translate(-50%,-50%);box-shadow:0 0 0 2px #0c0a09,0 0 16px 2px var(--c);pointer-events:none}
+.eqp-vl,.eqp-dot,.eqp-tip{position:absolute;opacity:0;pointer-events:none;transition:opacity .15s}
+.eqp.on .eqp-vl,.eqp.on .eqp-dot,.eqp.on .eqp-tip{opacity:1}
+.eqp-vl{top:0;bottom:0;width:1px;background:linear-gradient(180deg,rgba(236,211,145,.0),rgba(236,211,145,.55),rgba(236,211,145,0))}
+.eqp-dot{width:11px;height:11px;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 3px #0c0a09,0 0 0 4px rgba(236,211,145,.5)}
+.eqp-tip{z-index:2;transform:translateX(-50%);min-width:168px;padding:10px 12px;border-radius:12px;background:rgba(18,16,13,.94);border:1px solid rgba(236,211,145,.24);
+  box-shadow:0 18px 40px -12px rgba(0,0,0,.9);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);font-size:11px;line-height:1.6}
+.eqp-tip b{display:block;font-size:12px;color:var(--text)}.eqp-tip>span{display:block;color:var(--muted);font-size:10.5px}
+.eqp-tip dl{display:grid;grid-template-columns:auto auto;gap:3px 14px;margin:7px 0 0;padding-top:7px;border-top:1px solid var(--border)}
+.eqp-tip dt{color:var(--text2)}.eqp-tip dd{margin:0;text-align:left;font:700 11.5px/1.6 var(--f-mono)}
+.eqp-dd{position:relative;margin:14px 0 0 46px;padding-top:10px;border-top:1px solid var(--border)}
+.eqp-dd u{display:block;text-decoration:none;font-size:10px;color:var(--muted);margin-bottom:6px}
+.eqp-dd svg{display:block;width:100%;height:38px}.eqp-ddp{fill:rgba(255,107,120,.2);stroke:rgba(255,107,120,.6);stroke-width:1;vector-effect:non-scaling-stroke}
+.eqp-ddmax{position:absolute;bottom:-16px;transform:translateX(-50%);font:600 9.5px/1 var(--f-mono);color:var(--red);white-space:nowrap}
+.eqp-dd{margin-bottom:12px}
