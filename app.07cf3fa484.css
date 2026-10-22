@@ -1431,3 +1431,20 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 .fade-up{animation-timing-function:var(--ease)}
 @media(prefers-reduced-motion:reduce){.trade-item:hover,.price-alert:hover,.btn-primary:hover{transform:none}}
 
+
+/* v26.2 — آیکون‌های خطی (tools/line_icons.js) */
+.lic{display:inline-block;width:1.12em;height:1.12em;vertical-align:-.2em;flex:none;overflow:visible}
+.lic-ok{color:var(--green)}.lic-warn{color:#f2b552}.lic-bad{color:var(--red)}.lic-gold{color:var(--gold-light)}
+.btn-primary .lic,.ai-send .lic,.toggle-btn.active .lic,.pc-tab.on .lic,.tb-avatar .lic{color:inherit}
+/* ظرف‌هایی که فقط یک آیکون دارند: کاشیِ طلایی */
+.ins-ico,.ann-ico,.pc-ico,.qc-banner-ico{display:inline-grid;place-items:center;flex:none;width:34px;height:34px;border-radius:11px;font-size:17px;line-height:1;
+  color:var(--gold-light);background:linear-gradient(160deg,rgba(236,211,145,.13),rgba(207,174,98,.04));border:1px solid rgba(236,211,145,.18);box-shadow:inset 0 1px 0 rgba(255,246,228,.07)}
+.ins-ico{width:30px;height:30px;border-radius:10px;font-size:15px;margin-top:0}
+.ins-ok .ins-ico,.ins-good .ins-ico{color:var(--green);background:rgba(63,214,154,.08);border-color:rgba(63,214,154,.2)}
+.ins-bad .ins-ico,.ins-warn .ins-ico{color:#f2b552;background:rgba(242,181,82,.08);border-color:rgba(242,181,82,.2)}
+.ins-ico .lic,.ann-ico .lic,.pc-ico .lic,.qc-banner-ico .lic{color:inherit;width:1em;height:1em;vertical-align:0}
+.empty-ico{display:grid;place-items:center;width:72px;height:72px;margin:0 auto 16px;border-radius:22px;font-size:32px;color:var(--gold-light);
+  background:radial-gradient(circle at 50% 0,rgba(236,211,145,.16),rgba(207,174,98,.03) 70%);border:1px solid rgba(236,211,145,.16);box-shadow:inset 0 1px 0 rgba(255,246,228,.07),0 20px 40px -24px rgba(207,174,98,.4)}
+.empty-ico .lic{width:1em;height:1em;vertical-align:0;stroke-width:1.5}
+.card-title .lic,.alert-panel-title .lic,.bs-title .lic{color:var(--gold);width:1.05em;height:1.05em}
+.ai-chip{background:rgba(207,174,98,.07);border:1px solid rgba(236,211,145,.2);color:var(--gold-light)}

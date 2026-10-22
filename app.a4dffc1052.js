@@ -1,4 +1,135 @@
 
+// ══════════════════════════════════════════════════════
+// v26.2 — آیکون‌های خطی به جای ایموجی (مالک ۱۴۰۵-۰۷-۳۰: «خیلی باکیفیت، جذاب و حرفه‌ای»)
+// ایموجی روی هر گوشی شکلِ دیگری دارد و رنگی و شلوغ است. اینجا هر ایموجیِ شناخته‌شده‌ای که در
+// صفحه نوشته شود، همان لحظه (پیش از رسم) به یک آیکونِ خطیِ هم‌خانواده تبدیل می‌شود — بدون
+// دست‌زدن به صدها قالب. پنجره‌های بومی (alert/confirm)، عنوان تب و نشان‌های رنگیِ «مسیر پیشرفت»
+// (.xp2-ico، .xp2-level، [data-raw]) دست‌نخورده می‌مانند. منبع: tools/line_icons.js
+// ══════════════════════════════════════════════════════
+const LINE_ICONS = (() => {
+  const C = (cx, cy, r) => `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;
+  const R = (x, y, w, h, rx) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${rx}"/>`;
+  const P = (...d) => d.map(x => `<path d="${x}"/>`).join('');
+  const I = {
+    check: C(12, 12, 10) + P('m8.5 12.2 2.4 2.4 4.6-5'),
+    warn: P('M10.3 3.9 2.4 17.6A2 2 0 0 0 4.1 20.6h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z', 'M12 9.5v4', 'M12 17h.01'),
+    ban: C(12, 12, 10) + P('m4.9 4.9 14.2 14.2'),
+    lock: R(4, 11, 16, 10, 2.5) + P('M8 11V7.5a4 4 0 0 1 8 0V11', 'M12 15.2v1.6'),
+    unlock: R(4, 11, 16, 10, 2.5) + P('M8 11V7.5a4 4 0 0 1 7.7-1.5', 'M12 15.2v1.6'),
+    shield: P('M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z', 'm9 12 2 2 4-4'),
+    target: C(12, 12, 10) + C(12, 12, 6) + C(12, 12, 2),
+    hourglass: P('M5 22h14', 'M5 2h14', 'M17 22v-4.17a2 2 0 0 0-.59-1.42L12 12l-4.41 4.41A2 2 0 0 0 7 17.83V22', 'M7 2v4.17a2 2 0 0 0 .59 1.42L12 12l4.41-4.41A2 2 0 0 0 17 6.17V2'),
+    gem: P('M6 3h12l4 6-10 13L2 9Z', 'M11 3 8 9l4 13 4-13-3-6', 'M2 9h20'),
+    cash: R(2, 6, 20, 12, 2.5) + C(12, 12, 2.5) + P('M6 12h.01', 'M18 12h.01'),
+    wallet: P('M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1', 'M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4'),
+    save: P('M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z', 'M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7', 'M7 3v4a1 1 0 0 0 1 1h7'),
+    chat: P('M7.9 20A9 9 0 1 0 4 16.1L2 22Z', 'M8 12h.01', 'M12 12h.01', 'M16 12h.01'),
+    search: C(11, 11, 7.5) + P('m20.5 20.5-4.2-4.2'),
+    bulb: P('M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5', 'M9 18h6', 'M10 22h4'),
+    rocket: P('M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z', 'm12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z', 'M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0', 'M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5'),
+    trophy: P('M6 9H4.5a2.5 2.5 0 0 1 0-5H6', 'M18 9h1.5a2.5 2.5 0 0 0 0-5H18', 'M4 22h16', 'M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22', 'M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22', 'M18 2H6v7a6 6 0 0 0 12 0V2Z'),
+    key: C(7.5, 15.5, 5.5) + P('m21 2-9.6 9.6', 'm15.5 7.5 3 3L22 7l-3-3'),
+    users: C(9, 7, 4) + P('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75'),
+    sprout: P('M7 20h10', 'M10 20c5.5-2.5.8-6.4 3-10', 'M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z', 'M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z'),
+    zap: P('M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'),
+    eye: P('M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0') + C(12, 12, 3),
+    bell: P('M10.27 21a2 2 0 0 0 3.46 0', 'M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33'),
+    belloff: P('M10.27 21a2 2 0 0 0 3.46 0', 'M17 17H4a1 1 0 0 1-.74-1.67C4.59 13.96 6 12.5 6 8a6 6 0 0 1 .26-1.74', 'm2 2 20 20', 'M8.67 3.01A6 6 0 0 1 18 8c0 2.69.77 4.65 1.71 6.05'),
+    flame: P('M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z'),
+    offline: P('M12 20h.01', 'M8.5 16.43a5 5 0 0 1 7 0', 'M5 12.86a10 10 0 0 1 5.17-2.69', 'M19 12.86a10 10 0 0 0-2-1.52', 'M2 8.82a15 15 0 0 1 4.18-2.64', 'M22 8.82a15 15 0 0 0-11.29-3.76', 'm2 2 20 20'),
+    scale: P('m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z', 'm2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z', 'M7 21h10', 'M12 3v18', 'M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2'),
+    calendar: R(3, 4, 18, 18, 2.5) + P('M8 2v4', 'M16 2v4', 'M3 10h18', 'M8 14h.01', 'M12 14h.01', 'M16 14h.01', 'M8 18h.01', 'M12 18h.01'),
+    bars: P('M3 3v16a2 2 0 0 0 2 2h16', 'M18 17V9', 'M13 17V5', 'M8 17v-3'),
+    trend: P('M16 7h6v6', 'm22 7-8.5 8.5-5-5L2 17'),
+    pencil: P('M21.17 6.81a1 1 0 0 0-3.98-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z', 'm15 5 4 4'),
+    trash: P('M3 6h18', 'M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6', 'M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2', 'M10 11v6', 'M14 11v6'),
+    gear: P('M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z') + C(12, 12, 3),
+    alarm: C(12, 13, 8) + P('M12 9v4l2 2', 'M5 3 2 6', 'm22 6-3-3', 'M6.38 18.7 4 21', 'M17.64 18.67 20 21'),
+    download: P('M12 15V3', 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4', 'm7 10 5 5 5-5'),
+    down: P('M12 5v14', 'm19 12-7 7-7-7'),
+    link: P('M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'),
+    timer: C(12, 14, 8) + P('M10 2h4', 'M12 14l3-3'),
+    brain: P('M12 5a3 3 0 1 0-6 .13 4 4 0 0 0-2.52 5.77 4 4 0 0 0 .55 6.59A4 4 0 1 0 12 18Z', 'M12 5a3 3 0 1 1 6 .13 4 4 0 0 1 2.52 5.77 4 4 0 0 1-.55 6.59A4 4 0 1 1 12 18Z', 'M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4', 'M12 5v13'),
+    cap: P('M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z', 'M22 10v6', 'M6 12.5V16a6 3 0 0 0 12 0v-3.5'),
+    calc: R(4, 2, 16, 20, 2.5) + P('M8 6h8', 'M16 14v4', 'M16 10h.01', 'M12 10h.01', 'M8 10h.01', 'M12 14h.01', 'M8 14h.01', 'M12 18h.01', 'M8 18h.01'),
+    plus: P('M5 12h14', 'M12 5v14'),
+    clipboard: R(8, 2, 8, 4, 1) + P('M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2', 'M9 12h6', 'M9 16h4'),
+    party: P('M5.8 11.3 2 22l10.7-3.79', 'M4 3h.01', 'M22 8h.01', 'M15 2h.01', 'M22 20h.01', 'm22 2-2.24.75a2.9 2.9 0 0 0-1.96 3.12c.1.86-.57 1.63-1.45 1.63h-.38c-.86 0-1.6.6-1.76 1.44L14 10', 'm22 13-.82-.33c-.86-.34-1.82.2-1.98 1.11-.11.7-.72 1.22-1.43 1.22H17', 'm11 2 .33.82c.34.86-.2 1.82-1.11 1.98C9.52 4.9 9 5.52 9 6.23V7', 'M11 13c1.93 1.93 2.83 4.17 2 5-.83.83-3.07-.07-5-2-1.93-1.93-2.83-4.17-2-5 .83-.83 3.07.07 5 2Z'),
+    file: P('M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z', 'M14 2v4a2 2 0 0 0 2 2h4', 'M10 9H8', 'M16 13H8', 'M16 17H8'),
+    book: P('M12 7v14', 'M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z'),
+    refresh: P('M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8', 'M21 3v5h-5', 'M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16', 'M8 16H3v5'),
+    phone: R(5, 2, 14, 20, 2.5) + P('M12 18h.01'),
+    star: P('M11.53 2.3a.53.53 0 0 1 .95 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.16.76a.53.53 0 0 1 .3.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .3-.91l5.16-.75a2.12 2.12 0 0 0 1.6-1.16z'),
+    history: P('M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8', 'M3 3v5h5', 'M12 7v5l4 2'),
+    ruler: P('M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z', 'm14.5 12.5 2-2', 'm11.5 9.5 2-2', 'm8.5 6.5 2-2', 'm17.5 15.5 2-2'),
+    sparkles: P('M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0l1.58 6.14a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96l-6.14 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z', 'M20 3v4', 'M22 5h-4'),
+    award: C(12, 8, 6) + P('m15.48 12.89 1.51 8.53a.5.5 0 0 1-.81.47l-3.58-2.69a1 1 0 0 0-1.2 0l-3.59 2.69a.5.5 0 0 1-.81-.47l1.51-8.53'),
+    megaphone: P('m3 11 18-5v12L3 14v-3z', 'M11.6 16.8a3 3 0 1 1-5.8-1.6'),
+    hand: P('M18 11V6a2 2 0 0 0-4 0', 'M14 10V4a2 2 0 0 0-4 0v2', 'M10 10.5V6a2 2 0 0 0-4 0v8', 'M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15'),
+    help: C(12, 12, 10) + P('M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3', 'M12 17h.01'),
+    radio: C(12, 12, 2) + P('M4.9 19.1C1 15.2 1 8.8 4.9 4.9', 'M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5', 'M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5', 'M19.1 4.9C23 8.8 23 15.1 19.1 19'),
+    card: R(2, 5, 20, 14, 2.5) + P('M2 10h20', 'M6 15h4'),
+    wrench: P('M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z'),
+    globe: C(12, 12, 10) + P('M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20', 'M2 12h20'),
+    gift: R(3, 8, 18, 4, 1) + P('M12 8v13', 'M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7', 'M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5'),
+    pause: R(6, 4, 4, 16, 1.2) + R(14, 4, 4, 16, 1.2),
+    note: P('M12 20h9', 'M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.86.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.86z'),
+    radar: P('M19.07 4.93A10 10 0 0 0 6.99 3.34', 'M4 6h.01', 'M2.29 9.62A10 10 0 1 0 21.31 8.35', 'M16.24 7.76A6 6 0 1 0 8.23 16.67', 'M12 18h.01', 'M17.99 11.66A6 6 0 0 1 15.77 16.67') + C(12, 12, 2) + P('m13.41 10.59 5.66-5.66')
+  };
+  // ایموجی ⇒ [آیکون، لحن]. لحن فقط رنگ است؛ بقیه رنگِ متنِ کنارشان را می‌گیرند.
+  const MAP = {
+    '✅': ['check', 'ok'], '⚠': ['warn', 'warn'], '⛔': ['ban', 'bad'], '🔒': ['lock', 'gold'], '🔓': ['unlock', 'gold'], '🔐': ['lock', 'gold'],
+    '🛡': ['shield'], '🎯': ['target'], '⏳': ['hourglass'], '⌛': ['hourglass'], '💎': ['gem', 'gold'], '💵': ['cash', 'ok'], '💰': ['wallet', 'gold'],
+    '💾': ['save'], '💬': ['chat'], '🔍': ['search'], '🔎': ['search'], '💡': ['bulb', 'gold'], '🚀': ['rocket'], '🏆': ['trophy', 'gold'], '🔑': ['key', 'gold'],
+    '👥': ['users'], '🌱': ['sprout', 'ok'], '⚡': ['zap', 'gold'], '👁': ['eye'], '🔔': ['bell'], '🔕': ['belloff'], '🔥': ['flame', 'warn'], '📴': ['offline'],
+    '⚖': ['scale'], '🗓': ['calendar'], '📅': ['calendar'], '📊': ['bars'], '📈': ['trend', 'ok'], '✏': ['pencil'], '📝': ['note'], '🗑': ['trash'], '⚙': ['gear'],
+    '⏰': ['alarm'], '📥': ['download'], '⬇': ['down'], '🔗': ['link'], '⏱': ['timer'], '🧠': ['brain'], '🎓': ['cap'], '🧮': ['calc'], '➕': ['plus'],
+    '📋': ['clipboard'], '🎉': ['party', 'gold'], '📄': ['file'], '📘': ['book'], '📖': ['book'], '🔄': ['refresh'], '📱': ['phone'], '⭐': ['star', 'gold'],
+    '🕘': ['history'], '📐': ['ruler'], '✨': ['sparkles', 'gold'], '🎖': ['award', 'gold'], '📣': ['megaphone', 'gold'], '👋': ['hand'], '❔': ['help'],
+    '📡': ['radio'], '💳': ['card'], '🔧': ['wrench'], '🌐': ['globe'], '🎁': ['gift', 'gold'], '⏸': ['pause']
+  };
+  const keys = Object.keys(MAP).sort((a, b) => b.length - a.length);
+  const RE = new RegExp('(' + keys.join('|') + ')\\uFE0F?', 'gu');
+  const SKIP = 'script,style,textarea,option,select,title,svg,.xp2-ico,.xp2-level,[data-raw]';
+  const svg = (name, tone) => `<svg class="lic${tone ? ' lic-' + tone : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${I[name]}</svg>`;
+  // برای قالب‌هایی که بخواهند مستقیم آیکون بگذارند: ${lic('gem','gold')}
+  const lic = (name, tone) => I[name] ? svg(name, tone) : '';
+  function swap(node) {
+    const text = node.nodeValue;
+    RE.lastIndex = 0;
+    if (!RE.test(text)) return;
+    const host = node.parentNode;
+    if (!host || (host.closest && host.closest(SKIP))) return;
+    const tpl = document.createElement('template');
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    RE.lastIndex = 0;
+    tpl.innerHTML = esc(text).replace(RE, m => { const [n, t] = MAP[m.replace('️', '')] || []; return n ? svg(n, t) : m; });
+    host.replaceChild(tpl.content, node);
+  }
+  function scan(root) {
+    if (!root) return;
+    if (root.nodeType === 3) { swap(root); return; }
+    if (root.nodeType !== 1 && root.nodeType !== 11) return;
+    if (root.nodeType === 1 && root.closest(SKIP)) return;
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT), hits = [];
+    for (let n = w.nextNode(); n; n = w.nextNode()) { RE.lastIndex = 0; if (RE.test(n.nodeValue)) hits.push(n); }
+    hits.forEach(swap);
+  }
+  function start() {
+    scan(document.body);
+    new MutationObserver(muts => {
+      for (const m of muts) {
+        if (m.type === 'characterData') swap(m.target);
+        else m.addedNodes.forEach(scan);
+      }
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+  if (typeof document !== 'undefined' && typeof MutationObserver !== 'undefined') {
+    if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+  }
+  return { lic, MAP, names: Object.keys(I) };
+})();
+
 // ── LOGO BASE64 CONSTANTS ──
 
 
@@ -5101,7 +5232,7 @@ function renderMSXP(){
   <div id="xp-steps" style="display:flex;flex-direction:column;gap:10px">
     ${milestones.map((m,i)=>`
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center">
-      <div style="width:36px;height:36px;border-radius:50%;background:${m.color}22;border:2px solid ${m.color};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${esc(m.icon||'⭐')}</div>
+      <div style="width:36px;height:36px;border-radius:50%;background:${m.color}22;border:2px solid ${m.color};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0" data-raw>${esc(m.icon||'⭐')}</div>
       <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div class="fg"><div class="fl" style="font-size:9px">نام پله</div><input class="fi" style="padding:7px 10px;font-size:12px" id="xp-title-${i}" value="${esc(m.title)}"/></div>
         <div class="fg"><div class="fl" style="font-size:9px">تعداد ترید</div><input class="fi" style="padding:7px 10px;font-size:12px" type="number" id="xp-n-${i}" value="${m.n}" min="1" max="500"/></div>
