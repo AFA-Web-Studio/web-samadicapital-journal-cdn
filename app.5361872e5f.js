@@ -1649,10 +1649,6 @@ function rangeFilter(trades){
   }
   return trades.filter(t=>(t.date||'')>=fromISO);
 }
-function rangeChipsHTML(){
-  const opts=[['all','همه'],['month','این ماه'],['30','۳۰ روز اخیر'],['90','۹۰ روز اخیر']];
-  return `<div class="range-row fade-up">${opts.map(([k,l])=>`<button class="rchip ${dashRange===k?'active':''}" onclick="setDashRange('${k}')">${l}</button>`).join('')}</div>`;
-}
 
 // ══════════════════════════════════════════════════════
 // v13: تقویم حرارتی سود/زیان (شمسی)
@@ -1998,49 +1994,100 @@ function dashLeak(){
   return `بیشترین نشتِ این دوره: <em>${esc(core.label)}</em> — فقط ${faNum(Math.round(core.rate))}٪ رعایت شده.${cost}`;
 }
 
-function dashMeter(label, value, good, sub){
-  if(value == null) return `<div class="dm"><u>${label}</u><b style="color:var(--muted)">—</b>
-    <i><s style="width:0"></s></i></div>`;
-  const v = Math.max(0, Math.min(100, value));
-  const col = v >= good ? 'var(--green)' : v >= good * 0.6 ? 'var(--gold)' : 'var(--red)';
-  return `<div class="dm"><u>${label}</u><b style="color:${col}">${faNum(Math.round(v))}٪</b>
-    <i><s style="width:${v}%;background:${col}"></s></i>${sub ? `<em style="display:block;font-style:normal;font-size:9px;color:var(--muted);margin-top:5px">${sub}</em>` : ''}</div>`;
+// v26.3: سرِ داشبورد، زیرِ مسیر پیشرفت — در یک نگاه: چقدر، با چه روندی، با چه کیفیتی، و کجا نشت دارم.
+// سود/زیانِ بازه‌ی قبلیِ هم‌اندازه (ماه ⇒ ماه شمسیِ قبل؛ ۳۰/۹۰ ⇒ همان تعداد روزِ قبلش؛ «همه» ⇒ ۳۰ روز اخیر).
+function perfDelta(list){
+  const sum = arr => arr.filter(t => t.exit).reduce((a, t) => a + (calcPnl(t) || 0), 0);
+  const now = new Date(), iso = d => d.toISOString().slice(0, 10);
+  let from, prevFrom, label;
+  if (dashRange === 'month') {
+    const j = g2j(now.getFullYear(), now.getMonth() + 1, now.getDate());
+    const pm = j.jm === 1 ? { jy: j.jy - 1, jm: 12 } : { jy: j.jy, jm: j.jm - 1 };
+    from = isoOfG(j2gParts(j.jy, j.jm, 1)); prevFrom = isoOfG(j2gParts(pm.jy, pm.jm, 1)); label = 'نسبت به ماه قبل';
+  } else {
+    const days = dashRange === 'all' ? 30 : +dashRange;
+    from = iso(new Date(now.getTime() - days * 864e5)); prevFrom = iso(new Date(now.getTime() - 2 * days * 864e5));
+    label = dashRange === 'all' ? '۳۰ روز اخیر' : `نسبت به ${faNum(days)} روز قبل`;
+  }
+  const d = t => t.date || '';
+  const cur = sum(list.filter(t => d(t) >= from)), prev = sum(list.filter(t => d(t) >= prevFrom && d(t) < from));
+  return dashRange === 'all' ? { value: cur, label, abs: true } : { value: cur - prev, label, abs: false };
 }
-
-// جوابِ پنج‌ثانیه‌ای: چقدر، چطور، و کجا نشت دارم.
-function dashFocus(fs, rangeLbl, shown){
-  const total = fs?.total || 0;
-  const pb = playbookStats();
-  const xq = (typeof xqStats === 'function') ? xqStats() : null;
+// منحنیِ کوچکِ سرمایه: ارتفاعِ ثابت و خمِ نرم. با صدها ترید، آخرینِ هر دسته (حداکثر ~۹۶ نقطه) —
+// شکلِ کلی و نقطه‌ی پایانی دقیق می‌مانند، دندانه‌های ریز نه. نقطه‌ی پایانی HTML است تا با کشیدنِ SVG بیضی نشود.
+function perfSpark(data){
+  if (!data || data.length < 2) return '<div class="ph-spark ph-spark-empty">برای منحنی سرمایه دست‌کم دو معامله‌ی بسته لازم است</div>';
+  const step = Math.max(1, Math.ceil(data.length / 96));
+  const pick = data.filter((_, i) => i === 0 || i === data.length - 1 || i % step === 0);
+  const vals = pick.map(x => x.eq), mn = Math.min(0, ...vals), mx = Math.max(0, ...vals), rng = mx - mn || 1;
+  const X = i => i / (pick.length - 1) * 100, Y = v => 8 + (mx - v) / rng * 84;
+  const p = pick.map((x, i) => [X(i), Y(x.eq)]), f = v => +v.toFixed(2);
+  let d = `M${f(p[0][0])},${f(p[0][1])}`;
+  for (let i = 0; i < p.length - 1; i++) {
+    const a = p[i - 1] || p[i], b = p[i], c = p[i + 1], e = p[i + 2] || c;
+    d += ` C${f(b[0] + (c[0] - a[0]) / 6)},${f(b[1] + (c[1] - a[1]) / 6)} ${f(c[0] - (e[0] - b[0]) / 6)},${f(c[1] - (e[1] - b[1]) / 6)} ${f(c[0])},${f(c[1])}`;
+  }
+  const up = data[data.length - 1].eq >= 0, col = up ? 'var(--green)' : 'var(--red)', last = p[p.length - 1];
+  const id = 'phs' + Math.random().toString(36).slice(2, 7);
+  return `<div class="ph-spark"><svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label="منحنی سرمایه">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:${col};stop-opacity:.26"/><stop offset="1" style="stop-color:${col};stop-opacity:0"/></linearGradient></defs>
+    ${mn < 0 && mx > 0 ? `<line x1="0" x2="100" y1="${f(Y(0))}" y2="${f(Y(0))}" class="ph-zero" vector-effect="non-scaling-stroke"/>` : ''}
+    <path d="${d} L100,100 L0,100 Z" fill="url(#${id})"/>
+    <path d="${d}" fill="none" style="stroke:${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  </svg><span class="ph-dot" style="left:${f(last[0])}%;top:${f(last[1])}%;--c:${col}"></span></div>`;
+}
+function perfHero(fs, rangeLbl, shown, list){
+  const total = fs?.total || 0, closedN = fs ? fs.wins + fs.losses : 0;
+  const pb = playbookStats(), xq = (typeof xqStats === 'function') ? xqStats() : null;
   const adherence = pb ? (pb.ok ? pb.ok.n : 0) / pb.total * 100 : null;
-  const capture   = (xq && xq.n) ? xq.avgCapture : null;
-  const wr        = fs ? parseFloat(fs.winRate) : null;
+  const wr = fs && closedN ? parseFloat(fs.winRate) : null;
+  const pf = fs && closedN ? fs.profitFactor : null, pfN = pf === '∞' ? Infinity : +pf;
+  const tone = (v, good, ok) => v == null ? null : v >= good ? 'var(--green)' : v >= ok ? 'var(--gold-light)' : 'var(--red)';
+  const pct = v => faNum(Math.round(v)) + '٪';
+  const kpi = (label, value, sub, col, bar) => `<div class="ph-k"><u>${label}</u><b${col ? ` style="color:${col}"` : ''}>${value}</b>`
+    + (bar != null ? `<i><s style="width:${Math.max(0, Math.min(100, bar))}%;background:${col || 'var(--gold)'}"></s></i>` : '')
+    + (sub ? `<em>${sub}</em>` : '') + `</div>`;
+  const tiles = [
+    kpi('نرخ برد', wr == null ? '—' : pct(wr), fs && closedN ? `${faNum(fs.wins)} برد · ${faNum(fs.losses)} باخت` : 'معامله‌ی بسته نیست', tone(wr, 50, 35), wr),
+    kpi('فاکتور سود', pf == null ? '—' : `<bdi dir="ltr">${pf === '∞' ? '∞' : (+pf).toFixed(2)}</bdi>`, 'سودِ کل ÷ زیانِ کل', pf == null ? null : tone(pfN, 1.5, 1)),
+    kpi('امید ریاضی', fs && closedN ? `<bdi dir="ltr">${fmtUSD(fs.expectancy)}</bdi>` : '—', 'به ازای هر معامله', fs && closedN ? (fs.expectancy >= 0 ? 'var(--green)' : 'var(--red)') : null),
+    kpi('میانگین R', fs && fs.avgR != null ? `<bdi dir="ltr">${(+fs.avgR).toFixed(2)}R</bdi>` : '—', fs && fs.rCount ? `${faNum(fs.rCount)} معامله با حد ضرر` : 'حد ضرر ثبت نشده', fs && fs.avgR != null ? (+fs.avgR >= 0 ? 'var(--green)' : 'var(--red)') : null),
+    kpi('پایبندی به پلن', adherence == null ? '—' : pct(adherence), pb ? `${faNum(pb.total)} سنجیده` : 'هنوز سنجیده نشده', tone(adherence, 75, 45), adherence),
+    ...(xq && xq.n ? [kpi('نرخ تصرف', pct(xq.avgCapture), `${faNum(xq.n)} خروج سنجیده`, tone(xq.avgCapture, 60, 36), xq.avgCapture)] : [])
+  ];
+  const dl = list && list.length ? perfDelta(list) : null;
+  const delta = dl && (dl.abs || dl.value) ? `<span class="ph-delta ${dl.value >= 0 ? 'up' : 'dn'}">${dl.abs ? '' : `<i>${dl.value >= 0 ? '▲' : '▼'}</i>`}<bdi dir="ltr">${dl.abs ? fmtUSD(dl.value) : fmtUSD(Math.abs(dl.value), false)}</bdi><small>${dl.label}</small></span>` : '';
+  const opts = [['all', 'همه'], ['month', 'این ماه'], ['30', '۳۰ روز'], ['90', '۹۰ روز']];
   const leak = dashLeak();
-  return `<div class="dfoc fade-up">
-    <div class="dfoc-top">
-      <div class="dfoc-hi"><b>${esc(SESSION.name || '')}</b>
-        ${faNum(TRADES.filter(t=>!t._deleted).length)} معامله ثبت شده${shown != null ? ` · ${faNum(shown)} در این بازه` : ''}</div>
-      <div class="dfoc-pnl"><b style="color:${total >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtUSD(total)}</b>
-        <span>${rangeLbl}</span></div>
+  return `<section class="ph fade-up" aria-label="خلاصه‌ی عملکرد">
+    <div class="ph-bar">
+      <div class="ph-eye"><span>PERFORMANCE</span>${esc(rangeLbl)}</div>
+      <div class="ph-seg" role="tablist">${opts.map(([k, l]) => `<button type="button" role="tab" aria-selected="${dashRange === k}" class="${dashRange === k ? 'on' : ''}" onclick="setDashRange('${k}')">${l}</button>`).join('')}</div>
     </div>
-    <div class="dfoc-m">
-      ${dashMeter('پایبندی به پلن', adherence, 75, pb ? `${faNum(pb.total)} معامله` : '')}
-      ${dashMeter('نرخ تصرف', capture, 60, xq && xq.n ? `${faNum(xq.n)} سنجیده` : 'در انتظار داده')}
-      ${dashMeter('نرخ برد', wr, 50, fs ? `${faNum(fs.wins)}W / ${faNum(fs.losses)}L` : '')}
+    ${phaseChipsHTML()}
+    <div class="ph-main">
+      <div class="ph-id"><b>${esc(SESSION.name || '')}</b><span>${faNum(TRADES.filter(t => !t._deleted).length)} معامله ثبت شده${shown != null ? ` · ${faNum(shown)} در این بازه` : ''}</span></div>
+      <div class="ph-pnl"><b class="${total >= 0 ? 'up' : 'dn'}"><bdi dir="ltr">${fmtUSD(total)}</bdi></b>${delta}</div>
     </div>
-    ${leak ? `<div class="dfoc-leak"><span>⚑</span><div>${leak}</div></div>` : ''}
-  </div>`;
+    ${fs ? perfSpark(fs.equity) : ''}
+    <div class="ph-ks">${tiles.join('')}</div>
+    ${leak ? `<div class="ph-leak"><span>⚑</span><div>${leak}</div></div>` : ''}
+  </section>`;
 }
 
 // شبکه‌ی آماری — رنگ فقط روی چیزی که جهت دارد
-function kpiGrid(fs){
+// hero=true: داشبوردِ دانشجو که فاکتور سود، امید ریاضی و میانگین R را در perfHero نشان داده است
+function kpiGrid(fs, hero){
   const money = v => v >= 0 ? 'var(--green)' : 'var(--red)';
   const cell = (label, value, color, sub) =>
     `<div class="kc"><u>${label}</u><b${color ? ` style="color:${color}"` : ''}>${value}</b>${sub ? `<s>${sub}</s>` : ''}</div>`;
   return `<div class="kg fade-up">
-    ${cell('پرافیت فاکتور', fs.profitFactor, null)}
+    ${hero ? `${cell('میانگین برد', fmtUSD(fs.avgWin || 0), 'var(--green)')}
+    ${cell('میانگین باخت', fmtUSD(-(fs.avgLoss || 0)), 'var(--red)')}
+    ${fs.worstDay ? cell('بدترین روز', fmtUSD(fs.worstDay[1]), 'var(--red)', fmtDateFa(fs.worstDay[0])) : cell('بدترین روز', '—', null)}`
+    : `${cell('پرافیت فاکتور', fs.profitFactor, null)}
     ${cell('انتظار هر معامله', fmtUSD(fs.expectancy), money(fs.expectancy))}
-    ${cell('میانگین R واقعی', fs.avgR === null ? '—' : (+fs.avgR).toFixed(2) + 'R', fs.avgR === null ? null : money(fs.avgR))}
+    ${cell('میانگین R واقعی', fs.avgR === null ? '—' : (+fs.avgR).toFixed(2) + 'R', fs.avgR === null ? null : money(fs.avgR))}`}
     ${cell('میانگین R:R', fs.avgRR ? fs.avgRR + ':1' : '—', null)}
     ${cell('بیشترین افت', '$' + fs.maxDD.toFixed(0), 'var(--red)')}
     ${cell('بهترین معامله', fmtUSD(fs.best), 'var(--green)')}
@@ -2198,7 +2245,7 @@ function renderStudentDashboard(){
   const rangeLbl={all:'سود/زیان کل',month:'سود/زیان این ماه','30':'سود/زیان ۳۰ روز','90':'سود/زیان ۹۰ روز'}[dashRange]||'سود/زیان';
   const statBody=(!fs||!ftr.length)?`
     <div class="empty" style="padding:34px 20px"><span class="empty-ico">🗓️</span><div class="empty-t">در این بازه تریدی ثبت نشده</div><div class="empty-s">بازه دیگری را انتخاب کنید</div></div>`:`
-    ${kpiGrid(fs)}
+    ${kpiGrid(fs, true)}
 
     <div class="chart-wrap fade-up" style="animation-delay:.1s">
       <div class="chart-title">📈 منحنی سرمایه</div>
@@ -2218,10 +2265,7 @@ function renderStudentDashboard(){
     ${isMember()?'<div id="bill-card"></div>':''}
     ${announcementsCard()}
 
-    ${dashFocus(fs, rangeLbl, dashRange!=='all'?ftr.length:null)}
-
-    ${rangeChipsHTML()}
-    ${phaseChipsHTML()}
+    ${perfHero(fs, rangeLbl, dashRange!=='all'?ftr.length:null, phased)}
 
     ${proCompareCard()}
     ${proRiskCard()}
