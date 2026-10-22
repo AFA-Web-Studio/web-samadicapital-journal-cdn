@@ -5522,7 +5522,6 @@ function alertScaleOff(price, target){
   const r = alertScaleRatio(price, target);
   return r !== null && r >= ALERT_SCALE_LIMIT ? r : null;
 }
-function alertCloseness(a){const p=Number(a.lastPrice),t=Number(a.targetPrice);if(!p||!t)return 5;const d=Math.abs(p-t)/t*100;return Math.max(4,Math.min(100,100-d*8))}
 function alertEmptyMarkup(text){return`<div class="alert-empty">${ALERT_ICONS.empty}${esc(text)}</div>`}
 
 async function loadAlertDashboard(force=false){
@@ -5595,10 +5594,11 @@ function _renderPriceAlerts(el){
     ${alarmPrefCard()}
     ${renderStudentChannelStatus()}
     <div id="alert-editor-slot">${ALERT_EDITOR?renderAlertEditor():''}</div>
-    <div class="alert-layout"><section class="alert-panel"><div class="alert-panel-head"><div><div class="alert-panel-title">هشدارهای من</div><div style="font-size:9px;color:var(--muted);margin-top:4px">شرط‌ها فقط هنگام عبور واقعی قیمت فعال می‌شوند</div></div><button class="btn btn-primary" style="width:auto;margin:0;padding:9px 15px;min-height:40px" onclick="openAlertEditor()">＋ هشدار جدید</button></div>${alerts.length?`<div class="alert-list">${alerts.map(renderPriceAlertCard).join('')}</div>`:alertEmptyMarkup('هنوز هشداری نساخته‌ای؛ اولین قیمت مهم خود را ثبت کن.')}</section><aside style="display:grid;gap:14px;align-content:start">${renderPushCard()}${renderTelegramCard()}${renderAlertInbox()}${renderAlertTimeline()}</aside></div>`}
+    <div class="alert-layout"><section class="alert-panel"><div class="alert-panel-head"><div><div class="alert-panel-title">هشدارهای من</div><div style="font-size:9px;color:var(--muted);margin-top:4px">شرط‌ها فقط هنگام عبور واقعی قیمت فعال می‌شوند</div></div><button class="btn btn-primary" style="width:auto;margin:0;padding:9px 15px;min-height:40px" onclick="openAlertEditor()">＋ هشدار جدید</button></div>${alerts.length?renderAlertList(alerts):alertEmptyMarkup('هنوز هشداری نساخته‌ای؛ اولین قیمت مهم خود را ثبت کن.')}</section><aside style="display:grid;gap:14px;align-content:start">${renderPushCard()}${renderTelegramCard()}${renderAlertInbox()}${renderAlertTimeline()}</aside></div>`}
   </div>`;
   if(ALERT_EDITOR)updateAlertEditorPrice();
   refreshAlertCardPrices();
+  startAlertLive();
 }
 
 function renderPremiumLock(){
@@ -5634,8 +5634,8 @@ function alertLastPriceLabel(a){
 // کنارش می‌گذاریم — بدون رندر دوباره‌ی کل صفحه.
 async function refreshAlertCardPrices(){
   if(alertDemoMode())return;
-  const nodes=[...document.querySelectorAll('#alerts-content [data-live-price]')];
-  const stale=nodes.filter(n=>n.textContent.includes('هنگام رویداد'));
+  const nodes=[...document.querySelectorAll('#alerts-content .pa2[data-live="0"] [data-ap-when]')].map(n=>(n.dataset.livePrice=n.closest('.pa2').dataset.sym,n));
+  const stale=nodes.filter(n=>!n.dataset.done);
   if(!stale.length)return;
   const syms=[...new Set(stale.map(n=>n.dataset.livePrice).filter(Boolean))].slice(0,20);
   if(!syms.length)return;
@@ -5649,15 +5649,140 @@ async function refreshAlertCardPrices(){
     const p=Number(prices[n.dataset.livePrice]);
     if(!Number.isFinite(p)||p<=0)continue;
     if(!document.body.contains(n))continue;
-    n.innerHTML=`${esc(n.textContent)} · <b style="color:var(--gold)">حالا ${esc(alertPrice(p))}</b>`;
+    n.dataset.done=1;
+    n.innerHTML=`${n.textContent?esc(n.textContent)+' · ':''}<b style="color:var(--gold)">حالا ${esc(alertPrice(p))}</b>`;
   }
 }
 
+// ── v26.5: کارتِ هشدار به سبکِ TradingView ──
+// فاصله تا هدف، به درصدِ قیمتِ فعلی. dir: جهتی که قیمت باید برود. inside: شرط همین حالا برقرار است.
+function alertDistance(a, price){
+  const p = Number(price ?? a.lastPrice), t = Number(a.targetPrice);
+  if (!(p > 0) || !(t > 0)) return null;
+  const d = (t - p) / p * 100, dir = d >= 0 ? 'up' : 'down';
+  if (a.condition === 'zone') { const tol = Number(a.tolerance || .5), off = Math.abs(p - t) / t * 100 - tol; return { pct: Math.max(0, off), dir, inside: off <= 0, d }; }
+  const inside = a.condition === 'above' ? p >= t : p <= t;
+  return { pct: Math.abs(d), dir, inside, d };
+}
+function alertDistText(x){
+  if (!x) return { big: '—', small: 'قیمت هنوز نیامده' };
+  if (x.inside) return { big: 'در هدف', small: 'شرط همین حالا برقرار است' };
+  const v = x.pct < 1 ? x.pct.toFixed(2) : x.pct < 10 ? x.pct.toFixed(1) : Math.round(x.pct);
+  return { big: faNum(v).replace('.', '٫') + '٪', small: `تا هدف ${x.dir === 'up' ? 'رو به بالا' : 'رو به پایین'}` };
+}
+// نوار: هدف وسط، پنجره‌ای که قیمتِ فعلی را در بر بگیرد (حداقل ±۲٪)؛ محورِ قیمت چپ به راست، مثل نمودار
+function alertTrack(a, price){
+  const p = Number(price ?? a.lastPrice), t = Number(a.targetPrice);
+  if (!(p > 0) || !(t > 0)) return { pos: 50, band: null };
+  const d = (p - t) / t * 100, tol = a.condition === 'zone' ? Number(a.tolerance || .5) : 0;
+  const W = Math.max(2, Math.abs(d) * 1.3, tol * 2.4);
+  return { pos: Math.max(3, Math.min(97, 50 + d / W * 50)), band: tol ? [50 - tol / W * 50, 50 + tol / W * 50] : null };
+}
+function alertAgo(v){
+  if (!v) return '';
+  const t = Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(String(v)) ? v : String(v).replace(' ', 'T') + 'Z');
+  if (!t) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  return s < 60 ? `${faNum(Math.max(1, Math.round(s)))} ثانیه پیش` : s < 3600 ? `${faNum(Math.round(s / 60))} دقیقه پیش` : s < 86400 ? `${faNum(Math.round(s / 3600))} ساعت پیش` : `${faNum(Math.round(s / 86400))} روز پیش`;
+}
+const ALERT_COND = { above: ['عبور رو به بالا', 'M7 17 17 7M9 7h8v8'], below: ['عبور رو به پایین', 'M7 7l10 10M17 9v8H9'], zone: ['ورود به محدوده', 'M4 9h16M4 15h16'] };
+function alertCondChip(a){
+  const c = ALERT_COND[a.condition] || ALERT_COND.zone;
+  const lbl = a.condition === 'zone' ? `محدوده ±${faNum(a.tolerance || .5).replace('.', '٫')}٪` : c[0];
+  return `<span class="pa2-cond"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${c[1]}"/></svg>${lbl}</span>`;
+}
+function alertStatusPill(a){
+  const st = String(a.status || 'active');
+  return `<span class="pa2-st st-${st}"><i></i>${alertStatusLabel(st)}</span>`;
+}
+function alertChannels(a){
+  const c = a.channels || { telegram: true, push: true, inApp: true };
+  const one = (on, ico, name) => `<span class="pa2-chn${on ? ' on' : ''}" title="${name}${on ? '' : ' (خاموش)'}">${ALERT_ICONS[ico]}</span>`;
+  return one(c.telegram, 'telegram', 'تلگرام') + one(c.push, 'push', 'نوتیفیکیشن گوشی') + one(c.inApp, 'inbox', 'داخل ژورنال');
+}
+const PA2_ICO = {
+  test: '<path d="M10.27 21a2 2 0 0 0 3.46 0"/><path d="M22 8c0-2.3-.8-4.3-2-6"/><path d="M3.26 15.33A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.67C19.41 13.96 18 12.5 18 8A6 6 0 0 0 6 8c0 4.5-1.41 5.96-2.74 7.33"/><path d="M4 2C2.8 3.7 2 5.7 2 8"/>',
+  hist: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  edit: '<path d="M21.17 6.81a1 1 0 0 0-3.98-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/>',
+  del: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>'
+};
+const pa2Btn = (k, label, on, cls = '') => `<button type="button" class="pa2-btn ${cls}" onclick="${on}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${PA2_ICO[k]}</svg><span>${label}</span></button>`;
 function renderPriceAlertCard(a){
-  const id=alertSafeId(a.id),status=String(a.status||'active');
-  const channels=a.channels||{telegram:true,push:true,inApp:true},severity=a.severity||'normal';
-  const channelNames=[channels.telegram?'Telegram':'',channels.push?'Push':'',channels.inApp?'In-App':''].filter(Boolean).join(' + ');
-  return`<article class="price-alert ${status==='paused'?'paused':''} ${status==='triggered'?'triggered':''}"><div class="pa-main"><div class="coin-mark">${esc(String(a.symbol||'?').slice(0,5))}</div><div class="pa-info"><div class="pa-name">${esc(a.symbol)}/USDT <span class="badge ${status==='triggered'?'b-win':status==='paused'?'b-be':'b-open'}">${alertStatusLabel(status)}</span><span class="badge ${severity==='critical'?'b-loss':severity==='important'?'b-be':'b-open'}">${severity==='critical'?'بحرانی':severity==='important'?'مهم':'عادی'}</span></div><div class="pa-meta">${alertConditionLabel(a.condition,a.tolerance)} · ${esc(channelNames)} · ${alertDeliveryLabel(a.deliveryMode)}</div></div><div class="pa-price"><strong>${alertPrice(a.targetPrice)}</strong><small data-live-price="${esc(String(a.symbol||''))}">${alertLastPriceLabel(a)}</small></div></div><div class="pa-distance" title="میزان نزدیکی قیمت"><i style="width:${alertCloseness(a)}%"></i></div>${alertScaleOff(a.lastPrice,a.targetPrice)?`<div class="pa-warn">⚠️ هدف حدود ${faNum(Math.round(alertScaleOff(a.lastPrice,a.targetPrice)))} برابرِ قیمت فعلی است — این هشدار عملاً هرگز فعال نمی‌شود. ویرایشش کن.</div>`:''}${a.note?`<div style="font-size:9.5px;color:var(--text2);line-height:1.8;margin-top:9px">${esc(a.note)}</div>`:''}<div class="pa-foot"><div style="font-size:9px;color:var(--muted)">${a.frequency==='cross'?'فعال در هر عبور مجدد':'یک‌بار اجرا'}${a.lastTriggeredAt?' · آخرین ارسال ثبت شد':''}</div><div class="pa-actions"><button class="switch ${status!=='paused'&&status!=='fired'?'on':''}" onclick="togglePriceAlert('${id}')" aria-label="توقف یا فعال‌سازی"></button><button class="icon-btn" onclick="testPriceAlert('${id}')" title="آزمایش هشدار">↗</button><button class="icon-btn" onclick="openAlertHistory('${id}')" title="تاریخچه">🕘</button><button class="icon-btn" onclick="openAlertEditor('${id}')" title="ویرایش">✎</button><button class="icon-btn danger" onclick="deletePriceAlert('${id}')" title="حذف">×</button></div></div></article>`;
+  const id = alertSafeId(a.id), st = String(a.status || 'active'), sev = a.severity || 'normal', sym = String(a.symbol || '?');
+  const x = alertDistance(a), dt = alertDistText(x), tr = alertTrack(a), live = st === 'active';
+  const scale = alertScaleOff(a.lastPrice, a.targetPrice);
+  const when = st === 'active' ? (a.lastCheckedAt ? `بررسی ${alertAgo(a.lastCheckedAt)}` : '') : (a.lastTriggeredAt ? `ارسال ${alertAgo(a.lastTriggeredAt)}` : '');
+  return `<article class="pa2 st-${st} sev-${sev}${x && x.inside ? ' inside' : ''}" data-aid="${id}" data-sym="${esc(sym)}" data-live="${live ? 1 : 0}">
+    <div class="pa2-top">${coinLogo(sym)}
+      <div class="pa2-id"><b><bdi dir="ltr">${esc(sym)}<span>/USDT</span></bdi></b>${alertCondChip(a)}</div>
+      <div class="pa2-tags">${sev !== 'normal' ? `<span class="pa2-sev">${sev === 'critical' ? 'بحرانی' : 'مهم'}</span>` : ''}${alertStatusPill(a)}</div></div>
+    <div class="pa2-mid">
+      <div class="pa2-col"><u>هدف</u><b class="pa2-tg"><bdi dir="ltr">${alertPrice(a.targetPrice)}</bdi></b></div>
+      <div class="pa2-col pa2-dist ${x ? (x.inside ? 'in' : x.dir) : ''}"><b data-ap-dist>${dt.big}</b><small data-ap-dsub>${dt.small}</small></div>
+      <div class="pa2-col pa2-nowc"><u>${live ? 'قیمت فعلی' : 'قیمت هنگام رویداد'}</u><b data-ap-price><bdi dir="ltr">${a.lastPrice == null ? '—' : alertPrice(a.lastPrice)}</bdi></b><small data-ap-when>${when}</small></div>
+    </div>
+    <div class="pa2-track" aria-hidden="true">${tr.band ? `<span class="pa2-band" style="left:${tr.band[0].toFixed(1)}%;width:${(tr.band[1] - tr.band[0]).toFixed(1)}%"></span>` : ''}
+      <span class="pa2-fill" style="left:${Math.min(50, tr.pos).toFixed(1)}%;width:${Math.abs(tr.pos - 50).toFixed(1)}%"></span>
+      <span class="pa2-flag"></span><span class="pa2-now" style="left:${tr.pos.toFixed(1)}%"></span></div>
+    ${scale ? `<div class="pa-warn">⚠️ هدف حدود ${faNum(Math.round(scale))} برابرِ قیمت فعلی است — این هشدار عملاً هرگز فعال نمی‌شود. ویرایشش کن.</div>` : ''}
+    ${a.note ? `<div class="pa2-note">${esc(a.note)}</div>` : ''}
+    <div class="pa2-foot">
+      <div class="pa2-meta"><span class="pa2-chs">${alertChannels(a)}</span><span>${alertDeliveryLabel(a.deliveryMode)} · ${a.frequency === 'cross' ? 'هر عبور' : 'یک‌بار'}</span></div>
+      <div class="pa2-act"><button class="switch ${st !== 'paused' && st !== 'fired' ? 'on' : ''}" onclick="togglePriceAlert('${id}')" aria-label="توقف یا فعال‌سازی"></button>
+        ${pa2Btn('test', 'آزمایش', `testPriceAlert('${id}')`)}${pa2Btn('hist', 'تاریخچه', `openAlertHistory('${id}')`)}${pa2Btn('edit', 'ویرایش', `openAlertEditor('${id}')`)}
+        <span class="pa2-sep"></span>${pa2Btn('del', 'حذف', `deletePriceAlert('${id}')`, 'danger')}</div>
+    </div>
+  </article>`;
+}
+// فهرست: فعال‌ها (نزدیک‌ترین بالا)، ارسال‌شده‌ها (تازه‌ترین بالا)، متوقف/تکمیل‌شده
+function alertGroups(alerts){
+  const near = a => { const x = alertDistance(a); return x ? (x.inside ? -1 : x.pct) : 1e9; };
+  const ts = a => Date.parse(String(a.lastTriggeredAt || '').replace(' ', 'T')) || 0;
+  const g = [['active', 'فعال', alerts.filter(a => (a.status || 'active') === 'active').sort((p, q) => near(p) - near(q))],
+    ['triggered', 'ارسال‌شده', alerts.filter(a => a.status === 'triggered').sort((p, q) => ts(q) - ts(p))],
+    ['paused', 'متوقف و تکمیل‌شده', alerts.filter(a => a.status === 'paused' || a.status === 'fired')]];
+  return g.filter(x => x[2].length);
+}
+function alertViewMode(){ try { return localStorage.getItem('sc_alert_view') === 'rows' ? 'rows' : 'cards'; } catch (_) { return 'cards'; } }
+function setAlertView(v){ try { localStorage.setItem('sc_alert_view', v); } catch (_) {} renderPriceAlerts(); }
+function renderAlertList(alerts){
+  const v = alertViewMode();
+  return `<div class="pa2-view" role="group" aria-label="نمای فهرست">
+      <button type="button" class="${v === 'cards' ? 'on' : ''}" onclick="setAlertView('cards')">کارت</button><button type="button" class="${v === 'rows' ? 'on' : ''}" onclick="setAlertView('rows')">فشرده</button></div>
+    ${alertGroups(alerts).map(([k, label, list]) => `<div class="pa2-group g-${k}"><div class="pa2-gh"><i></i>${label}<span>${faNum(list.length)}</span></div>
+      <div class="alert-list pa2-list ${v}">${list.map(renderPriceAlertCard).join('')}</div></div>`).join('')}`;
+}
+// قیمتِ زنده روی کارت‌های فعال: هر ۳۰ ثانیه، فقط وقتی صفحه‌ی هشدار دیده می‌شود
+let ALERT_LIVE_TIMER = null;
+function startAlertLive(){
+  if (ALERT_LIVE_TIMER || alertDemoMode()) return;
+  ALERT_LIVE_TIMER = setInterval(alertLiveTick, 30000);
+  setTimeout(alertLiveTick, 1500);
+}
+async function alertLiveTick(){
+  const cards = [...document.querySelectorAll('#alerts-content .pa2[data-live="1"]')];
+  if (!cards.length) { if (!document.getElementById('alerts-content')?.offsetParent) { clearInterval(ALERT_LIVE_TIMER); ALERT_LIVE_TIMER = null; } return; }
+  if (document.visibilityState !== 'visible') return;
+  const syms = [...new Set(cards.map(c => c.dataset.sym).filter(x => /^[A-Z0-9]{2,12}$/.test(x)))].slice(0, 20);
+  if (!syms.length) return;
+  let prices = {};
+  try { const r = await apiFetch('/api/prices?symbols=' + encodeURIComponent(syms.join(','))); if (!r || !r.ok) return; prices = (await r.json()).prices || {}; } catch (_) { return; }
+  for (const c of cards) {
+    const p = Number(prices[c.dataset.sym]); if (!(p > 0) || !document.body.contains(c)) continue;
+    const a = (ALERT_STATE.alerts || []).find(z => alertSafeId(z.id) === c.dataset.aid); if (!a) continue;
+    const prev = Number(c.dataset.p || a.lastPrice), x = alertDistance(a, p), dt = alertDistText(x), tr = alertTrack(a, p);
+    c.dataset.p = p;
+    const q = sel => c.querySelector(sel);
+    q('[data-ap-price]').innerHTML = `<bdi dir="ltr">${alertPrice(p)}</bdi>`;
+    q('[data-ap-when]').textContent = 'زنده · همین حالا';
+    q('[data-ap-dist]').textContent = dt.big; q('[data-ap-dsub]').textContent = dt.small;
+    q('.pa2-dist').className = `pa2-col pa2-dist ${x ? (x.inside ? 'in' : x.dir) : ''}`;
+    c.classList.toggle('inside', !!(x && x.inside));
+    const now = q('.pa2-now'), fill = q('.pa2-fill');
+    if (now) now.style.left = tr.pos.toFixed(1) + '%';
+    if (fill) { fill.style.left = Math.min(50, tr.pos).toFixed(1) + '%'; fill.style.width = Math.abs(tr.pos - 50).toFixed(1) + '%'; }
+    if (prev > 0 && p !== prev) { const b = q('[data-ap-price]'); b.classList.remove('fl-up', 'fl-dn'); void b.offsetWidth; b.classList.add(p > prev ? 'fl-up' : 'fl-dn'); }
+  }
 }
 
 // کارت تنظیم آلارم — دانشجویی که صدا نمی‌خواهد باید بتواند خاموشش کند،
