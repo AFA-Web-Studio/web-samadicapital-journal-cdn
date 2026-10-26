@@ -578,7 +578,8 @@
     const f = st.funnel;
     const pick = [7, 30, 90].map(d => `<button class="${d === days ? 'on' : ''}" onclick="BILLING.funnelDays(${d})">${faNum(d)} روز</button>`).join('');
     const pct = (a, b) => b ? faNum(Math.round(a / b * 100)) + '٪' : '—';
-    const body = !f ? '<div class="ab-meta">در حال بارگذاری…</div>' : f.error ? '<div class="err-msg" style="display:block">بارگذاری نشد.</div>'
+    // v26.9: پاسخِ بی‌ردیف (سرورِ قدیمی یا خطا) کلِ پنل را نشکند
+    const body = !f ? '<div class="ab-meta">در حال بارگذاری…</div>' : (f.error || !Array.isArray(f.rows) || !f.total) ? '<div class="err-msg" style="display:block">بارگذاری نشد.</div>'
       : !f.rows.length ? '<div class="ab-meta" style="padding:10px 0">هنوز در این بازه چیزی ثبت نشده.</div>'
       : `<div style="overflow-x:auto"><table class="ab-funnel" style="width:100%;border-collapse:collapse;font-size:12.5px">
           <thead><tr style="color:var(--muted);text-align:start"><th style="text-align:start;padding:6px 4px">منبع</th><th>بازدید</th><th>شروع ثبت‌نام</th><th>ثبت‌نام کامل</th><th>پرداخت</th><th>درآمد (USDT)</th></tr></thead>

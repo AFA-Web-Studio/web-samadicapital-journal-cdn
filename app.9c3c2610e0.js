@@ -825,8 +825,8 @@ async function saveFeedbackEntry(uid,tradeId,text){
   const fb=await loadFeedback(uid);
   if(text&&text.trim())fb[tradeId]={text:text.trim(),at:new Date().toISOString()};
   else delete fb[tradeId];
-  await cloudSet(_fbKey(uid),fb);
-  return fb;
+  const ok = await cloudSet(_fbKey(uid),fb);
+  return ok === true ? fb : null;            // v26.9: شکست ⇒ null (فراخواننده پیامِ موفقیت نمی‌دهد)
 }
 
 // ══════════════════════════════════════════════════════
@@ -1097,7 +1097,14 @@ async function cloudSet(key, value) {
 async function cloudDelete(key) {
   L.d(key);
   const r = await apiFetch('/api/kv/' + key, { method: 'DELETE' });
-  if (!r || !r.ok) console.warn('cloudDelete:', key, r ? r.status : 'offline');
+  if (!r || !r.ok) { console.warn('cloudDelete:', key, r ? r.status : 'offline'); return false; }
+  return true;
+}
+// v26.9: نتیجه‌ی ذخیره روی سرور — پیامِ «ذخیره شد» فقط وقتی سرور واقعاً پذیرفته
+function savedOrWarn(...results){
+  if (results.every(x => x === true)) return true;
+  showToast('⚠️ روی سرور ذخیره نشد — فقط روی همین دستگاه ماند. اتصال را بررسی کن و دوباره بزن');
+  return false;
 }
 
 // ══════════════════════════════════════════════════════
@@ -1384,7 +1391,7 @@ function getXP(count){
 // v25.18: هفت معیار، جمع ۱۰۰ — کپیِ DISC_W و disciplineChecks در worker.js.
 const DISC_W={sl:25,slReasons:10,tp:10,tpReasons:10,entryReasons:20,rr:15,emotion:10};
 const DISC_LABELS={sl:'قیمت حد ضرر',slReasons:'دلیل حد ضرر',tp:'قیمت حد سود',tpReasons:'دلیل حد سود',
-  entryReasons:'دلیل ورود',rr:'R:R ≥ ۲ (زیر ۱ ساعت ≥ ۱٫۵)',emotion:'احساس لحظهٔ ورود'};
+  entryReasons:'دلیل ورود',rr:'R:R دست‌کم ۱:۲ (زیر ۱ ساعت ۱:۱٫۵)',emotion:'احساس لحظهٔ ورود'};
 function academyDiscipline(list){
   const live=(list||[]).filter(t=>t&&!t._deleted);
   const num=v=>{const n=parseFloat(String(v==null?'':v).replace(/[^0-9.\-]/g,''));return isFinite(n)?n:null};
@@ -2110,7 +2117,8 @@ function perfDelta(list){
   }
   const d = t => t.date || '';
   const cur = sum(list.filter(t => d(t) >= from)), prev = sum(list.filter(t => d(t) >= prevFrom && d(t) < from));
-  return dashRange === 'all' ? { value: cur, label, abs: true } : { value: cur - prev, label, abs: false };
+  const curN = list.filter(t => t.exit && d(t) >= from).length;
+  return dashRange === 'all' ? { value: cur, label, abs: true, empty: !curN } : { value: cur - prev, label, abs: false };
 }
 // منحنیِ کوچکِ سرمایه: ارتفاعِ ثابت و خمِ نرم. با صدها ترید، آخرینِ هر دسته (حداکثر ~۹۶ نقطه) —
 // شکلِ کلی و نقطه‌ی پایانی دقیق می‌مانند، دندانه‌های ریز نه. نقطه‌ی پایانی HTML است تا با کشیدنِ SVG بیضی نشود.
@@ -2155,7 +2163,8 @@ function perfHero(fs, rangeLbl, shown, list){
     ...(xq && xq.n ? [kpi('نرخ تصرف', pct(xq.avgCapture), `${faNum(xq.n)} خروج سنجیده`, tone(xq.avgCapture, 60, 36), xq.avgCapture)] : [])
   ];
   const dl = list && list.length ? perfDelta(list) : null;
-  const delta = dl && (dl.abs || dl.value) ? `<span class="ph-delta ${dl.value >= 0 ? 'up' : 'dn'}">${dl.abs ? '' : `<i>${dl.value >= 0 ? '▲' : '▼'}</i>`}<bdi dir="ltr">${dl.abs ? fmtUSD(dl.value) : fmtUSD(Math.abs(dl.value), false)}</bdi><small>${dl.label}</small></span>` : '';
+  const delta = dl && dl.empty ? `<span class="ph-delta" style="color:var(--muted);border:1px solid var(--border)"><small>۳۰ روز اخیر بدون معامله</small></span>`
+    : dl && (dl.abs || dl.value) ? `<span class="ph-delta ${dl.value >= 0 ? 'up' : 'dn'}">${dl.abs ? '' : `<i>${dl.value >= 0 ? '▲' : '▼'}</i>`}<bdi dir="ltr">${dl.abs ? fmtUSD(dl.value) : fmtUSD(Math.abs(dl.value), false)}</bdi><small>${dl.label}</small></span>` : '';
   const opts = [['all', 'همه'], ['month', 'این ماه'], ['30', '۳۰ روز'], ['90', '۹۰ روز']];
   const leak = dashLeak();
   return `<section class="ph fade-up" aria-label="خلاصه‌ی عملکرد">
@@ -4004,11 +4013,12 @@ function exitQualityForTrade(t){
 // همه‌چیز «خارج از پلن» می‌شد و کارت بی‌معنا. اینجا فقط اطلاع‌رسانی است.
 const PLAYBOOK_RULES = [
   { id:'stop',    core:true,  label:'حد ضرر مشخص بود',        test:t => hasDefinedRisk(t) },
-  { id:'rr',      core:true,  label:`R:R ≥ ${faNum(RR_MIN)} (زیر ۱ ساعت ≥ ${faNum(RR_MIN_INTRADAY).replace('.','٫')})`, test:t => { const r=calcRR(t); return r==null?null:+r>=rrMinFor(t.timeframe)-1e-6 } },
+  { id:'rr',      core:true,  label:`R:R دست‌کم ۱:${faNum(RR_MIN)} (زیر ۱ ساعت ۱:${faNum(RR_MIN_INTRADAY).replace('.','٫')})`, test:t => { const r=calcRR(t); return r==null?null:+r>=rrMinFor(t.timeframe)-1e-6 } },
   { id:'reason',  core:true,  label:'دلیل ورود کافی',   test:t => principleCounts(t).entry>=needFor(t).entry },
   { id:'slWhy',   core:true,  label:`دلیل حد ضرر ${faNum(ENTRY_PRINCIPLES.sl)}+`,  test:t => _rc(t.slReasons)>=needFor(t).sl },
   { id:'tpWhy',   core:true,  label:`دلیل حد سود ${faNum(ENTRY_PRINCIPLES.tp)}+`,  test:t => _rc(t.tpReasons)>=needFor(t).tp },
-  { id:'lev',     core:true,  label:'اهرم ≤ ۱۰',               test:t => (+t.leverage||1)<=10 },
+  // v26.9: همان سقفِ دوره (۲×) برای حسابِ دوره؛ ژورنالِ شخصیِ مدیر و اعضای عمومی ۱۰×
+  { id:'lev',     core:true,  get label(){ return `اهرم حداکثر ${faNum(planLevMax())}×`; }, test:t => (+t.leverage||1)<=planLevMax() },
   { id:'revenge', core:true,  label:'انتقام‌گیری نبود',         test:t => t._notRevenge },
   { id:'size',    core:false, label:'حجم در بودجه‌ی پله',       test:t => t._sizeOk }
 ];
@@ -4051,6 +4061,7 @@ function pbFollowed(ev){
   return vals.every(Boolean);
 }
 
+function planLevMax(){ return isCourseAccount() && !ownerJournal() ? LEVERAGE_MAX : 10; }
 function playbookStats(){
   // معامله‌ی واردشده‌ای که دانشجو هنوز دستش نزده، «خارج از پلن» نیست —
   // فقط هنوز ژورنال نشده. قضاوتش نتیجه را بی‌معنا می‌کند.
@@ -4861,6 +4872,7 @@ async function saveFeedbackFromEditor(uid,tradeId,del=false){
   if(!del&&!text.trim()){showToast('⚠️ متن نظر خالی است');return}
   showToast('⏳ در حال ذخیره...');
   const fb=await saveFeedbackEntry(uid,tradeId,del?'':text);
+  if(!fb){ savedOrWarn(false); return; }     // برگه باز می‌ماند تا متن از دست نرود
   MENTOR_FB={_uid:uid,_loaded:true,data:fb};
   closeSheet();
   showToast(del?'🗑️ نظر حذف شد':'✅ نظر برای دانشجو ثبت شد');
@@ -5108,8 +5120,7 @@ function _getSettingsDefault() {
 function getCurrentReasonList() { return S.g(_getSettingsStorageKey()) || _getSettingsDefault(); }
 async function persistCurrentList(list) {
   S.s(_getSettingsStorageKey(), list);
-  await cloudSet(_getSettingsStorageKey(), list);
-  showToast('✅ لیست ذخیره شد');
+  if(savedOrWarn(await cloudSet(_getSettingsStorageKey(), list))) showToast('✅ لیست ذخیره شد');
   renderMentorMain();
 }
 async function addReasonItem() {
@@ -5141,8 +5152,8 @@ async function resetReasonList() {
   const names={entry:'دلایل ورود',sl_long:'حد ضرر Long',sl_short:'حد ضرر Short',tp_long:'حد سود Long',tp_short:'حد سود Short'};
   if(!confirm(`لیست "${names[settingsTab]}" به پیش‌فرض بازگردد؟`))return;
   S.d(_getSettingsStorageKey());
-  await cloudDelete(_getSettingsStorageKey());
-  showToast('↺ لیست به پیش‌فرض بازگشت'); renderMentorMain();
+  if(savedOrWarn(await cloudDelete(_getSettingsStorageKey()))) showToast('↺ لیست به پیش‌فرض بازگشت');
+  renderMentorMain();
 }
 
 async function addStudent(){
@@ -5367,7 +5378,8 @@ async function mentorViewAs(uid){
   // save mentor session to restore later
   L.s('sc_mentor_restore', SESSION);
   const studentTrades = await loadTrades(uid);
-  TRADES = studentTrades;
+  // v26.9: بی‌اتصال، loadTrades فقط حافظه‌ی همین دستگاه را دارد؛ داده‌ی بارشده‌ی پنل کامل‌تر است
+  TRADES = studentTrades.length ? studentTrades : (ALL_TRADES[uid] || []).filter(t => t && !t._deleted);
   FEEDBACK = await loadFeedback(uid); // v13: نظرها در حالت ناظر هم دیده شوند
   dashRange='all';calOffset=0;
   SESSION = {role:'student', uid, name: st.name + ' (ناظر)', isViewOnly: true, ...(st.type==='vip'?{accountType:'vip'}:{})};
@@ -5495,11 +5507,12 @@ async function saveMSGeneral(){
   const name = document.getElementById('ms-academy')?.value.trim();
   const pass = document.getElementById('ms-pass')?.value;
   const pass2 = document.getElementById('ms-pass2')?.value;
-  if(name){ S.s('sc_academy_name', name); await cloudSet('sc_academy_name', name); }
+  const oks=[];
+  if(name){ S.s('sc_academy_name', name); oks.push(await cloudSet('sc_academy_name', name)); }
   if(document.getElementById('ms-tilt-streak')){
     const tilt = tiltConfig({ enabled: document.getElementById('ms-tilt-on').checked,
       streak: document.getElementById('ms-tilt-streak').value, dailyPct: document.getElementById('ms-tilt-pct').value });
-    S.s('sc_tilt', tilt); await cloudSet('sc_tilt', tilt);
+    S.s('sc_tilt', tilt); oks.push(await cloudSet('sc_tilt', tilt));
   }
   if(pass){
     if(pass !== pass2){ alert('رمز عبور و تکرار آن یکسان نیستند'); return; }
@@ -5509,6 +5522,7 @@ async function saveMSGeneral(){
     if(!r||!r.ok){alert(r&&r.status===401?'رمز فعلی اشتباه است':apiErrMsg(r,'تغییر رمز'));return}
     await rememberMentorPass(pass); // فقط هشِ محلی برای ورود اضطراری آفلاین (رمز متنی ذخیره نمی‌شود)
   }
+  if(!savedOrWarn(...oks)) return;
   showToast('✅ تنظیمات ذخیره شد');
   document.getElementById('ms-pass').value='';
   document.getElementById('ms-pass2').value='';
@@ -5563,8 +5577,7 @@ async function saveMSXP(){
   const baseVal=isNaN(base)||base<0?getBaseBudget():base;
   S.s('sc_xp_milestones', updated);
   S.s('sc_base_budget', baseVal);
-  await cloudSet('sc_xp_milestones', updated);
-  await cloudSet('sc_base_budget', baseVal);
+  if(!savedOrWarn(await cloudSet('sc_xp_milestones', updated), await cloudSet('sc_base_budget', baseVal))) return;
   showToast('✅ پله‌ها و بودجه‌ها ذخیره شد');
 }
 
@@ -5606,8 +5619,8 @@ async function addMSListItem(){
   const input = document.getElementById('ms-new-item');
   const val = input?.value.trim(); if(!val){input?.focus();return;}
   const list = [...(S.g(key)||defMap[key]), val];
-  S.s(key, list); await cloudSet(key, list);
-  input.value=''; showToast('✅ آیتم اضافه شد');
+  S.s(key, list); const ok = savedOrWarn(await cloudSet(key, list));
+  input.value=''; if(ok) showToast('✅ آیتم اضافه شد');
   document.getElementById('ms-panel').innerHTML=renderMSPanel();
 }
 
@@ -5615,7 +5628,7 @@ async function delMSItem(i, key){
   const defMap = {'sc_coins':COINS_FULL,'sc_strategies':STRATEGIES,'sc_sessions':SESSIONS,'sc_emotions':EMOTIONS,'sc_timeframes':TIMEFRAMES};
   if(!confirm('حذف شود؟'))return;
   const list = (S.g(key)||defMap[key]).filter((_,idx)=>idx!==i);
-  S.s(key,list); await cloudSet(key,list);
+  S.s(key,list); savedOrWarn(await cloudSet(key,list));
   document.getElementById('ms-panel').innerHTML=renderMSPanel();
 }
 
@@ -5625,14 +5638,14 @@ function editMSItem(i, key){
   const newVal = prompt('ویرایش:', list[i]);
   if(newVal===null||!newVal.trim()) return;
   list[i]=newVal.trim();
-  S.s(key,list); cloudSet(key,list);
+  S.s(key,list); cloudSet(key,list).then(ok=>savedOrWarn(ok));
   document.getElementById('ms-panel').innerHTML=renderMSPanel();
 }
 
 async function resetMSList(key){
   const defMap = {'sc_coins':COINS_FULL,'sc_strategies':STRATEGIES,'sc_sessions':SESSIONS,'sc_emotions':EMOTIONS,'sc_timeframes':TIMEFRAMES};
   if(!confirm('به پیش‌فرض بازگردد؟'))return;
-  S.d(key); await cloudDelete(key);
+  S.d(key); savedOrWarn(await cloudDelete(key));
   document.getElementById('ms-panel').innerHTML=renderMSPanel();
 }
 
