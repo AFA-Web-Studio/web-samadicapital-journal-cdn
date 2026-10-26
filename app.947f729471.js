@@ -333,6 +333,18 @@ function calcIsolatedBudget({ B, r, C = 0, lev = LEVERAGE_MAX, openMargin = 0, r
   const free = Math.max(0, B - openMargin);
   return { ok:true, R, C, M, lev, position: M * lev, free, shortfall: Math.max(0, M - free) };
 }
+// v26.7: خودِ معامله‌های باز — تا کاربر ببیند کدام‌ها موجودیِ آزاد را گرفته‌اند
+function openTradesExcept(id){
+  return (Array.isArray(TRADES) ? TRADES : []).filter(t => t && !t._deleted && !(+t.exit > 0) && t.id !== id && +t.size > 0);
+}
+function openTradesNote(id){
+  const list = openTradesExcept(id).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  if (!list.length) return '';
+  const row = t => `<a href="#" class="pc-open-t" onclick="event.preventDefault();showDetail('${esc(t.id)}')"><b>${esc(t.coin || '—')}</b><span>${t.date ? fmtDateFa(t.date) : ''}</span><em><bdi dir="ltr">$${(+t.size).toLocaleString('en-US', { maximumFractionDigits: 2 })}</bdi></em></a>`;
+  return `<div class="pc-open"><div class="pc-open-h">${faNum(list.length)} معامله‌ی باز در ژورنال — مارجینشان از موجودی کم شده:</div>
+    ${list.slice(0, 3).map(row).join('')}${list.length > 3 ? `<div class="pc-open-more">و ${faNum(list.length - 3)} معامله‌ی بازِ دیگر</div>` : ''}
+    <div class="pc-open-f">اگر در صرافی بسته‌اند، این‌جا هم قیمتِ خروجشان را بزن تا موجودیِ آزاد درست حساب شود.</div></div>`;
+}
 // مارجینِ پوزیشن‌های بازِ کاربر، به‌جز همان تریدی که دارد ویرایش می‌شود
 function openMarginExcept(id){
   return (Array.isArray(TRADES) ? TRADES : [])
@@ -2810,6 +2822,15 @@ function refreshProCalc(){
   if (+B > 0) L.s(capitalKey(), +B);
   if (+r > 0) L.s(riskKey(), +r);
   const openMargin = openMarginExcept(card?.dataset.edit || null);
+  // v26.7: حد ضرر باید سمتِ درست باشد؛ وگرنه فاصله‌اش «درست» به نظر می‌رسد و عدد غلط می‌دهد
+  if (mode !== 3) {
+    const e0 = +g('f-entry'), st0 = +g('f-sl'), long0 = g('f-dir') !== 'Short';
+    if (e0 > 0 && st0 > 0 && (long0 ? st0 >= e0 : st0 <= e0)) {
+      PRO_CALC_LAST = null;
+      box.innerHTML = `<div class="pc-warn">⚠️ حد ضررِ ${long0 ? 'لانگ باید <b>زیرِ</b>' : 'شورت باید <b>بالای</b>'} قیمت ورود باشد — الان <bdi dir="ltr">${esc(String(st0))}</bdi> ${long0 ? 'بالای' : 'زیرِ'} ورودِ <bdi dir="ltr">${esc(String(e0))}</bdi> است. جهت یا حد ضرر را درست کن.</div>`;
+      return;
+    }
+  }
   // مدیر: اهرم از فیلد لوریجِ فرم و بازه‌ی ریسکِ باز؛ بقیه: قفل‌های دوره
   const own = ownerJournal() ? OWNER_RISK : {};
   const formLev = +g('f-lev') >= 1 ? +g('f-lev') : PRO_LOCKED_LEVERAGE;
@@ -2846,7 +2867,7 @@ function refreshProCalc(){
     // مارجینِ تریدهای باز از کل موجودی بیشتر شده: یا موجودی درست وارد نشده، یا تریدی در ژورنال بسته نشده
     const openN = (Array.isArray(TRADES) ? TRADES : []).filter(t => t && !t._deleted && !(+t.exit > 0) && t.id !== (card?.dataset.edit || null)).length;
     box.innerHTML = `<div class="pc-warn">⚠️ مارجینِ ${faNum(openN)} تریدِ بازِ ژورنالت (${bd(openMargin)}) از «کل موجودی حساب» (${bd(+B)}) بیشتر است.
-      کل موجودی را درست بزن (همه‌ی پولِ حساب، با پوزیشن‌های باز)؛ اگر تریدی را در صرافی بسته‌ای، در ژورنال هم ببندش.</div>`;
+      کل موجودی را درست بزن (همه‌ی پولِ حساب، با پوزیشن‌های باز)؛ اگر تریدی را در صرافی بسته‌ای، در ژورنال هم ببندش.</div>${openTradesNote(card?.dataset.edit || null)}`;
     return;
   }
   const size = capped ? res0.free : want;
@@ -2866,6 +2887,7 @@ function refreshProCalc(){
   if (capped) {
     const busy = openMargin > 0 ? ` — ${bd(openMargin)} از حسابت در پوزیشن‌های باز است` : '';
     notes += `<div class="pc-info">برای ضررِ کاملِ ${dec(+r)}٪ با این حد ضرر، ${bd(want)} مارجین لازم بود که از موجودیِ آزادت (${bd(res0.free)}) بیشتر است${busy}. پس با همان ${bd(res0.free)} وارد شو؛ ضررت کمتر از سقف می‌ماند.</div>`;
+    if (openMargin > 0) notes += openTradesNote(card?.dataset.edit || null);
   }
   if (mode === 2 && res0.fit === 'high')
     notes += `<div class="pc-mis">اهرمِ لازم ${dec(res0.lev)}× است ولی سقفِ مرحله‌ی تو ${faNum(res0.maxLev)}×؛ با ${faNum(res0.maxLev)}× ضررت کمتر از سقف می‌ماند.</div>`;
@@ -2880,8 +2902,8 @@ function refreshProCalc(){
     const bad = over || formLoss / +B * 100 > RISK_MAX + 1e-9;
     notes += `<div class="${bad ? 'pc-warn' : 'pc-info'}">${bad ? '⚠️ ' : ''}مارجینِ الانِ فرم ${bd(fs)} است؛ با آن اگر حد ضرر بخورد ${bd(formLoss)} (${pctB(formLoss)} حساب) ضرر می‌کنی${over ? ` و از کل موجودی حساب (${bd(+B)}) هم بیشتر است — یکی از این دو عدد اشتباه است` : ''}. «اعمال» مبلغ پیشنهادی را جایش می‌گذارد.</div>`;
   }
-  box.innerHTML = `<div class="pc-ans">
-      <div class="pc-hl">${headline}</div>
+  box.innerHTML = `<div class="pc-ans${capped ? ' capped' : ''}">
+      <div class="pc-hl">${capped ? `<span class="pc-cap">موجودیِ آزاد کم است · ریسکِ واقعی ${pctB(lossAt)}</span>` : ''}${headline}</div>
       <button type="button" class="pc-apply" onclick="applyProCalc()">اعمال<small>در فرم</small></button>
     </div>
     <div class="pc-stats">${stats.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>

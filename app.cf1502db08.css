@@ -1595,3 +1595,14 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 .ms-tilt-h{display:flex;align-items:center;justify-content:space-between}.ms-tilt-h b{font-size:13px}
 .ms-tilt-on{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
 .ms-tilt p{margin:8px 0 10px;font-size:11.5px;line-height:1.9;color:var(--text2)}
+
+/* v26.7 — ماشین‌حساب: پیشنهادِ محدودشده و معامله‌های باز */
+.pc-ans.capped{border-color:rgba(242,181,82,.45)!important;background:linear-gradient(160deg,rgba(242,181,82,.1),rgba(242,181,82,.03))!important}
+.pc-cap{display:block;margin-bottom:4px;font-size:11px;font-weight:700;color:#f2b552}
+.pc-open{margin-top:10px;padding:11px 12px;border-radius:12px;background:rgba(242,181,82,.05);border:1px solid rgba(242,181,82,.22)}
+.pc-open-h{font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px}
+.pc-open-t{display:flex;align-items:center;gap:10px;padding:7px 2px;border-top:1px solid var(--border);color:var(--text2);text-decoration:none;font-size:12px}
+.pc-open-t b{color:var(--text);font-family:var(--f-mono)}.pc-open-t em{margin-inline-start:auto;font-style:normal;font-family:var(--f-mono);color:#f2b552}
+.pc-open-t:hover b{color:var(--gold-light)}
+.pc-open-more{font-size:11px;color:var(--muted);padding-top:4px}
+.pc-open-f{margin-top:6px;font-size:11px;line-height:1.9;color:var(--muted)}
