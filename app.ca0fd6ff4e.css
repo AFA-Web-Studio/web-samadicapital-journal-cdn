@@ -1606,3 +1606,8 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 .pc-open-t:hover b{color:var(--gold-light)}
 .pc-open-more{font-size:11px;color:var(--muted);padding-top:4px}
 .pc-open-f{margin-top:6px;font-size:11px;line-height:1.9;color:var(--muted)}
+
+/* v26.10 — خطِ «حساب» زیرِ نتیجه‌ی ماشین‌حساب */
+.pc-proof{margin-top:8px;padding:9px 11px;border-radius:10px;background:rgba(255,246,228,.03);border:1px dashed rgba(236,211,145,.25);font-size:11.5px;line-height:2;color:var(--text2)}
+.pc-proof span{font-weight:700;color:var(--gold-light)}.pc-proof b{color:var(--red)}
+.pc-proof em{display:block;font-style:normal;color:var(--muted)}

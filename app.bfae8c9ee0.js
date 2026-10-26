@@ -2931,6 +2931,8 @@ function refreshProCalc(){
       <button type="button" class="pc-apply" onclick="applyProCalc()">اعمال<small>در فرم</small></button>
     </div>
     <div class="pc-stats">${stats.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join('')}</div>
+    ${mode === 3 ? '' : `<div class="pc-proof"><span>حساب:</span> ${bd(size)} مارجین × ${faNum(+(+lev).toFixed(2))} اهرم × ${dec(res0.s)}٪ فاصله‌ی حد ضرر = <b>${bd(lossAt)}</b> ضرر
+      <em>${lossAt <= res0.R + 0.005 ? '✓' : '⚠️'} سقفِ تو: ${dec(+r)}٪ از ${bd(+B)} = ${bd(res0.R)}${capped ? ' — بیشتر از موجودی نمی‌شود گذاشت، پس ضرر کمتر از سقف می‌ماند' : ''}</em></div>`}
     ${notes}
     ${mode === 2 ? `<div class="pc-res-note">اگر صرافی فقط اهرمِ عدد صحیح می‌گیرد، عدد پایین‌تر را بزن — ضرر کمتر می‌شود.</div>` : ''}`;
 }
