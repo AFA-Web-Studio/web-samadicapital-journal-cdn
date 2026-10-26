@@ -253,6 +253,14 @@ function calcEntrySize({ B, r, entry, stop, L = PRO_LOCKED_LEVERAGE, openMargin 
   const free = Math.max(0, B - openMargin);
   return { ok:true, s, R, M, position: M * L, L, free, shortfall: Math.max(0, M - free) };
 }
+// v26.8: وقتی موجودی برای ریسکِ کامل کافی نیست — کمترین فاصله‌ی حد ضرر که با مارجینِ M و اهرمِ L همان زیانِ R را بدهد
+function calcMinStopFor({ R, M, L, entry, long }){
+  R = +R; M = +M; L = +L; entry = +entry;
+  if (!(R > 0) || !(M > 0) || !(L >= 1) || !(entry > 0)) return null;
+  const pct = R / (M * L) * 100;
+  if (pct >= 100 / L) return null;                       // پشتِ قیمتِ لیکوییدیشن ⇒ معنا ندارد
+  return { pct, price: long ? entry * (1 - pct / 100) : entry * (1 + pct / 100) };
+}
 // ریسکِ واقعیِ یک تریدِ ثبت‌شده، به درصدِ موجودی — برای تحلیل
 function tradeRiskPct(t, capital){
   const B = +(t.capital || capital), e = +t.entry, sl = +t.stopLoss, m = +t.size, lev = +t.leverage || 1;
@@ -2877,6 +2885,8 @@ function refreshProCalc(){
       ? `مارجین ایزوله‌ی <b>${bd(size)}</b> با اهرم <b>${faNum(lev)}×</b>`
     : mode === 2
       ? `اهرم <b>${dec(lev)}×</b> با مارجین <b>${bd(size)}</b>`
+      : capped
+      ? `بیشترین مارجینِ ممکن: <b>${bd(size)}</b>${openMargin > 0 ? '' : ' (کلِ موجودی)'} با اهرم <b>${faNum(lev)}×</b>`
       : `با <b>${bd(size)}</b> مارجین و اهرم <b>${faNum(lev)}×</b> وارد شو`;
   const stats = [
     ['ارزش پوزیشن', bd(size * lev)],
@@ -2886,7 +2896,12 @@ function refreshProCalc(){
   let notes = '';
   if (capped) {
     const busy = openMargin > 0 ? ` — ${bd(openMargin)} از حسابت در پوزیشن‌های باز است` : '';
-    notes += `<div class="pc-info">برای ضررِ کاملِ ${dec(+r)}٪ با این حد ضرر، ${bd(want)} مارجین لازم بود که از موجودیِ آزادت (${bd(res0.free)}) بیشتر است${busy}. پس با همان ${bd(res0.free)} وارد شو؛ ضررت کمتر از سقف می‌ماند.</div>`;
+    const ms = mode === 1 ? calcMinStopFor({ R: res0.R, M: res0.free, L: lev, entry: g('f-entry'), long: g('f-dir') !== 'Short' }) : null;
+    const px = v => (+v).toLocaleString('en-US', { maximumFractionDigits: +v >= 100 ? 1 : +v >= 1 ? 4 : 8 });
+    notes += `<div class="pc-warn">برای ریسکِ ${dec(+r)}٪ (${bd(res0.R)}) با این حد ضرر، ${bd(want)} مارجین لازم است، ولی موجودیِ آزادت ${bd(res0.free)} است${busy}.
+      با همه‌ی آن، ریسکِ واقعی فقط <b>${pctB(lossAt)}</b> می‌شود و کلِ حساب درگیرِ همین یک معامله است.
+      ${ms ? `<br><b>برای ریسکِ کاملِ ${dec(+r)}٪ با اهرم ${faNum(lev)}×، حد ضرر باید دست‌کم ${dec(ms.pct)}٪ فاصله داشته باشد</b> — برای این ${g('f-dir') !== 'Short' ? 'لانگ' : 'شورت'}: <bdi dir="ltr">${px(ms.price)}</bdi> ${g('f-dir') !== 'Short' ? 'یا پایین‌تر' : 'یا بالاتر'}.
+      <br>حد ضرر را فقط به‌خاطرِ حجم جابه‌جا نکن؛ اگر ساختارِ نمودار حد ضررِ دورتری نمی‌دهد، یا با ریسکِ کمتر وارد شو یا از این ترید بگذر.` : ''}</div>`;
     if (openMargin > 0) notes += openTradesNote(card?.dataset.edit || null);
   }
   if (mode === 2 && res0.fit === 'high')
@@ -5175,9 +5190,15 @@ async function resetStudentPin(uid){
 // ══════════════════════════════════════════════════════
 function exportCSV(){
   const header=['date','time','coin','pair','direction','entry','exit','stopLoss','takeProfit','size','leverage','strategy','session','emotion','result','fees','notes','tags','entryReasons','slReasons','tpReasons'];
-  const rows=TRADES.map(t=>header.map(k=>{const v=Array.isArray(t[k])?(t[k]||[]).join('|'):(t[k]||'');return`"${v.toString().replace(/"/g,'""')}"`}).join(','));
-  const csv=[header.join(','),...rows].join('\n');
-  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download=`trades_${SESSION.name}_${new Date().toISOString().slice(0,10)}.csv`;a.click();
+  // v26.8: نتیجه از روی قیمت‌ها (نه مقدارِ ذخیره‌شده‌ای که ممکن است کهنه باشد)؛ متنی که با = + - @ شروع شود
+  // در اکسل فرمول اجرا می‌شود ⇒ یک ' جلویش. فایل با Blob: لینکِ data: روی آیفون و فایلِ بزرگ دانلود نمی‌شود.
+  const cell=(t,k)=>{let v=k==='result'?tradeResult(t):Array.isArray(t[k])?t[k].join('|'):(t[k]??'');v=String(v);
+    if(/^[=+\-@\t\r]/.test(v)&&!/^[+\-]?\d+(\.\d+)?$/.test(v))v="'"+v;return`"${v.replace(/"/g,'""')}"`;};
+  const rows=TRADES.filter(t=>t&&!t._deleted).map(t=>header.map(k=>cell(t,k)).join(','));
+  const csv='﻿'+[header.join(','),...rows].join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download=`trades_${String(SESSION.name||'journal').replace(/[\\/:*?"<>|]/g,'')}_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000);
 }
 
 function showToast(msg){
