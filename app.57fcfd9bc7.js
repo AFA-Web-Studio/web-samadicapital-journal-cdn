@@ -692,26 +692,50 @@ function fmtPrice(n){
 // جستجوی سریع رمزارز در فرم ثبت ترید (v20.3)
 // فهرست بیش از ۱۰۰ رمزارز دارد و پیدا کردن با اسکرول کند بود.
 // گزینه‌های نامرتبط پنهان می‌شوند و اگر فقط یکی بماند، خودکار انتخاب می‌شود.
+// ── v26.11: جستجوی رمزارز (فرم ثبت ترید و فرم هشدار) ──
+const COIN_FA = { 'بیت':'BTC','بیتکوین':'BTC','بیت‌کوین':'BTC','اتریوم':'ETH','اتر':'ETH','سولانا':'SOL','ریپل':'XRP','بایننس':'BNB',
+  'دوج':'DOGE','دوج‌کوین':'DOGE','کاردانو':'ADA','ترون':'TRX','تون':'TON','لایت‌کوین':'LTC','لایتکوین':'LTC','آوالانچ':'AVAX',
+  'چین‌لینک':'LINK','پولکادات':'DOT','شیبا':'SHIB','هایپر':'HYPE','هایپرلیکویید':'HYPE','طلا':['PAXG','XAUT'],'پکس':'PAXG' };
+function coinQuery(q){ return String(q || '').trim().replace(/\s+/g, '').replace(/\/?USDT$/i, ''); }
+function coinMatches(list, q){
+  const raw = coinQuery(q); if (!raw) return list.slice();
+  const T = raw.toUpperCase(), low = raw.toLowerCase(), out = [], seen = new Set(), add = x => { if (!seen.has(x)) { seen.add(x); out.push(x); } };
+  const fa = Object.entries(COIN_FA).filter(([k]) => k.startsWith(raw)).flatMap(([, v]) => [].concat(v));
+  for (const x of list) if (x.toUpperCase() === T) add(x);
+  for (const x of fa) if (list.includes(x)) add(x);
+  for (const x of list) if (x.toUpperCase().startsWith(T)) add(x);
+  for (const x of list) if (x.toUpperCase().includes(T)) add(x);
+  // نامِ انگلیسی، فقط از ابتدای یک کلمه: gold ⇒ pax-gold، ولی eth نه tether
+  if (low.length >= 3) for (const x of list) if ((CG_IDS[x] || '').split('-').some(w => w.startsWith(low))) add(x);
+  return out;
+}
+// نتیجه‌ای که خودکار انتخاب شود: نمادِ دقیق، یا تنها نتیجه
+function coinPick(list, q){
+  const T = coinQuery(q).toUpperCase(); if (!T) return null;
+  const exact = list.find(x => x.toUpperCase() === T); if (exact) return exact;
+  const m = coinMatches(list, q); return m.length === 1 ? m[0] : null;
+}
+// اگر نتیجه‌ای هست و انتخابِ فعلی جزوِ آن نیست، اولین نتیجه انتخاب می‌شود (بقیه در فهرست می‌مانند)
+function coinAutoPick(list, q, cur){
+  const m = coinMatches(list, q); if (!coinQuery(q) || !m.length) return null;
+  return coinPick(list, q) || (m.includes(cur) ? null : m[0]);
+}
+function coinHint(n, picked){
+  return picked ? `✓ ${picked} انتخاب شد${n > 1 ? `؛ ${faNum(n - 1)} رمزارزِ دیگر هم پیدا شد (از فهرست عوض کن)` : ''}`   // «·» کنارِ رقمِ فارسی شبیهِ صفر است
+    : n ? `${faNum(n)} رمزارز پیدا شد — از فهرست انتخاب کن` : 'رمزارزی با این نام پیدا نشد';
+}
 function filterCoinOptions(q){
   const sel=document.getElementById('f-coin'); if(!sel)return;
   const hint=document.getElementById('f-coin-hint');
-  const term=String(q||'').trim().toUpperCase();
-  let shown=0, only=null;
-  for(const opt of sel.options){
-    if(!opt.value){ opt.hidden=!!term; continue }   // «انتخاب کنید»
-    const match=!term||opt.value.toUpperCase().includes(term);
-    opt.hidden=!match;
-    if(match){ shown++; only=opt.value }
-  }
-  if(term&&shown===1){ sel.value=only; updateCoinInfo(); }
-  else if(term&&shown===0&&sel.value){ /* انتخاب قبلی دست‌نخورده می‌ماند */ }
-  if(hint){
-    hint.textContent = !term ? ''
-      : shown===0 ? 'رمزارزی با این نام پیدا نشد'
-      : shown===1 ? `✓ ${only} انتخاب شد`
-      : `${faNum(shown)} رمزارز پیدا شد — از فهرست انتخاب کن`;
-    hint.className='coin-hint'+(shown===0?' none':shown===1?' one':'');
-  }
+  const all=getDynList('sc_coins',COINS_FULL), cur=sel.value, term=coinQuery(q);
+  const m=coinMatches(all,q), pick=coinAutoPick(all,q,cur);
+  const list=term?(cur&&!m.includes(cur)?[cur,...m]:m):all;     // انتخابِ فعلی گم نشود
+  sel.innerHTML=`<option value="">${term?(m.length?'— '+faNum(m.length)+' نتیجه —':'نتیجه‌ای نیست'):'انتخاب کنید'}</option>`
+    +list.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value=pick||cur||'';
+  if(pick&&pick!==cur) updateCoinInfo();
+  const now=sel.value&&m.includes(sel.value)?sel.value:null;
+  if(hint){ hint.textContent=term?coinHint(m.length,now):''; hint.className='coin-hint'+(!term?'':m.length===0?' none':now?' one':''); }
 }
 
 async function updateCoinInfo(){
@@ -4417,9 +4441,11 @@ function coinLogo(sym, style){
 // همان لایه‌ی چندمنبعی‌ای می‌گیرد که موتور هشدار روی سرور استفاده می‌کند.
 const LIVE_PRICE_CACHE={};
 const LIVE_PRICE_TTL=60000;
+// v26.11: نمادهایی که سرور گفت قیمت ندارند (هیچ منبعی) — برای ردِ هشدارِ مرده
+const LIVE_PRICE_MISSING = {};
 async function livePrice(sym){
   const S=String(sym||'').toUpperCase();
-  if(!/^[A-Z0-9]{2,12}$/.test(S)) return null;
+  if(!/^[A-Z0-9]{1,12}$/.test(S)) return null;
   const hit=LIVE_PRICE_CACHE[S];
   if(hit&&Date.now()-hit.t<LIVE_PRICE_TTL) return hit.v;
   try{
@@ -4427,7 +4453,8 @@ async function livePrice(sym){
     if(r&&r.ok){
       const d=await r.json();
       const v=Number(d?.prices?.[S]);
-      if(Number.isFinite(v)&&v>0){ LIVE_PRICE_CACHE[S]={t:Date.now(),v}; return v }
+      if(Number.isFinite(v)&&v>0){ LIVE_PRICE_CACHE[S]={t:Date.now(),v}; delete LIVE_PRICE_MISSING[S]; return v }
+      LIVE_PRICE_MISSING[S]=Date.now();      // سرور جواب داد ولی هیچ منبعی این نماد را ندارد
     }
   }catch(_){ }
   return null;
@@ -5955,7 +5982,7 @@ async function alertLiveTick(){
   const cards = [...document.querySelectorAll('#alerts-content .pa2[data-live="1"]')];
   if (!cards.length) { if (!document.getElementById('alerts-content')?.offsetParent) { clearInterval(ALERT_LIVE_TIMER); ALERT_LIVE_TIMER = null; } return; }
   if (document.visibilityState !== 'visible') return;
-  const syms = [...new Set(cards.map(c => c.dataset.sym).filter(x => /^[A-Z0-9]{2,12}$/.test(x)))].slice(0, 20);
+  const syms = [...new Set(cards.map(c => c.dataset.sym).filter(x => /^[A-Z0-9]{1,12}$/.test(x)))].slice(0, 20);
   if (!syms.length) return;
   let prices = {};
   try { const r = await apiFetch('/api/prices?symbols=' + encodeURIComponent(syms.join(','))); if (!r || !r.ok) return; prices = (await r.json()).prices || {}; } catch (_) { return; }
@@ -6063,6 +6090,34 @@ function toggleAlertChannel(key,el){
   if(label){label.classList.toggle('active',!!ALERT_EDITOR.channels[key]);return}
   renderAlertEditorSlot();
 }
+// v26.11: فهرستِ رمزارزهای هشدار (موتورِ قیمت ۱ تا ۱۲ نویسه) و جستجو در آن
+function alertKnownCoins(){ return COINS_FULL.filter(x => x !== 'Other' && /^[A-Z0-9]{1,12}$/.test(x)); }
+function alertSymbolOptions(d){
+  const all = alertKnownCoins(), term = coinQuery(d._q), m = coinMatches(all, d._q), cur = d.symbol, custom = !all.includes(cur);
+  const list = term ? (!custom && cur && !m.includes(cur) ? [cur, ...m] : m) : all;
+  return list.map(x => `<option value="${x}" ${x === cur ? 'selected' : ''}>${x}/USDT</option>`).join('')
+    + `<option value="CUSTOM" ${custom ? 'selected' : ''}>رمزارز دیگر…</option>`;
+}
+function alertSymbolHint(d){
+  const term = coinQuery(d._q).toUpperCase(); if (!term) return '';
+  const all = alertKnownCoins(), m = coinMatches(all, d._q);
+  if (m.length || !/^[A-Z0-9]{1,12}$/.test(term)) return coinHint(m.length, m.includes(d.symbol) ? d.symbol : null);
+  return `«${esc(term)}» در فهرست نیست — <button type="button" class="coin-use" onclick="useCustomAlertSymbol('${term}')">با همین نماد بساز</button>`;
+}
+function filterAlertSymbols(q){
+  if (!ALERT_EDITOR) return;
+  ALERT_EDITOR._q = q;
+  const all = alertKnownCoins(), was = ALERT_EDITOR.symbol, pick = coinAutoPick(all, q, was);
+  if (pick && pick !== was) {
+    ALERT_EDITOR.symbol = pick;
+    if (!all.includes(was)) { renderAlertEditorSlot(); return; }   // فیلدِ «نماد دلخواه» باید برود
+    updateAlertEditorPrice();
+  }
+  const sel = document.getElementById('al-symbol'), hint = document.getElementById('al-symbol-hint');
+  if (sel) sel.innerHTML = alertSymbolOptions(ALERT_EDITOR);
+  if (hint) hint.innerHTML = alertSymbolHint(ALERT_EDITOR);
+}
+function useCustomAlertSymbol(sym){ if (!ALERT_EDITOR) return; ALERT_EDITOR.symbol = sym; ALERT_EDITOR._q = ''; renderAlertEditorSlot(); updateAlertEditorPrice(); }
 function handleAlertSymbolSelect(value){
   if(!ALERT_EDITOR)return;
   ALERT_EDITOR.symbol=value==='CUSTOM'?'':value;
@@ -6070,11 +6125,11 @@ function handleAlertSymbolSelect(value){
 }
 function setCustomAlertSymbol(value){if(!ALERT_EDITOR)return;ALERT_EDITOR.symbol=String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);updateAlertEditorPrice()}
 function renderAlertEditor(){
-  const d=ALERT_EDITOR,knownCoins=COINS_FULL.filter(x=>x!=='Other'&&/^[A-Z0-9]{2,12}$/.test(x)),custom=!knownCoins.includes(d.symbol),channels=d.channels||{telegram:true,push:true,inApp:true};
+  const d=ALERT_EDITOR,knownCoins=alertKnownCoins(),custom=!knownCoins.includes(d.symbol),channels=d.channels||{telegram:true,push:true,inApp:true};
   const allowed=ALERT_STATE.channels?.policy||{},system=ALERT_STATE.channels?.settings||{};
   const canTelegram=allowed.telegramAllowed!==false&&system.telegramEnabled!==false,canPush=allowed.pushAllowed!==false&&system.pushEnabled!==false,canInApp=allowed.inAppAllowed!==false&&system.inAppEnabled!==false;
   return`<section class="alert-panel alert-editor"><div class="alert-panel-head"><div><div class="alert-panel-title">${d.id?'ویرایش هشدار':'ساخت هشدار جدید'}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">قیمت مرجع: بازار لحظه‌ای جفت USDT · کانال‌ها زیر کنترل سیاست مدیر هستند</div></div><button class="icon-btn" onclick="cancelAlertEditor()" aria-label="بستن">×</button></div>
-  <div class="alert-form-grid"><label class="fg"><span class="fl">رمزارز <span class="req">*</span></span><select id="al-symbol" class="fi" onchange="handleAlertSymbolSelect(this.value)">${knownCoins.map(x=>`<option value="${x}" ${x===d.symbol?'selected':''}>${x}/USDT</option>`).join('')}<option value="CUSTOM" ${custom?'selected':''}>رمزارز دیگر…</option></select>${custom?`<input id="al-custom-symbol" class="fi" style="margin-top:7px;text-transform:uppercase;direction:ltr;text-align:left" maxlength="12" value="${esc(d.symbol)}" placeholder="SYMBOL مثل POL" oninput="setCustomAlertSymbol(this.value)">`:''}<span id="al-current" class="price-context"><span>قیمت فعلی</span><strong>${custom&&!d.symbol?'پس از ورود Symbol':'در حال دریافت…'}</strong></span></label><label class="fg"><span class="fl">قیمت هدف (USDT) <span class="req">*</span></span><input id="al-target" class="fi" type="number" min="0" step="any" inputmode="decimal" value="${esc(d.targetPrice)}" placeholder="مثلاً 120000" oninput="setAlertDraft('targetPrice',this.value)"><span style="font-size:9px;color:var(--muted)">قیمت باید عددی مثبت و دقیق باشد.</span></label></div>
+  <div class="alert-form-grid"><label class="fg"><span class="fl">رمزارز <span class="req">*</span> <span class="fl-note">${faNum(knownCoins.length)} رمزارز</span></span><input id="al-symbol-search" class="fi coin-search" type="search" autocomplete="off" dir="auto" value="${esc(d._q||'')}" placeholder="🔍 جستجو — مثلاً PAXG، gold یا طلا" oninput="filterAlertSymbols(this.value)"><select id="al-symbol" class="fi" style="margin-top:7px" onchange="handleAlertSymbolSelect(this.value)">${alertSymbolOptions(d)}</select><span id="al-symbol-hint" class="coin-hint">${alertSymbolHint(d)}</span>${custom?`<input id="al-custom-symbol" class="fi" style="margin-top:7px;text-transform:uppercase;direction:ltr;text-align:left" maxlength="12" value="${esc(d.symbol)}" placeholder="SYMBOL مثل POL" oninput="setCustomAlertSymbol(this.value)">`:''}<span id="al-current" class="price-context"><span>قیمت فعلی</span><strong>${custom&&!d.symbol?'پس از ورود Symbol':'در حال دریافت…'}</strong></span></label><label class="fg"><span class="fl">قیمت هدف (USDT) <span class="req">*</span></span><input id="al-target" class="fi" type="number" min="0" step="any" inputmode="decimal" value="${esc(d.targetPrice)}" placeholder="مثلاً 120000" oninput="setAlertDraft('targetPrice',this.value)"><span style="font-size:9px;color:var(--muted)">قیمت باید عددی مثبت و دقیق باشد.</span></label></div>
   <div class="fg" style="margin-top:15px"><span class="fl">شرط فعال‌شدن</span><div class="mode-grid"><button class="mode-option ${d.condition==='above'?'active':''}" onclick="chooseAlertMode('condition','above',this)"><b>↗ عبور رو به بالا</b><span>قیمت از پایین به هدف برسد یا عبور کند</span></button><button class="mode-option ${d.condition==='below'?'active':''}" onclick="chooseAlertMode('condition','below',this)"><b>↘ عبور رو به پایین</b><span>قیمت از بالا به هدف برسد یا پایین‌تر رود</span></button><button class="mode-option ${d.condition==='zone'?'active':''}" onclick="chooseAlertMode('condition','zone',this)"><b>◎ ورود به محدوده</b><span>ورود از هر جهت به ناحیه تصمیم</span></button></div></div>${d.condition==='zone'?`<label class="fg" style="margin-top:12px;max-width:260px"><span class="fl">تلرانس محدوده (درصد)</span><input id="al-tolerance" class="fi" type="number" min="0.05" max="5" step="0.05" value="${esc(d.tolerance)}" oninput="setAlertDraft('tolerance',this.value)"></label>`:''}
   <div class="fg" style="margin-top:15px"><span class="fl">اهمیت هشدار</span><div class="severity-grid"><button class="severity-option ${d.severity==='normal'?'active':''}" onclick="chooseAlertMode('severity','normal',this)"><b>عادی</b><span>اعلان سبک و قابل آرشیو</span></button><button class="severity-option ${d.severity==='important'?'active':''}" onclick="chooseAlertMode('severity','important',this)"><b>مهم</b><span>اولویت بالاتر و ویبره فعال</span></button><button class="severity-option ${d.severity==='critical'?'active':''}" onclick="chooseAlertMode('severity','critical',this)"><b>بحرانی</b><span>امکان عبور از ساعات سکوت طبق تنظیم مدیر</span></button></div></div>
   <div class="fg" style="margin-top:15px"><span class="fl">کانال‌های تحویل</span><div class="channel-picks"><label class="channel-pick ${channels.telegram&&canTelegram?'active':''} ${canTelegram?'':'blocked'}"><input type="checkbox" ${channels.telegram&&canTelegram?'checked':''} ${canTelegram?'':'disabled'} onchange="toggleAlertChannel('telegram',this)">Telegram</label><label class="channel-pick ${channels.push&&canPush?'active':''} ${canPush?'':'blocked'}"><input type="checkbox" ${channels.push&&canPush?'checked':''} ${canPush?'':'disabled'} onchange="toggleAlertChannel('push',this)">Push دستگاه</label><label class="channel-pick ${channels.inApp&&canInApp?'active':''} ${canInApp?'':'blocked'}"><input type="checkbox" ${channels.inApp&&canInApp?'checked':''} ${canInApp?'':'disabled'} onchange="toggleAlertChannel('inApp',this)">داخل ژورنال</label></div></div>
@@ -6094,7 +6149,7 @@ async function updateAlertEditorPrice(){
   const p=await livePrice(sym);
   const cur=document.getElementById('al-current');
   if(!cur||ALERT_EDITOR?.symbol!==sym)return;   // کاربر رمزارز را عوض کرده
-  cur.innerHTML=`<span>قیمت فعلی ${esc(sym)}</span><strong>${p!=null?alertPrice(p):'در دسترس نیست'}</strong>`;
+  cur.innerHTML=`<span>قیمت فعلی ${esc(sym)}</span><strong${p==null&&LIVE_PRICE_MISSING[sym]?' style="color:var(--red)"':''}>${p!=null?alertPrice(p):LIVE_PRICE_MISSING[sym]?'در منابعِ قیمتِ ما نیست — هشدار روی آن فعال نمی‌شود':'در دسترس نیست'}</strong>`;
 }
 
 // قیمت هدف را با قیمت زنده می‌سنجد. فرم قیمت لحظه‌ای را از قبل نشان می‌داد
@@ -6108,6 +6163,11 @@ function alertAlreadyPassed(condition, price, target){
 async function confirmAlertScale(symbol, target, condition){
   let price = null;
   try{ price = alertDemoMode() ? ALERT_PRICE_DEMO[symbol] : await livePrice(symbol) }catch(_){ }
+  // v26.11: سرور گفت این نماد در هیچ منبعی قیمت ندارد ⇒ هشدار هرگز فعال نمی‌شود؛ ساخته نشود
+  if (price == null && !alertDemoMode() && LIVE_PRICE_MISSING[symbol]) {
+    alert(`قیمت ${symbol} در منابعِ قیمتِ ژورنال (Hyperliquid، Coinbase، OKX) پیدا نشد؛ هشدار روی آن هرگز فعال نمی‌شود.\n\nنماد را بررسی کن یا رمزارز دیگری انتخاب کن.`);
+    return false;
+  }
   if(alertAlreadyPassed(condition, price, target)){
     const up = condition === 'above';
     if(!confirm(`⚠️ قیمت فعلی ${symbol} (${alertPrice(price)}) همین الان ${up ? 'بالای' : 'زیر'} هدف تو (${alertPrice(target)}) است.` + '\n\n'
@@ -6125,7 +6185,7 @@ async function confirmAlertScale(symbol, target, condition){
 }
 
 async function savePriceAlert(){
-  const target=Number(ALERT_EDITOR?.targetPrice),tol=Number(ALERT_EDITOR?.tolerance||.5);if(!ALERT_EDITOR||!/^[A-Z0-9]{2,12}$/.test(ALERT_EDITOR.symbol)){showToast('Symbol معتبر رمزارز را وارد کنید');document.getElementById('al-custom-symbol')?.focus();return}if(!Number.isFinite(target)||target<=0){showToast('قیمت هدف معتبر وارد کنید');document.getElementById('al-target')?.focus();return}if(ALERT_EDITOR.condition==='zone'&&(tol<.05||tol>5)){showToast('تلرانس باید بین ۰٫۰۵ تا ۵ درصد باشد');return}
+  const target=Number(ALERT_EDITOR?.targetPrice),tol=Number(ALERT_EDITOR?.tolerance||.5);if(!ALERT_EDITOR||!/^[A-Z0-9]{1,12}$/.test(ALERT_EDITOR.symbol)){showToast('نماد معتبر رمزارز را وارد یا انتخاب کنید');document.getElementById('al-custom-symbol')?.focus();return}if(!Number.isFinite(target)||target<=0){showToast('قیمت هدف معتبر وارد کنید');document.getElementById('al-target')?.focus();return}if(ALERT_EDITOR.condition==='zone'&&(tol<.05||tol>5)){showToast('تلرانس باید بین ۰٫۰۵ تا ۵ درصد باشد');return}
   const channels=ALERT_EDITOR.channels||{};if(!channels.telegram&&!channels.push&&!channels.inApp){showToast('حداقل یک کانال اعلان را انتخاب کنید');return}
   if(!(await confirmAlertScale(ALERT_EDITOR.symbol, target, ALERT_EDITOR.condition))) return;
   const payload={symbol:ALERT_EDITOR.symbol,targetPrice:target,condition:ALERT_EDITOR.condition,tolerance:tol,deliveryMode:ALERT_EDITOR.deliveryMode,frequency:ALERT_EDITOR.frequency,severity:ALERT_EDITOR.severity||'normal',telegramEnabled:!!channels.telegram,pushEnabled:!!channels.push,inAppEnabled:!!channels.inApp,note:String(ALERT_EDITOR.note||'').slice(0,500),expiresAt:ALERT_EDITOR.expiresAt||null};const btn=document.getElementById('al-save');if(btn)btn.disabled=true;
