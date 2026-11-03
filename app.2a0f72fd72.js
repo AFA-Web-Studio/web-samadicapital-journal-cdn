@@ -5280,6 +5280,12 @@ function setLoginBusy(busy){
 }
 (function(){ const y=document.getElementById('lg-year'); if(y) y.textContent=new Date().getFullYear(); })();
 
+// v26.12: قفل پله‌ای است (۱۵ دقیقه ← ۱ ساعت ← ۲۴ ساعت) — زمانِ واقعی از پاسخِ سرور
+function loginLockText(until){
+  const m=Math.ceil((Date.parse(until)-Date.now())/6e4);
+  const w=!(m>0)?'چند دقیقه‌ی':m>=55?`${faNum(Math.round(m/60))} ساعتِ`:`${faNum(m)} دقیقه‌ی`;
+  return `🔒 به دلیل تلاشِ اشتباهِ زیاد، ورود قفل شد؛ ${w} دیگر دوباره امتحان کنید`;
+}
 function doLogin(){
   setLoginBusy(true);
   const err=document.getElementById('lerr');err.style.display='none';
@@ -5298,7 +5304,7 @@ function doLogin(){
       }
       const d=await r.json().catch(()=>({}));
       if(r.ok){setToken(d.token);L.s('sc_offline_ok_mentor',true);await rememberMentorPass(password);startMentorSession();}
-      else if(r.status===423)fail('🔒 به دلیل تلاش زیاد، ورود ۱۵ دقیقه قفل شد');
+      else if(r.status===423)fail(loginLockText(d.until));
       else fail('⚠️ رمز عبور اشتباه است'+(d.left?` (${faNum(d.left)} تلاش مانده)`:''));
     });
   } else {
@@ -5322,9 +5328,10 @@ function doLogin(){
       const d=await r.json().catch(()=>({}));
       if(r.ok){setToken(d.token);L.s('sc_offline_ok_'+d.uid,d.name||true);L.s('sc_acct_'+d.uid,d.accountType||'cip');startSession({role:'student',uid:d.uid,name:d.name,accountType:d.accountType||'cip'});}
       else if(r.status===404)fail('⚠️ این شماره ثبت نشده. با استاد تماس بگیرید');
-      else if(r.status===428)fail('⚠️ برای شما هنوز PIN ساخته نشده — از استاد بخواهید');
-      else if(r.status===423)fail('🔒 به دلیل تلاش زیاد، ورود ۱۵ دقیقه قفل شد');
-      else fail('⚠️ PIN اشتباه است'+(d.left?` (${faNum(d.left)} تلاش مانده)`:''));
+      else if(r.status===403)fail('⛔ این حساب غیرفعال شده است؛ با پشتیبانی تماس بگیرید');
+      else if(r.status===423)fail(loginLockText(d.until));
+      // v26.12: سرور دیگر نمی‌گوید «شماره ثبت نشده» یا «PIN ساخته نشده» (هر کسی می‌توانست عضویت را بپرسد) — یک پیام برای همه
+      else fail('⚠️ شماره یا PIN درست نیست'+(d.left?` (${faNum(d.left)} تلاش مانده)`:'')+'. اگر PIN ندارید یا فراموش کرده‌اید، به استاد پیام بدهید.');
       setLoginBusy(false);
     });
   }
