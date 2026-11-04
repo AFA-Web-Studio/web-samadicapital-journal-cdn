@@ -1615,3 +1615,96 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 /* v26.11 — جستجوی رمزارز در فرم هشدار */
 #al-symbol-hint{display:block;margin-top:5px;min-height:0}
 .coin-use{margin-inline-start:6px;padding:2px 9px;border-radius:8px;border:1px solid rgba(236,211,145,.35);background:rgba(207,174,98,.08);color:var(--gold-light);font:600 11px/1.6 var(--f-body);cursor:pointer}
+
+/* v26.13 — ظاهر و کاربری: تب‌های داشبورد، سه نمره، جدولِ دسکتاپ، تاریخِ شمسی */
+.dtabs{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;padding:4px;margin:2px 0 14px;border-radius:16px;background:rgba(0,0,0,.28);border:1px solid var(--border)}
+.dtabs button{min-height:42px;padding:0 8px;border:0;border-radius:12px;background:transparent;color:var(--muted);font:600 13px/1.2 var(--f-body);cursor:pointer;transition:color .25s var(--ease),background .25s var(--ease)}
+.dtabs button:hover{color:var(--text)}
+.dtabs button.on{background:linear-gradient(180deg,rgba(236,211,145,.2),rgba(207,174,98,.08));color:#f6e3ae;box-shadow:inset 0 0 0 1px rgba(236,211,145,.32)}
+.dtabs button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.dtabs .s{display:none}
+@media (max-width:520px){.dtabs .l{display:none}.dtabs .s{display:inline}}
+.dpane{animation:dpIn .35s var(--ease)}
+@keyframes dpIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.dpane-empty{padding:30px 18px}
+.sc-tag{font-size:10.5px;font-weight:600;color:var(--gold-light);padding:3px 9px;border-radius:999px;border:1px solid rgba(236,211,145,.3);background:rgba(207,174,98,.08);white-space:nowrap}
+.disc-foot{font-size:11px;color:var(--muted);margin-top:9px;line-height:1.8}
+.scx .scx-r{display:grid;grid-template-columns:78px 1fr;gap:14px;align-items:center;padding:13px 0;border-top:1px solid var(--border)}
+.scx .scx-r:first-of-type{border-top:0;padding-top:2px}
+.scx-v{font:700 26px/1 var(--f-mono);text-align:center}
+.scx-v small{display:block;margin-top:6px;font:500 10.5px/1 var(--f-body);color:var(--muted)}
+.scx-r u{display:block;text-decoration:none;font-size:11.5px;color:var(--gold-light)}
+.scx-r b{display:block;font-size:14px;color:var(--text);margin-top:3px}
+.scx-r em{display:block;font-style:normal;font-size:11.5px;color:var(--text2);margin-top:4px;line-height:1.75}
+.pb-score{display:flex;align-items:center;gap:14px;padding:12px 14px;margin:-2px 0 14px;border-radius:14px;background:rgba(255,246,228,.03);border:1px solid var(--border)}
+.pb-score>b{font:700 30px/1 var(--f-mono);flex:none}
+.pb-score span{font-size:12px;line-height:1.8;color:var(--text2)}
+.pb-score em{display:block;font-style:normal;color:var(--muted)}
+.tg-now{padding:12px 14px;border-radius:14px;border:1px solid rgba(63,214,154,.25);background:rgba(63,214,154,.06)}
+.tg-now.hit{border-color:rgba(255,107,120,.35);background:rgba(255,107,120,.07)}
+.tg-now b{display:block;font-size:14px;color:var(--green)}.tg-now.hit b{color:var(--red)}
+.tg-now span{display:block;font-size:12px;color:var(--text2);margin-top:4px;line-height:1.7}
+.tg-after{display:flex;align-items:center;gap:12px;margin-top:12px}
+.tg-after b{font:700 24px/1 var(--f-mono);min-width:40px;text-align:center}
+.tg-after span{font-size:12px;color:var(--text2);line-height:1.7}
+.tbl-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 12px}
+.tbl-coin{width:auto;min-width:180px;min-height:38px!important;padding-block:6px}
+.tbl-reset{min-height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--border2);background:transparent;color:var(--text2);font:600 12px/1 var(--f-body);cursor:pointer}
+.tbl-reset:hover{color:var(--gold-light);border-color:rgba(236,211,145,.35)}
+.tbl-n{margin-inline-start:auto;font-size:12px;color:var(--muted)}
+.tbl-wrap{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;background:linear-gradient(145deg,rgba(29,27,24,.92),rgba(21,19,16,.96));box-shadow:var(--shadow-card)}
+.ttbl{width:100%;border-collapse:collapse;font-size:13px}
+.ttbl th{background:#14120f;text-align:start;font:600 11.5px/1 var(--f-body);color:var(--muted);padding:0;border-bottom:1px solid var(--border2);white-space:nowrap}
+.ttbl th.np{padding:13px 12px}
+.ttbl th button{display:flex;align-items:center;gap:5px;width:100%;padding:13px 12px;border:0;background:none;color:inherit;font:inherit;cursor:pointer;text-align:start}
+.ttbl th button i{font-style:normal;font-size:9px;opacity:.55}
+.ttbl th button:hover,.ttbl th[aria-sort=ascending] button,.ttbl th[aria-sort=descending] button{color:var(--gold-light)}
+.ttbl th[aria-sort=ascending] button i,.ttbl th[aria-sort=descending] button i{opacity:1}
+.ttbl th button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.ttbl td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap;color:var(--text)}
+.ttbl tbody tr{cursor:pointer;transition:background .2s}
+.ttbl tbody tr:nth-child(even){background:rgba(255,246,228,.014)}
+.ttbl tbody tr:hover{background:rgba(207,174,98,.065)}
+.ttbl tbody tr:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+.ttbl tbody tr:last-child td{border-bottom:0}
+.tb-num{font-family:var(--f-mono);font-size:12.5px}
+.tb-num small,.tb-date small{display:block;font-size:10.5px;color:var(--muted);margin-top:3px;font-family:var(--f-mono)}
+.tb-date{font-size:12.5px}
+.tb-coin{display:flex;align-items:center;gap:8px}
+.tb-coin .t-icon{width:26px;height:26px;border-radius:8px;font-size:8px;flex:none}
+.tb-coin .tl-badge{font-size:10px}
+.tb-q{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px}
+.tb-q i{width:8px;height:8px;border-radius:50%}
+.tb-q.off{font-family:var(--f-body);color:var(--muted);font-size:11.5px}
+.tb-tags span{display:inline-block;margin-inline-end:4px;padding:2px 8px;border-radius:7px;background:rgba(207,174,98,.1);color:var(--gold);font-size:11px}
+.tb-tags em{font-style:normal;font-size:11px;color:var(--muted)}
+.jd-fg{grid-column:1/-1}
+.jdt{display:flex;gap:8px;align-items:stretch;position:relative}
+.jd-btn{flex:1;min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:start;cursor:pointer;font:inherit;color:var(--text)}
+.jd-btn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jd-btn small{margin-inline-start:8px;font-size:.86em;color:var(--muted)}
+.disc-sub{margin:-4px 0 10px}
+.jd-btn i{font-style:normal;color:var(--gold);font-size:11px}
+.jd-time{display:flex;align-items:center;gap:4px;flex:none}
+.jd-time .fi{width:64px;padding-inline:6px;text-align:center;text-align-last:center;font-family:var(--f-mono)}
+.jd-time b{color:var(--muted)}
+.jd-quick{display:flex;gap:6px;margin-top:8px}
+.jd-quick button{min-height:30px;padding:0 13px;border-radius:999px;border:1px solid var(--border2);background:transparent;color:var(--text2);font:600 12px/1 var(--f-body);cursor:pointer}
+.jd-quick button:hover{color:var(--gold-light);border-color:rgba(236,211,145,.35)}
+.jd-pop{position:absolute;z-index:40;inset-inline-start:0;top:calc(100% + 6px);width:min(320px,100%);padding:12px;border-radius:18px;background:#14120f;border:1px solid var(--border2);box-shadow:0 24px 60px -20px rgba(0,0,0,.85)}
+.jd-pop[hidden]{display:none}
+.jd-head{display:flex;align-items:center;gap:4px;margin-bottom:8px}
+.jd-head b{flex:1;text-align:center;font-size:14px;color:var(--text)}
+.jd-head button,.jd-foot button{min-width:32px;min-height:32px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font:600 14px/1 var(--f-body)}
+.jd-head button:hover:not(:disabled),.jd-foot button:hover{color:var(--gold-light);border-color:rgba(236,211,145,.35)}
+.jd-head button:disabled{opacity:.3;cursor:default}
+.jd-wd,.jd-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center}
+.jd-wd span{font-size:11px;color:var(--muted);padding:4px 0}
+.jd-grid button{aspect-ratio:1;border:0;border-radius:10px;background:transparent;color:var(--text);font:500 13px/1 var(--f-mono);cursor:pointer}
+.jd-grid button:hover:not(:disabled){background:rgba(207,174,98,.12)}
+.jd-grid button.now{box-shadow:inset 0 0 0 1px rgba(236,211,145,.45);color:var(--gold-light)}
+.jd-grid button.sel{background:var(--grad-gold);color:#14110b;font-weight:700}
+.jd-grid button:disabled{color:rgba(244,239,230,.16);cursor:default}
+.jd-foot{display:flex;justify-content:center;margin-top:8px}
+.jd-foot button{padding:0 14px;font-size:12px}
+@media (max-width:420px){.jd-time .fi{width:56px}.jd-btn small{display:none}}

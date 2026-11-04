@@ -478,29 +478,30 @@ const DEFAULT_ENTRY_REASONS = [
 
 // ── حد ضرر/سود: دو ست جداگانه برای Long و Short ──
 // Long SL = زیر سطح | Short SL = بالای سطح
+// v26.14 (مالک ۱۴۰۵-۰۸-۱۳): «زیر/بالای شکست پرایس اکشن» — همان قاعده‌ی فهرست‌های مالک: لانگ «زیر»، شورت «بالای»
 const DEFAULT_SL_LONG = [
   'زیر حمایت استاتیک','زیر حمایت داینامیک',
   'زیر فیبو','زیر کانال','زیر الگو',
-  'زیر کف اخیر','زیر سطح شکسته',
+  'زیر کف اخیر','زیر سطح شکسته','زیر شکست پرایس اکشن',
   'ATR-Based','Fixed %','Risk/Reward Based'
 ];
 const DEFAULT_SL_SHORT = [
   'بالای مقاومت استاتیک','بالای مقاومت داینامیک',
   'بالای فیبو','بالای کانال','بالای الگو',
-  'بالای سقف اخیر','بالای سطح شکسته',
+  'بالای سقف اخیر','بالای سطح شکسته','بالای شکست پرایس اکشن',
   'ATR-Based','Fixed %','Risk/Reward Based'
 ];
 
 // Long TP = بالای سطح | Short TP = زیر سطح
 const DEFAULT_TP_LONG = [
   'مقاومت استاتیک','مقاومت داینامیک',
-  'بالای فیبو','بالای کانال','هدف الگو',
+  'بالای فیبو','بالای کانال','هدف الگو','زیر شکست پرایس اکشن',
   'سقف تاریخی','R:R 1:2','R:R 1:3','R:R 1:4',
   'ATR Target','فریم بالاتر','خبر/رویداد'
 ];
 const DEFAULT_TP_SHORT = [
   'حمایت استاتیک','حمایت داینامیک',
-  'زیر فیبو','زیر کانال','هدف الگو',
+  'زیر فیبو','زیر کانال','هدف الگو','بالای شکست پرایس اکشن',
   'کف تاریخی','R:R 1:2','R:R 1:3','R:R 1:4',
   'ATR Target','فریم بالاتر','خبر/رویداد'
 ];
@@ -836,6 +837,8 @@ function fmtDateFaShort(iso){
   try{const j=g2j(gy,gm,gd);return faNum(j.jd)+' '+JMONTHS[j.jm-1]}catch(e){return iso}
 }
 function isoOfG(g){return String(g.gy).padStart(4,'0')+'-'+String(g.gm).padStart(2,'0')+'-'+String(g.gd).padStart(2,'0')}
+// v26.13: تاریخِ محلیِ دستگاه، نه UTC — toISOString بین ۰۰:۰۰ تا ۰۳:۳۰ تهران روزِ قبل را می‌داد
+function isoLocal(d=new Date()){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 
 // ── فیدبک منتور روی ترید — کلید جدید sc_feedback_<uid> (به دیتای موجود دست نمی‌زند) ──
 let FEEDBACK={};        // برای دانشجوی جاری: {tradeId:{text,at}}
@@ -1433,6 +1436,15 @@ function academyDiscipline(list){
   const parts=Object.fromEntries(Object.keys(DISC_W).map(x=>[x,k?cnt[x]/k:0]));
   return{parts,counted:k,score:k?Math.round(Object.keys(DISC_W).reduce((a,x)=>a+cnt[x]/k*DISC_W[x],0)):0};
 }
+// v26.13: R واقعیِ یک ترید = سود/زیان ÷ ریسک تا حد ضرر (حالت ۳: مارجین ایزوله + ذخیره‌ی هزینه).
+// میانگین R در آمار و ستونِ «R واقعی» جدول هر دو از همین می‌خوانند.
+function tradeR(t, p = calcPnl(t)){
+  const e=+t.entry,sl=+t.stopLoss,sz=+t.size,lev=+t.leverage||1,iso=isIsolatedBudget(t);
+  if(!t.exit||!e||!(sl||iso)||!sz||p==null) return null;
+  const atStop=sl?Math.abs(e-sl)/e*sz*lev:Infinity;
+  const risk=iso?Math.min(sz,atStop)+(+t.feeReserve||0):atStop;
+  return risk>0?p/risk:null;
+}
 function computeStats(trades,discList){
   // v13: ترتیب زمانی واقعی — منحنی سرمایه/دراودان/استریک حتی با ثبت ترید گذشته درست می‌ماند
   const closed=trades.filter(t=>t.exit)
@@ -1502,15 +1514,7 @@ function computeStats(trades,discList){
 
   // ── v13: R-multipleها، انتظار ریاضی، تحلیل روز/ساعت/تگ، دیسیپلین ──
   const rMuls=[];
-  closed.forEach((t,i)=>{
-    const e=+t.entry,sl=+t.stopLoss,sz=+t.size,lev=+t.leverage||1,p=pnls[i],iso=isIsolatedBudget(t);
-    if(e&&(sl||iso)&&sz&&p!==null&&p!==undefined){
-      const atStop=sl?Math.abs(e-sl)/e*sz*lev:Infinity;
-      // حالت ۳: ریسکِ هر ترید مارجین ایزوله است (به‌اضافه‌ی ذخیره‌ی هزینه)
-      const risk=iso?Math.min(sz,atStop)+(+t.feeReserve||0):atStop;
-      if(risk>0)rMuls.push(p/risk);
-    }
-  });
+  closed.forEach((t,i)=>{ const r=tradeR(t,pnls[i]); if(r!=null)rMuls.push(r); });
   const avgR=rMuls.length?rMuls.reduce((a,b)=>a+b,0)/rMuls.length:null;
   const expectancy=closed.length?total/closed.length:0;
 
@@ -1920,9 +1924,9 @@ function disciplineCard(s){
         <div class="disc-ring-in"><span style="color:${col}">${faNum(d.score)}</span><small>از ۱۰۰</small></div>
       </div>
       <div style="flex:1;min-width:0">
-        <div class="card-title" style="margin-bottom:10px">🎖️ نمره دیسیپلین</div>
+        <div class="card-title" style="margin-bottom:10px">🎖️ کامل‌بودنِ ژورنال</div><div class="disc-sub"><span class="sc-tag">نمره‌ی انضباطِ آکادمی</span></div>
         ${items.map(([k,v])=>`<div class="disc-row"><span>${k}</span><div class="disc-bar"><div style="width:${Math.round(v*100)}%;background:${v>=0.75?'var(--green)':v>=0.45?'var(--gold)':'var(--red)'}"></div></div><b>${faNum(Math.round(v*100))}٪</b></div>`).join('')}
-        <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.8">روی ${faNum(d.counted)} ترید · همین عدد در آکادمی ملاک جلسهٔ مازاد است.</div>
+        <div class="disc-foot">می‌سنجد هر معامله چقدر کامل ثبت شده: قیمت‌ها، دلیل‌ها، R:R و احساسِ لحظه‌ی ورود. روی ${faNum(d.counted)} ترید · همین عدد در آکادمی ملاک جلسهٔ مازاد است.</div>
       </div>
     </div>
   </div>`;
@@ -2170,7 +2174,7 @@ function perfSpark(data){
 function perfHero(fs, rangeLbl, shown, list){
   const total = fs?.total || 0, closedN = fs ? fs.wins + fs.losses : 0;
   const pb = playbookStats(), xq = (typeof xqStats === 'function') ? xqStats() : null;
-  const adherence = pb ? (pb.ok ? pb.ok.n : 0) / pb.total * 100 : null;
+  const adherence = pb ? pb.avgAdh : null;
   const wr = fs && closedN ? parseFloat(fs.winRate) : null;
   const pf = fs && closedN ? fs.profitFactor : null, pfN = pf === '∞' ? Infinity : +pf;
   const tone = (v, good, ok) => v == null ? null : v >= good ? 'var(--green)' : v >= ok ? 'var(--gold-light)' : 'var(--red)';
@@ -2183,7 +2187,7 @@ function perfHero(fs, rangeLbl, shown, list){
     kpi('فاکتور سود', pf == null ? '—' : `<bdi dir="ltr">${pf === '∞' ? '∞' : (+pf).toFixed(2)}</bdi>`, 'سودِ کل ÷ زیانِ کل', pf == null ? null : tone(pfN, 1.5, 1)),
     kpi('امید ریاضی', fs && closedN ? `<bdi dir="ltr">${fmtUSD(fs.expectancy)}</bdi>` : '—', 'به ازای هر معامله', fs && closedN ? (fs.expectancy >= 0 ? 'var(--green)' : 'var(--red)') : null),
     kpi('میانگین R', fs && fs.avgR != null ? `<bdi dir="ltr">${(+fs.avgR).toFixed(2)}R</bdi>` : '—', fs && fs.rCount ? `${faNum(fs.rCount)} معامله با حد ضرر` : 'حد ضرر ثبت نشده', fs && fs.avgR != null ? (+fs.avgR >= 0 ? 'var(--green)' : 'var(--red)') : null),
-    kpi('پایبندی به پلن', adherence == null ? '—' : pct(adherence), pb ? `${faNum(pb.total)} سنجیده` : 'هنوز سنجیده نشده', tone(adherence, 75, 45), adherence),
+    kpi('پایبندی به پلن', adherence == null ? '—' : pct(adherence), pb ? `${faNum(Math.round(pb.fullPct))}٪ معامله‌ها کاملاً طبق پلن` : 'هنوز سنجیده نشده', tone(adherence, 75, 45), adherence),
     ...(xq && xq.n ? [kpi('نرخ تصرف', pct(xq.avgCapture), `${faNum(xq.n)} خروج سنجیده`, tone(xq.avgCapture, 60, 36), xq.avgCapture)] : [])
   ];
   const dl = list && list.length ? perfDelta(list) : null;
@@ -2458,6 +2462,56 @@ function proModesAnnouncement(){
   </div>`;
 }
 
+// ── v26.13: تب‌های داشبورد ──
+const DASH_TABS=[['sum','خلاصه','خلاصه'],['beh','رفتار و انضباط','انضباط'],['stat','آمار و تفکیک','آمار'],['course','دوره','دوره']];
+let DASH_TAB=L.g('sc_dash_tab')||'sum';
+function dashTabs(panes){
+  const tabs=DASH_TABS.filter(([k])=>panes[k]!=null);
+  if(!tabs.some(([k])=>k===DASH_TAB)) DASH_TAB='sum';
+  const none='<div class="empty dpane-empty"><div class="empty-t">این بخش هنوز داده ندارد</div><div class="empty-s">بعد از چند معامله‌ی بسته و کامل پر می‌شود</div></div>';
+  return `<div class="dtabs" role="tablist" aria-label="بخش‌های داشبورد" onkeydown="dashTabKey(event)">${tabs.map(([k,l,sh])=>
+      `<button type="button" role="tab" id="dtab-${k}" aria-controls="dpane-${k}" aria-selected="${k===DASH_TAB}" tabindex="${k===DASH_TAB?0:-1}" class="${k===DASH_TAB?'on':''}" onclick="setDashTab('${k}')"><span class="l">${l}</span><span class="s">${sh}</span></button>`).join('')}</div>
+    ${tabs.map(([k])=>`<div class="dpane" role="tabpanel" id="dpane-${k}" aria-labelledby="dtab-${k}"${k===DASH_TAB?'':' hidden'}>${panes[k].trim()||none}</div>`).join('')}`;
+}
+function setDashTab(k){
+  DASH_TAB=k; L.s('sc_dash_tab',k);
+  document.querySelectorAll('.dtabs [role=tab]').forEach(b=>{const on=b.id==='dtab-'+k;b.classList.toggle('on',on);b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1});
+  document.querySelectorAll('.dpane').forEach(p=>{p.hidden=p.id!=='dpane-'+k});
+}
+// فلش‌ها بینِ تب‌ها (راست‌به‌چپ: فلشِ چپ = تبِ بعدی)
+function dashTabKey(e){
+  const d=e.key==='ArrowLeft'?1:e.key==='ArrowRight'?-1:0; if(!d) return;
+  const bs=[...e.currentTarget.querySelectorAll('[role=tab]')], at=bs.indexOf(document.activeElement); if(at<0) return;
+  const b=bs[(at+d+bs.length)%bs.length]; e.preventDefault(); b.focus(); b.click();
+}
+// v26.13 (بازبینی A3): سه عدد، سه سؤالِ جدا — تا «۹۴» و «۱۳٪» کنار هم گیج‌کننده نباشند
+function scoresCard(){
+  const pb=playbookStats(), d=academyDiscipline(TRADES);
+  const touched=TRADES.filter(t=>!t._deleted&&tradeTouched(t));
+  const ok=touched.length?touched.filter(principlesMet).length/touched.length*100:null;
+  const tone=(v,g,o)=>v==null?'var(--muted)':v>=g?'var(--green)':v>=o?'var(--gold-light)':'var(--red)';
+  const row=(q,name,v,unit,col,what)=>`<div class="scx-r"><div class="scx-v" style="color:${col}">${v==null?'—':faNum(Math.round(v))}<small>${v==null?'هنوز نه':unit}</small></div>
+    <div><u>${q}</u><b>${name}</b><em>${what}</em></div></div>`;
+  return `<div class="card scx fade-up"><div class="card-title">سه عدد، سه سؤال</div>
+    ${row('قانون‌های پلن را رعایت کردی؟','پایبندی به پلن',pb?pb.avgAdh:null,'٪',tone(pb?.avgAdh,75,45),
+      pb?`میانگینِ قانون‌های اصلیِ رعایت‌شده در هر معامله؛ ${faNum(Math.round(pb.fullPct))}٪ معامله‌ها همه را با هم داشتند.`:'میانگینِ قانون‌های اصلیِ رعایت‌شده در هر معامله؛ از ۶ معامله‌ی بسته و کامل به بعد.')}
+    ${row('با دلیلِ کافی وارد شدی؟','ورود اصولی',ok,'٪',tone(ok,60,35),'سهمِ معامله‌هایی که دلیل‌های لازمِ ورود، حد ضرر و حد سود را دارند.')}
+    ${row('ژورنالت کامل است؟','کامل‌بودنِ ژورنال',d&&d.counted?d.score:null,'از ۱۰۰',tone(d&&d.counted?d.score:null,75,45),'قیمت‌ها، دلیل‌ها، R:R و احساسِ هر معامله — همان نمره‌ی انضباطِ آکادمی.')}
+  </div>`;
+}
+// v26.13: محافظ روز بد در تبِ «رفتار و انضباط» — وضعیتِ امروز و معامله‌های بعد از سقف در ۳۰ روز
+function tiltDashCard(){
+  const cfg=tiltConfig(S.g('sc_tilt')); if(!cfg.enabled) return '';
+  const st=tiltNow(), from=isoLocal(new Date(Date.now()-30*864e5));
+  const after=TRADES.filter(t=>!t._deleted&&t.afterLimit&&String(t.date||'')>=from).length;
+  const pc=v=>faNum(String(+(+v).toFixed(1))).replace('.','٫');
+  return `<div class="card tg-card fade-up"><div class="card-title">🛑 محافظ روز بد</div>
+    <div class="tg-now ${st.hit?'hit':''}"><b>${st.hit?'امروز کافی است':'امروز در محدوده‌ای'}</b>
+      <span>${st.hit?tiltWhy(st):`ضررِ پشت‌سرِهم: ${faNum(st.streak)} از ${faNum(cfg.streak)}${st.pct!=null?`، ضررِ امروز ${pc(st.pct)}٪ از سقفِ ${pc(cfg.dailyPct)}٪`:''}`}</span></div>
+    <div class="tg-after"><b style="color:${after?'var(--red)':'var(--green)'}">${faNum(after)}</b>
+      <span>معامله بعد از رسیدن به سقفِ روزانه، در ۳۰ روزِ اخیر${after?' — در ژورنال با برچسبِ «بعد از سقف» پیدایشان کن.':'.'}</span></div>
+  </div>`;
+}
 function renderStudentDashboard(){
   const s=computeStats(TRADES);
   const el=document.getElementById('dash-content');
@@ -2484,20 +2538,18 @@ function renderStudentDashboard(){
   const allS=dashRange==='all'?fs:computeStats(phased);
   const total=fs?.total||0;
   const rangeLbl={all:'سود/زیان کل',month:'سود/زیان این ماه','30':'سود/زیان ۳۰ روز','90':'سود/زیان ۹۰ روز'}[dashRange]||'سود/زیان';
-  const statBody=(!fs||!ftr.length)?`
-    <div class="empty" style="padding:34px 20px"><span class="empty-ico">🗓️</span><div class="empty-t">در این بازه تریدی ثبت نشده</div><div class="empty-s">بازه دیگری را انتخاب کنید</div></div>`:`
-    ${kpiGrid(fs, true)}
+  const has=!!(fs&&ftr.length);
+  const empty=`<div class="empty" style="padding:34px 20px"><span class="empty-ico">🗓️</span><div class="empty-t">در این بازه تریدی ثبت نشده</div><div class="empty-s">بازه دیگری را انتخاب کنید</div></div>`;
+  const course=`${proCompareCard()}${proRiskCard()}`;
+  // v26.13 (بازبینی U3): ۱۶ بخشِ پشت‌سرِهم (~۹٬۰۰۰ پیکسل) ⇒ چهار تب زیرِ مسیر و کارتِ عملکرد
+  const panes={
+    sum:`${has?insightsCard(fs):''}${has?`${equityPro(fs.equity, 'eqp-dash', '📈 منحنی سرمایه')}`:empty}${heatmapCalendar(TRADES)}`,
+    beh:`${scoresCard()}${playbookCard()}${disciplineCard({discipline:academyDiscipline(TRADES)})}${exitQualityCard()}${tiltDashCard()}`,
+    stat:has?`${kpiGrid(fs, true)}${cohortCard()}${reasonWRSection(fs.byEntryReason,'وین‌ریت هر دلیل ورود')}${breakdownModule(fs)}`:empty,
+    course:course.trim()?course:null
+  };
 
-    ${equityPro(fs.equity, 'eqp-dash', '📈 منحنی سرمایه')}
-
-    ${exitQualityCard()}
-    ${playbookCard()}
-    ${cohortCard()}
-    ${reasonWRSection(fs.byEntryReason,'وین‌ریت هر دلیل ورود')}
-    ${breakdownModule(fs)}
-`;
-
-  // ترتیب تازه: اول جوابِ پنج‌ثانیه‌ای، بعد روند، بعد جزئیات، و در آخر بایگانی.
+  // مسیر پیشرفت اول و تمام‌قد (مالک ۱۴۰۵-۰۸-۰۱)، بعد عملکرد و پوزیشن‌های باز، بعد تب‌ها
   el.innerHTML=`
     ${showsCoursePath()?renderXPBar(TRADES.length):''}
     ${isMember()?'<div id="bill-card"></div>':''}
@@ -2505,20 +2557,11 @@ function renderStudentDashboard(){
 
     ${perfHero(fs, rangeLbl, dashRange!=='all'?ftr.length:null, phased)}
 
-    ${proCompareCard()}
-    ${proRiskCard()}
-
     ${openPositionsCard()}
 
-    ${fs&&ftr.length?insightsCard(fs):''}
+    ${dashTabs(panes)}
 
-    ${statBody}
-
-    ${disciplineCard({discipline:academyDiscipline(TRADES)})}
-
-    ${heatmapCalendar(TRADES)}
-
-    ${fs&&ftr.length?`<div class="dash-foot"><button class="btn btn-ghost dash-export" onclick="exportCSV()">⬇️ خروجی CSV همه‌ی معامله‌ها</button></div>`:''}`;
+    ${has?`<div class="dash-foot"><button class="btn btn-ghost dash-export" onclick="exportCSV()">⬇️ خروجی CSV همه‌ی معامله‌ها</button></div>`:''}`;
   if(isMember()) window.BILLING?.fillCard();
 }
 
@@ -2554,7 +2597,77 @@ function tradeQualityBar(t){
 
 function setTradesSort(k){ tradesSort = k; tradesPage = 1; renderTrades(); }
 
-function tradesSummary(list){
+// ── v26.13 (بازبینی U7): جدولِ معامله‌ها در دسکتاپ — مرتب‌سازی روی هر ستون، ۵۰ ردیف در صفحه،
+// فیلترِ کوین و بازه. گوشی همان کارت‌ها را دارد و این فیلترها رویش اثری ندارند.
+const WIDE_MQ = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
+const isWide = () => !!(WIDE_MQ && WIDE_MQ.matches);
+let TBL = Object.assign({ sort:'date', dir:-1, coin:'', range:'all' }, L.g('sc_tbl') || {});
+function tblSet(k, v){
+  if (k === 'sort') { TBL.dir = TBL.sort === v ? -TBL.dir : (v === 'coin' || v === 'dir' ? 1 : -1); TBL.sort = v; }
+  else TBL[k] = v;
+  L.s('sc_tbl', TBL); tradesPage = 1; renderTrades();
+}
+function tblFrom(r){
+  const now = new Date();
+  if (r === 'month' || r === 'year') { const j = g2j(now.getFullYear(), now.getMonth() + 1, now.getDate()); return isoOfG(j2gParts(j.jy, r === 'year' ? 1 : j.jm, 1)); }
+  return r === '30' || r === '90' ? isoLocal(new Date(now.getTime() - (+r) * 864e5)) : '';
+}
+function tblFilter(list){
+  const from = tblFrom(TBL.range);
+  return list.filter(t => (!TBL.coin || t.coin === TBL.coin) && (!from || String(t.date || '') >= from));
+}
+function tblVal(t, k){
+  if (k === 'date') return (t.date || '') + ' ' + (t.time || '');
+  if (k === 'coin') return t.coin || '';
+  if (k === 'dir') return t.direction || '';
+  if (k === 'r') return tradeR(t);
+  if (k === 'pnl') return t.exit ? calcPnl(t) : null;
+  if (k === 'quality') return tradeTouched(t) ? principlesScore(t) : null;
+  return null;
+}
+// خالی‌ها (معامله‌ی باز، بی‌حد ضرر، ثبت‌نشده) در هر جهتی ته جدول می‌مانند
+function tblSort(list){
+  const nil = v => v == null || v === '';
+  return list.map(t => [t, tblVal(t, TBL.sort)]).sort((a, b) => nil(a[1]) ? (nil(b[1]) ? 0 : 1) : nil(b[1]) ? -1
+    : (typeof a[1] === 'string' ? a[1].localeCompare(b[1]) : a[1] - b[1]) * TBL.dir).map(x => x[0]);
+}
+const TBL_COLS = [['date','تاریخ'],['coin','کوین'],['dir','جهت'],[null,'ورود'],[null,'خروج'],['r','R واقعی'],['pnl','سود / زیان'],['quality','ورود اصولی'],[null,'برچسب‌ها']];
+function tblToolbar(n){
+  const cnt = TRADES.filter(t => !t._deleted && t.coin).reduce((m, t) => (m[t.coin] = (m[t.coin] || 0) + 1, m), {});
+  const coins = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
+  const ranges = [['all','همه'],['month','این ماه'],['30','۳۰ روز'],['90','۹۰ روز'],['year','امسال']];
+  return `<div class="tbl-bar">
+    <div class="ph-seg" role="radiogroup" aria-label="بازه‌ی زمانی">${ranges.map(([k, l]) => `<button type="button" role="radio" aria-checked="${TBL.range === k}" class="${TBL.range === k ? 'on' : ''}" onclick="tblSet('range','${k}')">${l}</button>`).join('')}</div>
+    <select class="fi tbl-coin" aria-label="کوین" onchange="tblSet('coin',this.value)"><option value="">همه‌ی کوین‌ها</option>${coins.map(([c, k]) => `<option value="${esc(c)}" ${TBL.coin === c ? 'selected' : ''}>${esc(c)} (${faNum(k)})</option>`).join('')}</select>
+    ${TBL.coin || TBL.range !== 'all' ? `<button type="button" class="tbl-reset" onclick="TBL.coin='';tblSet('range','all')">پاک کردنِ فیلتر</button>` : ''}
+    <span class="tbl-n">${faNum(n)} معامله</span></div>`;
+}
+function tradesTable(items){
+  const th = TBL_COLS.map(([k, l]) => !k ? `<th scope="col" class="np">${l}</th>`
+    : `<th scope="col" aria-sort="${TBL.sort === k ? (TBL.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" onclick="tblSet('sort','${k}')">${l}<i aria-hidden="true">${TBL.sort === k ? (TBL.dir > 0 ? '▲' : '▼') : ''}</i></button></th>`).join('');
+  const num = v => v === '' || v == null ? '—' : `<bdi dir="ltr">${esc(v)}</bdi>`;
+  const rows = items.map(t => {
+    const pnl = t.exit ? calcPnl(t) : null, r = tradeR(t, pnl), sc = tradeTouched(t) ? principlesScore(t) : null;
+    const tags = String(t.tags || '').split(',').map(x => x.trim()).filter(Boolean);
+    return `<tr tabindex="0" onclick="showDetail('${t.id}')" onkeydown="if(event.key==='Enter')showDetail('${t.id}')">
+      <td class="tb-date">${fmtDateFa(t.date)}${t.time ? `<small>${faNum(t.time)}</small>` : ''}</td>
+      <td><div class="tb-coin">${coinLogo(t.coin)}<b>${esc(t.coin)}</b>${FEEDBACK[t.id] ? '<span title="نظر استاد">💬</span>' : ''}${t.chartUrl ? '<span class="tl-chart" title="نمودار TradingView دارد">📈</span>' : ''}${tiltBadge(t)}</div></td>
+      <td><span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span></td>
+      <td class="tb-num">${num(t.entry)}</td>
+      <td class="tb-num">${t.exit ? num(t.exit) : '<span class="badge b-open">باز</span>'}</td>
+      <td class="tb-num" style="color:${r == null ? 'var(--muted)' : r >= 0 ? 'var(--green)' : 'var(--red)'}">${r == null ? '—' : `<bdi dir="ltr">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</bdi>`}</td>
+      <td class="tb-num">${pnl == null ? '—' : `<b style="color:${pnl >= 0 ? 'var(--green)' : 'var(--red)'}"><bdi dir="ltr">${fmtUSD(pnl)}</bdi></b>${+t.size ? `<small dir="ltr">${fmtPct(pnl / (+t.size) * 100)}</small>` : ''}`}</td>
+      <td>${sc == null ? '<span class="tb-q off">ثبت نشده</span>' : `<span class="tb-q"><i style="background:${tradeQualityBar(t)}"></i>${faNum(Math.round(sc))}٪</span>`}</td>
+      <td class="tb-tags">${tags.slice(0, 2).map(g => `<span>#${esc(g)}</span>`).join('')}${tags.length > 2 ? `<em>+${faNum(tags.length - 2)}</em>` : ''}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="tbl-wrap"><table class="ttbl"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+// از گوشی به دسکتاپ و برعکس (چرخاندنِ تبلت، تغییرِ اندازه‌ی پنجره)
+if (WIDE_MQ) { const f = () => { if (document.getElementById('screen-trades')?.classList.contains('active')) { tradesPage = 1; renderTrades(); } };
+  WIDE_MQ.addEventListener ? WIDE_MQ.addEventListener('change', f) : WIDE_MQ.addListener && WIDE_MQ.addListener(f); }
+
+function tradesSummary(list, wide){
   const closed = list.filter(t => t.exit);
   const pnls = closed.map(calcPnl).filter(v => v != null);
   const net = pnls.reduce((a, b) => a + b, 0);
@@ -2562,7 +2675,7 @@ function tradesSummary(list){
   const wr = pnls.length ? Math.round(wins / pnls.length * 100) : null;
   const touched = list.filter(t => tradeTouched(t));
   const okPct = touched.length ? Math.round(touched.filter(principlesMet).length / touched.length * 100) : null;
-  const opts = [['date','تاریخ'],['pnl','بیشترین سود'],['loss','بیشترین ضرر'],['quality','کیفیت ورود']];
+  const opts = [['date','تاریخ'],['pnl','بیشترین سود'],['loss','بیشترین ضرر'],['quality','ورود اصولی']];
   return `<div class="tsum fade-in">
     <div><u>معامله</u><b>${faNum(list.length)}</b></div>
     <span class="sep"></span>
@@ -2571,7 +2684,7 @@ function tradesSummary(list){
     <div><u>نرخ برد</u><b>${wr==null?'—':faNum(wr)+'٪'}</b></div>
     <span class="sep"></span>
     <div><u>ورود اصولی</u><b style="color:${okPct==null?'var(--muted)':okPct>=60?'var(--green)':'var(--gold)'}">${okPct==null?'—':faNum(okPct)+'٪'}</b></div>
-    <div class="tsort">${opts.map(([k,l])=>`<button class="${tradesSort===k?'on':''}" onclick="setTradesSort('${k}')">${l}</button>`).join('')}</div>
+    ${wide?'':`<div class="tsort">${opts.map(([k,l])=>`<button class="${tradesSort===k?'on':''}" onclick="setTradesSort('${k}')">${l}</button>`).join('')}</div>`}
   </div>`;
 }
 
@@ -2587,28 +2700,33 @@ function renderTrades(){
   const f=document.getElementById('filter-res')?.value||'';
   const q=(document.getElementById('trade-search')?.value||'').trim().toLowerCase();
   const match=t=>!q||[t.coin,t.pair,t.tags,t.notes,t.strategy,t.session,...(Array.isArray(t.entryReasons)?t.entryReasons:[])].filter(Boolean).join(' ').toLowerCase().includes(q);
-  const list=[...TRADES].filter(t=>(!f||tradeResult(t)===f)&&match(t));
+  const wide=isWide();
+  let list=[...TRADES].filter(t=>(!f||tradeResult(t)===f)&&match(t));
+  if(wide) list=tblFilter(list);
 
   // مرتب‌سازی — معامله‌ی باز همیشه بالا می‌ماند تا فراموش نشود
   const pnlOf=t=>t.exit?(calcPnl(t)??0):null;
-  if(tradesSort==='pnl')        list.sort((a,b)=>(pnlOf(b)??-Infinity)-(pnlOf(a)??-Infinity));
+  if(wide)                      list=tblSort(list);
+  else if(tradesSort==='pnl')   list.sort((a,b)=>(pnlOf(b)??-Infinity)-(pnlOf(a)??-Infinity));
   else if(tradesSort==='loss')  list.sort((a,b)=>(pnlOf(a)??Infinity)-(pnlOf(b)??Infinity));
   else if(tradesSort==='quality')list.sort((a,b)=>(tradeTouched(b)?principlesScore(b):-1)-(tradeTouched(a)?principlesScore(a):-1));
   else                          list.sort(byDateDesc);
 
   const el=document.getElementById('trades-list');
-  if(!list.length){el.innerHTML='<div class="empty"><span class="empty-ico">📋</span><div class="empty-t">تریدی یافت نشد</div></div>';return}
-  const totalPages=Math.max(1,Math.ceil(list.length/TRADES_PER_PAGE));
+  if(!list.length){el.innerHTML=(wide?tblToolbar(0):'')+'<div class="empty"><span class="empty-ico">📋</span><div class="empty-t">تریدی یافت نشد</div></div>';return}
+  const per=wide?50:TRADES_PER_PAGE;
+  const totalPages=Math.max(1,Math.ceil(list.length/per));
   if(tradesPage>totalPages) tradesPage=totalPages;
   if(tradesPage<1) tradesPage=1;
-  const start=(tradesPage-1)*TRADES_PER_PAGE;
-  const pageItems=list.slice(start, start+TRADES_PER_PAGE);
+  const start=(tradesPage-1)*per;
+  const pageItems=list.slice(start, start+per);
+  if(wide){ el.innerHTML = tradesSummary(list, true) + tblToolbar(list.length) + tradesTable(pageItems) + (totalPages>1 ? buildTradesPager(totalPages, list.length) : ''); return; }
   const itemsHTML=pageItems.map(t=>{
     const pnl=t.exit?calcPnl(t):null,rr=calcRR(t);
     const pct=t.exit&&t.size?(pnl/(+t.size)*100):null;
     const er=Array.isArray(t.entryReasons)?t.entryReasons.slice(0,2):[];
     return`<div class="trade-item fade-in" onclick="showDetail('${t.id}')">
-      <span class="t-q" style="background:${tradeQualityBar(t)}" title="کیفیت ورود بر پایه‌ی استاندارد ۳+۲+۲"></span>
+      <span class="t-q" style="background:${tradeQualityBar(t)}" title="ورود اصولی: دلیل‌های لازمِ ورود، حد ضرر و حد سود"></span>
       ${coinLogo(t.coin)}
       <div class="t-info">
         <div class="t-coin">${esc(t.coin)}/${esc(t.pair)} <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span>${FEEDBACK[t.id]?' <span title="نظر استاد">💬</span>':''}${tiltBadge(t)}${t.chartUrl?' <span class="tl-chart" title="نمودار TradingView دارد">📈</span>':''}</div>
@@ -2736,7 +2854,7 @@ function refreshFormBar(){
   const r = rrCheck(rrFormInput());
   const rrCls = r.rr === null || r.iso ? '' : 'rr-' + r.level;
   box.innerHTML = `<div class="tb-ring" style="--p:${pct};--c:${col}"><span>${faNum(pct)}</span></div>
-    <div class="tb-kv"><small>اصول</small><b style="color:${col}">${done ? 'کامل ✓' : faNum(pct) + '٪'}</b></div>
+    <div class="tb-kv"><small>ورود اصولی</small><b style="color:${col}">${done ? 'کامل ✓' : faNum(pct) + '٪'}</b></div>
     <div class="tb-kv"><small>R:R</small><b class="${rrCls}" dir="ltr">${r.rr === null ? '—' : '۱:' + fmtRR(r.rr)}</b></div>`;
 }
 function principlesLiveHTML(){
@@ -2971,13 +3089,99 @@ function applyProCalc(){
   showToast(PRO_CALC_LAST.mode === 3 ? 'مارجین ایزوله و اهرم در فرم قرار گرفت' : 'مارجین و اهرم در فرم قرار گرفت');
 }
 
+// ── v26.13 (بازبینی B4): تاریخِ شمسی و ساعتِ ۲۴ساعته ──
+// انتخابگرِ پیش‌فرضِ مرورگر میلادی و ۱۲ساعته بود (10/25/2026 07:19 PM). مقدار همچنان در f-date (میلادیِ ISO) و
+// f-time (HH:MM) می‌ماند تا ذخیره، داده‌ی قبلی و سرور هیچ تغییری نکنند. روزِ آینده انتخاب‌شدنی نیست.
+let JD = { y: 0, m: 0 };
+function jdParts(iso){ const [gy, gm, gd] = String(iso || '').split('-').map(Number); return gy && gm && gd ? g2j(gy, gm, gd) : null; }
+function jdLabel(iso){
+  const j = jdParts(iso); if (!j) return 'انتخابِ تاریخ';
+  const [gy, gm, gd] = iso.split('-').map(Number);
+  return `${faNum(j.jd)} ${JMONTHS[j.jm - 1]} ${faNum(j.jy)}<small>${WD_FA[new Date(gy, gm - 1, gd).getDay()]}</small>`;
+}
+const jdOpts = (n, cur) => Array.from({ length: n }, (_, i) => { const v = String(i).padStart(2, '0'); return `<option value="${v}"${v === cur ? ' selected' : ''}>${faNum(v)}</option>`; }).join('');
+function jdField(date, time){
+  const [h = '', m = ''] = String(time || '').split(':').map(x => x ? x.padStart(2, '0') : '');
+  return `<div class="jdt">
+      <button type="button" class="fi jd-btn" id="jd-btn" aria-haspopup="dialog" aria-expanded="false" onclick="jdToggle()"><span id="jd-lbl">${jdLabel(date)}</span><i aria-hidden="true">▾</i></button>
+      <div class="jd-time" dir="ltr" role="group" aria-label="ساعت، ۲۴ساعته">
+        <select id="jd-h" class="fi" aria-label="ساعت" onchange="jdTime()"><option value="">--</option>${jdOpts(24, h)}</select><b>:</b>
+        <select id="jd-m" class="fi" aria-label="دقیقه" onchange="jdTime()"><option value="">--</option>${jdOpts(60, m)}</select>
+      </div>
+      <div class="jd-pop" id="jd-pop" role="dialog" aria-label="انتخابِ تاریخ" hidden></div>
+    </div>
+    <div class="jd-quick"><button type="button" onclick="jdQuick('now')">الان</button><button type="button" onclick="jdQuick(0)">امروز</button><button type="button" onclick="jdQuick(-1)">دیروز</button></div>
+    <input type="hidden" id="f-date" value="${esc(date || '')}"><input type="hidden" id="f-time" value="${esc(time || '')}">`;
+}
+function jdSet(iso){
+  const f = document.getElementById('f-date'); if (!f) return;
+  f.value = iso; const l = document.getElementById('jd-lbl'); if (l) l.innerHTML = jdLabel(iso);
+}
+function jdTime(){
+  const h = document.getElementById('jd-h'), m = document.getElementById('jd-m'), f = document.getElementById('f-time');
+  if (!h || !m || !f) return;
+  if (h.value && !m.value) m.value = '00';
+  if (!h.value) m.value = '';
+  f.value = h.value ? h.value + ':' + m.value : '';
+}
+function jdQuick(k){
+  const d = new Date();
+  if (k === 'now') {
+    jdSet(isoLocal(d));
+    document.getElementById('jd-h').value = String(d.getHours()).padStart(2, '0');
+    document.getElementById('jd-m').value = String(d.getMinutes()).padStart(2, '0');
+    jdTime();
+  } else { d.setDate(d.getDate() + k); jdSet(isoLocal(d)); }
+  jdClose();
+}
+function jdToggle(){
+  const pop = document.getElementById('jd-pop'); if (!pop) return;
+  if (!pop.hidden) return jdClose();
+  const j = jdParts(document.getElementById('f-date').value) || jdParts(isoLocal());
+  JD = { y: j.jy, m: j.jm }; pop.hidden = false; jdRender();
+  document.getElementById('jd-btn').setAttribute('aria-expanded', 'true');
+  setTimeout(() => { document.addEventListener('pointerdown', jdOutside, true); document.addEventListener('keydown', jdKey, true); });
+}
+function jdClose(){
+  const pop = document.getElementById('jd-pop'); if (pop) pop.hidden = true;
+  document.getElementById('jd-btn')?.setAttribute('aria-expanded', 'false');
+  document.removeEventListener('pointerdown', jdOutside, true); document.removeEventListener('keydown', jdKey, true);
+}
+function jdOutside(e){ if (!e.target.closest('.jd-pop,#jd-btn')) jdClose(); }
+function jdKey(e){ if (e.key === 'Escape') { e.preventDefault(); jdClose(); document.getElementById('jd-btn')?.focus(); } }
+function jdNav(dm){
+  let y = JD.y, m = JD.m + dm;
+  while (m < 1) { m += 12; y--; } while (m > 12) { m -= 12; y++; }
+  const t = jdParts(isoLocal()); if (y > t.jy || (y === t.jy && m > t.jm)) { y = t.jy; m = t.jm; }
+  JD = { y, m }; jdRender();
+}
+function jdPick(iso){ jdSet(iso); jdClose(); document.getElementById('jd-btn')?.focus(); }
+function jdRender(){
+  const pop = document.getElementById('jd-pop'); if (!pop || pop.hidden) return;
+  const { y, m } = JD, g1 = j2gParts(y, m, 1), lead = (new Date(g1.gy, g1.gm - 1, g1.gd).getDay() + 1) % 7;   // شنبه = ستونِ اول
+  const today = isoLocal(), tj = jdParts(today), sel = document.getElementById('f-date')?.value || '';
+  const atNow = y > tj.jy || (y === tj.jy && m >= tj.jm);
+  let cells = '<span></span>'.repeat(lead);
+  for (let d = 1; d <= jMonthLen(y, m); d++) {
+    const iso = isoOfG(j2gParts(y, m, d));
+    cells += `<button type="button" class="${iso === sel ? 'sel' : ''}${iso === today ? ' now' : ''}"${iso > today ? ' disabled' : ''} aria-label="${faNum(d)} ${JMONTHS[m - 1]}" onclick="jdPick('${iso}')">${faNum(d)}</button>`;
+  }
+  pop.innerHTML = `<div class="jd-head">
+      <button type="button" onclick="jdNav(-12)" aria-label="سالِ قبل">»</button><button type="button" onclick="jdNav(-1)" aria-label="ماهِ قبل">›</button>
+      <b>${JMONTHS[m - 1]} ${faNum(y)}</b>
+      <button type="button" onclick="jdNav(1)" aria-label="ماهِ بعد"${atNow ? ' disabled' : ''}>‹</button><button type="button" onclick="jdNav(12)" aria-label="سالِ بعد"${y >= tj.jy || (y === tj.jy - 1 && m > tj.jm) ? ' disabled' : ''}>«</button>
+    </div>
+    <div class="jd-wd">${['ش', 'ی', 'د', 'س', 'چ', 'پ', 'ج'].map(x => `<span>${x}</span>`).join('')}</div>
+    <div class="jd-grid">${cells}</div>
+    <div class="jd-foot"><button type="button" onclick="jdPick('${today}')">امروز</button></div>`;
+}
 function renderTradeForm(t){
   const isEdit=!!t;
   // آستانه‌ی همین ترید: ویرایش ⇒ جایگاه خودش، ترید تازه ⇒ جایگاهِ بعدی
   FORM_NEED = isEdit ? needFor(TRADES.find(x=>x.id===t.id)||t) : needForNext();
   PRO_CALC_APPLIED = 0;
   const p=isEdit?null:(getStudentPrefs()||{}); // پیش‌فرض هوشمند بر اساس آخرین ترید
-  const d=t||{id:genId(),date:new Date().toISOString().slice(0,10),time:new Date().toTimeString().slice(0,5),coin:'',pair:'USDT',direction:'Long',entry:'',exit:'',stopLoss:'',takeProfit:'',size:'',leverage:'1',timeframe:'',strategy:'',session:'',emotion:'',fees:'',result:'Open',notes:'',tags:'',entryReasons:[],slReasons:[],tpReasons:[]};
+  const d=t||{id:genId(),date:isoLocal(),time:new Date().toTimeString().slice(0,5),coin:'',pair:'USDT',direction:'Long',entry:'',exit:'',stopLoss:'',takeProfit:'',size:'',leverage:'1',timeframe:'',strategy:'',session:'',emotion:'',fees:'',result:'Open',notes:'',tags:'',entryReasons:[],slReasons:[],tpReasons:[]};
   const er=Array.isArray(d.entryReasons)?d.entryReasons:[];
   const sl=Array.isArray(d.slReasons)?d.slReasons:[];
   const tp=Array.isArray(d.tpReasons)?d.tpReasons:[];
@@ -3012,8 +3216,7 @@ function renderTradeForm(t){
       <div class="fgrid">
         <div class="fg"><div class="fl">تایم‌فریم</div><select id="f-tf" class="fi" onchange="updateRRPreview()"><option value="">انتخاب کنید</option>${getDynList('sc_timeframes',TIMEFRAMES).map(x=>`<option ${d.timeframe===x?'selected':''}>${esc(x)}</option>`).join('')}</select></div>
         <div class="fg"><div class="fl">جفت</div><input id="f-pair" class="fi" value="${esc(d.pair||'USDT')}" placeholder="USDT"/></div>
-        <div class="fg"><div class="fl">تاریخ <span class="req">*</span></div><input id="f-date" class="fi" type="date" value="${esc(d.date)}"/></div>
-        <div class="fg"><div class="fl">ساعت</div><input id="f-time" class="fi" type="time" value="${esc(d.time||'')}"/></div>
+        <div class="fg jd-fg"><div class="fl">تاریخ و ساعت <span class="req">*</span></div>${jdField(d.date, d.time)}</div>
       </div>
     </section>
 
@@ -3850,7 +4053,7 @@ function qcFinishedMarkup(){
     <span class="qc-done-ico">${left?'✅':'🎉'}</span>
     <div class="qc-done-t">${left?'این دور تمام شد':'تمام شد'}</div>
     <div class="qc-done-s">${faNum(QC_STATE.done)} معامله کامل شد${QC_STATE.partial?`، ${faNum(QC_STATE.partial)} معامله هنوز ناقص است`:''}.
-      ${left?`<br>${faNum(left)} معامله هنوز کامل نیست${noSl?` — ${faNum(noSl)} تا فقط قیمت حد ضرر کم دارند`:''}.`:'<br>نمره‌ی دیسیپلینت همین حالا به‌روز شده است.'}</div>
+      ${left?`<br>${faNum(left)} معامله هنوز کامل نیست${noSl?` — ${faNum(noSl)} تا فقط قیمت حد ضرر کم دارند`:''}.`:'<br>کامل‌بودنِ ژورنالت (نمره‌ی انضباط) همین حالا به‌روز شده است.'}</div>
     ${left?'<button class="btn btn-primary" onclick="qcExit().then(openQuickComplete)">ادامهٔ تکمیل</button><button class="btn btn-ghost" style="margin-top:8px" onclick="qcExit()">بستن</button>'
           :'<button class="btn btn-primary" onclick="qcExit()">بستن</button>'}
   </div>`;
@@ -4087,6 +4290,11 @@ function pbFollowed(ev){
   return vals.every(Boolean);
 }
 
+// v26.13: سهمِ قانون‌های اصلیِ رعایت‌شده در یک ترید (۰ تا ۱) — «۸ از ۹» با «هیچ‌کدام» یکی نیست
+function pbShare(ev){
+  const vals=PLAYBOOK_CORE.map(id=>ev[id]).filter(v=>v!==null);
+  return vals.length<2 ? null : vals.filter(Boolean).length/vals.length;
+}
 function planLevMax(){ return isCourseAccount() && !ownerJournal() ? LEVERAGE_MAX : 10; }
 function playbookStats(){
   // معامله‌ی واردشده‌ای که دانشجو هنوز دستش نزده، «خارج از پلن» نیست —
@@ -4094,7 +4302,7 @@ function playbookStats(){
   const closed=TRADES.filter(t=>!t._deleted&&t.exit&&+t.entry>0&&+t.exit>0&&+t.size>0&&tradeTouched(t));
   if(closed.length<6) return null;
   const list=pbAnnotate(closed);
-  const rows=list.map(t=>{ const ev=pbEvaluate(t); return { t, ev, followed:pbFollowed(ev), pnl:calcPnl(t) } })
+  const rows=list.map(t=>{ const ev=pbEvaluate(t); return { t, ev, followed:pbFollowed(ev), share:pbShare(ev), pnl:calcPnl(t) } })
                  .filter(r=>r.pnl!=null&&r.followed!==null);
   if(rows.length<6) return null;
 
@@ -4124,11 +4332,13 @@ function playbookStats(){
     .filter(([,g])=>g.length>=3)
     .map(([name,g])=>({ name, n:g.length,
       winRate:g.filter(r=>r.pnl>0).length/g.length*100,
-      adherence:g.filter(r=>r.followed).length/g.length*100,
+      adherence:g.reduce((a,r)=>a+r.share,0)/g.length*100,
       net:g.reduce((a,r)=>a+r.pnl,0) }))
     .sort((a,b)=>b.net-a.net);
 
-  return { total:rows.length, ok, bad, perRule, strategies };
+  // avgAdh = عددِ اصلیِ «پایبندی»؛ fullPct = سهمِ معامله‌هایی که همه‌ی قانون‌ها را با هم داشتند
+  return { total:rows.length, ok, bad, perRule, strategies,
+           avgAdh:rows.reduce((a,r)=>a+r.share,0)/rows.length*100, fullPct:(ok?ok.n:0)/rows.length*100 };
 }
 
 function playbookCard(){
@@ -4168,6 +4378,8 @@ function playbookCard(){
 
   return `<div class="card fade-up pb-card">
     <div class="card-title">📘 پایبندی به پلن</div>
+    <div class="pb-score"><b style="color:${st.avgAdh>=75?'var(--green)':st.avgAdh>=45?'var(--gold-light)':'var(--red)'}">${faNum(Math.round(st.avgAdh))}٪</b>
+      <span>به‌طور میانگین در هر معامله این سهم از قانون‌های اصلیِ پلن رعایت شده.<em>${faNum(Math.round(st.fullPct))}٪ معامله‌ها همه‌ی قانون‌ها را با هم داشتند — مقایسه‌ی زیر همین دو گروه است.</em></span></div>
     <div class="pb-split">
       ${side(ok,'طبق پلن','هنوز نداری','var(--green)')}
       <div class="pb-vs">در برابر</div>
@@ -4405,7 +4617,7 @@ function mentorPersonalCard(){
     <div class="card-title">🔒 ژورنال شخصی من</div>
     <div class="mp-lead">
       فضای خصوصی خودت با <b>همان ابزارها و هشدارهای دانشجوها</b>، ولی بدون محدودیت (سقف اهرم، قفل ماشین‌حساب): ثبت ترید، ورود از فایل و صرافی،
-      کیفیت خروج، پایبندی به پلن، نمره دیسیپلین و هشدار قیمت.
+      کیفیت خروج، پایبندی به پلن، کامل‌بودنِ ژورنال و هشدار قیمت.
       ${n!==null?`<br>الان <b>${faNum(n)}</b> ترید شخصی داری.`:''}
       <br><span style="color:var(--muted);font-size:10.5px">این تریدها در هیچ آمار کلاسی دیده نمی‌شوند و هیچ دانشجویی به آن‌ها دسترسی ندارد.</span>
     </div>
