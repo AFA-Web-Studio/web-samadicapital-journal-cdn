@@ -1436,14 +1436,18 @@ function academyDiscipline(list){
   const parts=Object.fromEntries(Object.keys(DISC_W).map(x=>[x,k?cnt[x]/k:0]));
   return{parts,counted:k,score:k?Math.round(Object.keys(DISC_W).reduce((a,x)=>a+cnt[x]/k*DISC_W[x],0)):0};
 }
-// v26.13: R واقعیِ یک ترید = سود/زیان ÷ ریسک تا حد ضرر (حالت ۳: مارجین ایزوله + ذخیره‌ی هزینه).
-// میانگین R در آمار و ستونِ «R واقعی» جدول هر دو از همین می‌خوانند.
-function tradeR(t, p = calcPnl(t)){
+// v26.15: ریسکِ دلاریِ یک ترید = زیان اگر حد ضرر بخورد (حالت ۳: مارجین ایزوله + ذخیره‌ی هزینه).
+// مالک ۱۴۰۵-۰۸-۱۴: به دانشجو «R» نشان داده نمی‌شود، فقط دلار. tradeR فقط برای سنجش‌های درونی می‌ماند.
+function tradeRisk(t){
   const e=+t.entry,sl=+t.stopLoss,sz=+t.size,lev=+t.leverage||1,iso=isIsolatedBudget(t);
-  if(!t.exit||!e||!(sl||iso)||!sz||p==null) return null;
+  if(!e||!(sl||iso)||!sz) return null;
   const atStop=sl?Math.abs(e-sl)/e*sz*lev:Infinity;
   const risk=iso?Math.min(sz,atStop)+(+t.feeReserve||0):atStop;
-  return risk>0?p/risk:null;
+  return risk>0&&isFinite(risk)?risk:null;
+}
+function tradeR(t, p = calcPnl(t)){
+  if(!t.exit||p==null) return null;
+  const k=tradeRisk(t); return k?p/k:null;
 }
 function computeStats(trades,discList){
   // v13: ترتیب زمانی واقعی — منحنی سرمایه/دراودان/استریک حتی با ثبت ترید گذشته درست می‌ماند
@@ -1514,7 +1518,11 @@ function computeStats(trades,discList){
 
   // ── v13: R-multipleها، انتظار ریاضی، تحلیل روز/ساعت/تگ، دیسیپلین ──
   const rMuls=[];
-  closed.forEach((t,i)=>{ const r=tradeR(t,pnls[i]); if(r!=null)rMuls.push(r); });
+  // v26.15: ریسک و سودِ همان معامله‌های با حد ضرر، به دلار — برای بینش و کاشیِ «ریسکِ هر معامله»
+  const rRisk=[], rPnl=[];
+  closed.forEach((t,i)=>{ const p=pnls[i], k=p==null?null:tradeRisk(t); if(k){ rMuls.push(p/k); rRisk.push(k); rPnl.push(p); } });
+  const avgRiskUsd=rRisk.length?rRisk.reduce((a,b)=>a+b,0)/rRisk.length:null;
+  const avgPnlRisked=rPnl.length?rPnl.reduce((a,b)=>a+b,0)/rPnl.length:null;
   const avgR=rMuls.length?rMuls.reduce((a,b)=>a+b,0)/rMuls.length:null;
   const expectancy=closed.length?total/closed.length:0;
 
@@ -1555,7 +1563,7 @@ function computeStats(trades,discList){
     longs:trades.filter(t=>t.direction==='Long').length,
     shorts:trades.filter(t=>t.direction==='Short').length,
     bestDay,worstDay,avgSize,avgLev,
-    avgR,rCount:rMuls.length,expectancy,byWeekday,byHour,byTag,discipline
+    avgR,rCount:rMuls.length,avgRiskUsd,avgPnlRisked,expectancy,byWeekday,byHour,byTag,discipline
   };
 }
 
@@ -1889,8 +1897,9 @@ function buildInsights(s){
     const bw=wds[0],ww=wds[wds.length-1];
     if(bw[1].pnl>0&&ww[1].pnl<0)out.push({icon:'📅',tone:'neutral',text:`${bw[0]}ها بهترین روزت است (${fmtUSD(bw[1].pnl)}) و ${ww[0]}ها ضعیف‌ترین (${fmtUSD(ww[1].pnl)})`});
   }
-  if(s.avgR!==null&&s.rCount>=5){
-    out.push({icon:'📐',tone:s.avgR>=0?'good':'bad',text:`به ازای هر ۱ واحد ریسک، میانگین ${faNum(s.avgR.toFixed(2))}R برمی‌داری${s.avgR<0?' — سیستم فعلی در بلندمدت ضررده است':''}`});
+  if(s.avgRiskUsd!=null&&s.rCount>=5){
+    const g=s.avgPnlRisked>=0;
+    out.push({icon:'📐',tone:g?'good':'bad',text:`در هر معامله به‌طور میانگین ${fmtUSD(s.avgRiskUsd,false)} ریسک کردی و ${fmtUSD(Math.abs(s.avgPnlRisked),false)} ${g?'سود':'ضرر'} برداشتی${g?'':' — سیستم فعلی در بلندمدت ضررده است'}`});
   }
   if(s.discipline&&s.discipline.parts.sl<0.8)out.push({icon:'🛡️',tone:'bad',text:`فقط ${faNum(Math.round(s.discipline.parts.sl*100))}٪ تریدهایت حد ضرر ثبت‌شده دارند — بزرگ‌ترین ریسک حساب توست`});
   const ers=Object.entries(s.byEntryReason).filter(([,v])=>v.count>=4);
@@ -2186,7 +2195,7 @@ function perfHero(fs, rangeLbl, shown, list){
     kpi('نرخ برد', wr == null ? '—' : pct(wr), fs && closedN ? `${faNum(fs.wins)} برد · ${faNum(fs.losses)} باخت` : 'معامله‌ی بسته نیست', tone(wr, 50, 35), wr),
     kpi('فاکتور سود', pf == null ? '—' : `<bdi dir="ltr">${pf === '∞' ? '∞' : (+pf).toFixed(2)}</bdi>`, 'سودِ کل ÷ زیانِ کل', pf == null ? null : tone(pfN, 1.5, 1)),
     kpi('امید ریاضی', fs && closedN ? `<bdi dir="ltr">${fmtUSD(fs.expectancy)}</bdi>` : '—', 'به ازای هر معامله', fs && closedN ? (fs.expectancy >= 0 ? 'var(--green)' : 'var(--red)') : null),
-    kpi('میانگین R', fs && fs.avgR != null ? `<bdi dir="ltr">${(+fs.avgR).toFixed(2)}R</bdi>` : '—', fs && fs.rCount ? `${faNum(fs.rCount)} معامله با حد ضرر` : 'حد ضرر ثبت نشده', fs && fs.avgR != null ? (+fs.avgR >= 0 ? 'var(--green)' : 'var(--red)') : null),
+    kpi('ریسکِ هر معامله', fs && fs.avgRiskUsd != null ? `<bdi dir="ltr">${fmtUSD(fs.avgRiskUsd, false)}</bdi>` : '—', fs && fs.rCount ? 'میانگینِ زیان اگر حد ضرر بخورد' : 'حد ضرر ثبت نشده', null),
     kpi('پایبندی به پلن', adherence == null ? '—' : pct(adherence), pb ? `${faNum(Math.round(pb.fullPct))}٪ معامله‌ها کاملاً طبق پلن` : 'هنوز سنجیده نشده', tone(adherence, 75, 45), adherence),
     ...(xq && xq.n ? [kpi('نرخ تصرف', pct(xq.avgCapture), `${faNum(xq.n)} خروج سنجیده`, tone(xq.avgCapture, 60, 36), xq.avgCapture)] : [])
   ];
@@ -2223,7 +2232,7 @@ function kpiGrid(fs, hero){
     ${fs.worstDay ? cell('بدترین روز', fmtUSD(fs.worstDay[1]), 'var(--red)', fmtDateFa(fs.worstDay[0])) : cell('بدترین روز', '—', null)}`
     : `${cell('پرافیت فاکتور', fs.profitFactor, null)}
     ${cell('انتظار هر معامله', fmtUSD(fs.expectancy), money(fs.expectancy))}
-    ${cell('میانگین R واقعی', fs.avgR === null ? '—' : (+fs.avgR).toFixed(2) + 'R', fs.avgR === null ? null : money(fs.avgR))}`}
+    ${cell('ریسکِ هر معامله', fs.avgRiskUsd == null ? '—' : fmtUSD(fs.avgRiskUsd, false), null)}`}
     ${cell('میانگین R:R', fs.avgRR ? fs.avgRR + ':1' : '—', null)}
     ${cell('بیشترین افت', '$' + fs.maxDD.toFixed(0), 'var(--red)')}
     ${cell('بهترین معامله', fmtUSD(fs.best), 'var(--green)')}
@@ -2602,6 +2611,7 @@ function setTradesSort(k){ tradesSort = k; tradesPage = 1; renderTrades(); }
 const WIDE_MQ = window.matchMedia ? window.matchMedia('(min-width: 1024px)') : null;
 const isWide = () => !!(WIDE_MQ && WIDE_MQ.matches);
 let TBL = Object.assign({ sort:'date', dir:-1, coin:'', range:'all' }, L.g('sc_tbl') || {});
+if (TBL.sort === 'r') TBL.sort = 'risk';   // v26.15: ستونِ «R واقعی» ⇒ «ریسک»
 function tblSet(k, v){
   if (k === 'sort') { TBL.dir = TBL.sort === v ? -TBL.dir : (v === 'coin' || v === 'dir' ? 1 : -1); TBL.sort = v; }
   else TBL[k] = v;
@@ -2620,7 +2630,7 @@ function tblVal(t, k){
   if (k === 'date') return (t.date || '') + ' ' + (t.time || '');
   if (k === 'coin') return t.coin || '';
   if (k === 'dir') return t.direction || '';
-  if (k === 'r') return tradeR(t);
+  if (k === 'risk') return tradeRisk(t);
   if (k === 'pnl') return t.exit ? calcPnl(t) : null;
   if (k === 'quality') return tradeTouched(t) ? principlesScore(t) : null;
   return null;
@@ -2631,7 +2641,7 @@ function tblSort(list){
   return list.map(t => [t, tblVal(t, TBL.sort)]).sort((a, b) => nil(a[1]) ? (nil(b[1]) ? 0 : 1) : nil(b[1]) ? -1
     : (typeof a[1] === 'string' ? a[1].localeCompare(b[1]) : a[1] - b[1]) * TBL.dir).map(x => x[0]);
 }
-const TBL_COLS = [['date','تاریخ'],['coin','کوین'],['dir','جهت'],[null,'ورود'],[null,'خروج'],['r','R واقعی'],['pnl','سود / زیان'],['quality','ورود اصولی'],[null,'برچسب‌ها']];
+const TBL_COLS = [['date','تاریخ'],['coin','کوین'],['dir','جهت'],[null,'ورود'],[null,'خروج'],['risk','ریسک'],['pnl','سود / زیان'],['quality','ورود اصولی'],[null,'برچسب‌ها']];
 function tblToolbar(n){
   const cnt = TRADES.filter(t => !t._deleted && t.coin).reduce((m, t) => (m[t.coin] = (m[t.coin] || 0) + 1, m), {});
   const coins = Object.entries(cnt).sort((a, b) => b[1] - a[1]);
@@ -2647,7 +2657,7 @@ function tradesTable(items){
     : `<th scope="col" aria-sort="${TBL.sort === k ? (TBL.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" onclick="tblSet('sort','${k}')">${l}<i aria-hidden="true">${TBL.sort === k ? (TBL.dir > 0 ? '▲' : '▼') : ''}</i></button></th>`).join('');
   const num = v => v === '' || v == null ? '—' : `<bdi dir="ltr">${esc(v)}</bdi>`;
   const rows = items.map(t => {
-    const pnl = t.exit ? calcPnl(t) : null, r = tradeR(t, pnl), sc = tradeTouched(t) ? principlesScore(t) : null;
+    const pnl = t.exit ? calcPnl(t) : null, k = tradeRisk(t), sc = tradeTouched(t) ? principlesScore(t) : null;
     const tags = String(t.tags || '').split(',').map(x => x.trim()).filter(Boolean);
     return `<tr tabindex="0" onclick="showDetail('${t.id}')" onkeydown="if(event.key==='Enter')showDetail('${t.id}')">
       <td class="tb-date">${fmtDateFa(t.date)}${t.time ? `<small>${faNum(t.time)}</small>` : ''}</td>
@@ -2655,7 +2665,7 @@ function tradesTable(items){
       <td><span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span></td>
       <td class="tb-num">${num(t.entry)}</td>
       <td class="tb-num">${t.exit ? num(t.exit) : '<span class="badge b-open">باز</span>'}</td>
-      <td class="tb-num" style="color:${r == null ? 'var(--muted)' : r >= 0 ? 'var(--green)' : 'var(--red)'}">${r == null ? '—' : `<bdi dir="ltr">${r >= 0 ? '+' : ''}${r.toFixed(2)}R</bdi>`}</td>
+      <td class="tb-num" style="color:${k == null ? 'var(--muted)' : 'var(--text2)'}" title="زیان اگر حد ضرر بخورد">${k == null ? '—' : fmtUSD(k, false)}</td>
       <td class="tb-num">${pnl == null ? '—' : `<b style="color:${pnl >= 0 ? 'var(--green)' : 'var(--red)'}"><bdi dir="ltr">${fmtUSD(pnl)}</bdi></b>${+t.size ? `<small dir="ltr">${fmtPct(pnl / (+t.size) * 100)}</small>` : ''}`}</td>
       <td>${sc == null ? '<span class="tb-q off">ثبت نشده</span>' : `<span class="tb-q"><i style="background:${tradeQualityBar(t)}"></i>${faNum(Math.round(sc))}٪</span>`}</td>
       <td class="tb-tags">${tags.slice(0, 2).map(g => `<span>#${esc(g)}</span>`).join('')}${tags.length > 2 ? `<em>+${faNum(tags.length - 2)}</em>` : ''}</td>
@@ -6821,7 +6831,7 @@ function buildCoachSignals(stats,closedCount){
   else out.push({title:'ثبات در انتخاب موقعیت',text:`نرخ برد ${faNum(wr.toFixed(1))}٪ است؛ الگوی موقعیت‌های برنده را به چک‌لیست ثابت تبدیل کن.`});
   if(pf<1.2)out.push({title:'نسبت بازده به ریسک',text:'Profit Factor هنوز حاشیه امن کافی ندارد. پیش از ورود، حداقل R:R و محل ابطال تحلیل را مکتوب کن.'});
   else out.push({title:'حفظ مزیت آماری',text:`Profit Factor برابر ${faNum(pf.toFixed(2))} است. حجم را تنها در ستاپ‌های تکرارپذیر و ثبت‌شده افزایش بده.`});
-  if(stats.avgR!==null&&stats.avgR<0.5)out.push({title:'مدیریت خروج',text:'میانگین R واقعی پایین است؛ خروج زودهنگام از بردها و نگه‌داشتن زیان‌ها را در ده معامله بعدی بررسی کن.'});
+  if(stats.avgR!==null&&stats.avgR<0.5)out.push({title:'مدیریت خروج',text:`هر معامله به‌طور میانگین کمتر از نصفِ ریسکش سود داده (${fmtUSD(stats.avgPnlRisked)} در برابرِ ${fmtUSD(stats.avgRiskUsd,false)} ریسک)؛ خروجِ زودهنگام از بردها و نگه‌داشتنِ زیان‌ها را در ده معامله‌ی بعدی بررسی کن.`});
   return out.slice(0,3);
 }
 
