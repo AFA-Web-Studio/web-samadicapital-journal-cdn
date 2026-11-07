@@ -936,6 +936,7 @@ function pickDailyQuote(){
 
 function showDailyQuote(){
   if(!SESSION||SESSION.role!=='student'||SESSION.isViewOnly)return;
+  if(document.getElementById('det-sheet')?.classList.contains('open'))return;   // v26.16: برگه‌ی بازِ دیگری (مثلاً PINِ تازه) را نپوشاند
   const today=new Date().toISOString().slice(0,10);
   const k='sc_quote_day_'+SESSION.uid;
   if(L.g(k)===today)return; // امروز دیده
@@ -945,7 +946,7 @@ function showDailyQuote(){
   document.getElementById('det-content').innerHTML=`
     <div style="text-align:center;padding:8px 6px 4px">
       <div style="width:56px;height:56px;border-radius:50%;background:var(--grad-gold);display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 14px;box-shadow:0 8px 24px -6px rgba(200,168,75,.5)">💡</div>
-      <div style="font-size:10px;font-weight:700;letter-spacing:3px;color:var(--gold);margin-bottom:16px">جمله امروز · ${fmtDateFa(today)}</div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:3px;color:var(--gold);margin-bottom:16px">جمله امروز · ${fmtDateFa(today)}</div>
       <div style="font-size:16px;line-height:2.3;color:var(--text);font-weight:600;margin-bottom:12px">«${q.t}»</div>
       <div style="font-size:12px;color:var(--gold-dim);margin-bottom:22px">— ${q.by}</div>
       <button class="btn btn-primary" style="margin-top:0" onclick="closeSheet()">✅ امروز منضبط می‌مانم</button>
@@ -969,6 +970,7 @@ let dashRange='all';   // all | month | 30 | 90
 let dashBreak='coin';  // بُعدِ فعالِ ماژول تحلیل
 let dashPhase='all';   // all | pre | pro — فاز نسبت به پله‌ی آخرِ نردبان
 let calOffset=0;       // آفست ماه شمسیِ تقویم حرارتی (۰ = ماه جاری)
+let calAuto=true;      // v26.16: بارِ اول روی آخرین ماهی که معامله دارد (بعد از اولین ورق‌زدن خاموش)
 let editingTrade=null, mentorTab='overview', mentorSelected=null;
 let tradesPage=1; const TRADES_PER_PAGE=10;
 let mentorSort='attention';   // attention | pnl | activity | discipline | name
@@ -1796,6 +1798,7 @@ function rangeFilter(trades){
 // v13: تقویم حرارتی سود/زیان (شمسی)
 // ══════════════════════════════════════════════════════
 function calNav(d){
+  calAuto=false;
   calOffset=Math.min(0,calOffset+d);
   if(SESSION?.role==='mentor'&&mentorSelected)renderMentorMain();
   else if(SESSION?.role==='mentor')renderMentorDashboard();
@@ -1808,12 +1811,18 @@ function heatmapCalendar(trades){
   trades.filter(t=>!t.exit&&t.date).forEach(t=>{cntByDate[t.date]=(cntByDate[t.date]||0)+1});
   const now=new Date();
   const jNow=g2j(now.getFullYear(),now.getMonth()+1,now.getDate());
+  // v26.16 (بازبینی U5): ماهِ جاریِ خالی ⇒ بارِ اول روی آخرین ماهی که معامله دارد، نه یک ماهِ سفید
+  if(calAuto){
+    calAuto=false;
+    const last=trades.map(t=>String(t.date||'')).filter(d=>/^\d{4}-\d\d-\d\d$/.test(d)&&d<=isoLocal(now)).sort().pop();
+    if(last){ const [gy,gm,gd]=last.split('-').map(Number), j=g2j(gy,gm,gd), back=(jNow.jy-j.jy)*12+(jNow.jm-j.jm); if(back>0) calOffset=-back; }
+  }
   let jy=jNow.jy,jm=jNow.jm+calOffset;
   while(jm<1){jm+=12;jy--}
   const len=jMonthLen(jy,jm);
   const g1=j2gParts(jy,jm,1);
   const firstDow=(new Date(g1.gy,g1.gm-1,g1.gd).getDay()+1)%7; // 0=شنبه
-  const todayISO=now.toISOString().slice(0,10);
+  const todayISO=isoLocal(now);
   const monthVals=[];
   for(let d=1;d<=len;d++){
     const p=pnlByDate[isoOfG(j2gParts(jy,jm,d))];
@@ -2101,6 +2110,7 @@ function renderXPBar(count, animate=true){
 // v14.2: تبریک اتمام مسیر — یک‌بار، با نوتیف بودجه پس از تأیید استاد
 function checkGraduation(){
   if(!SESSION||SESSION.role!=='student'||SESSION.isViewOnly)return false;
+  if(document.getElementById('det-sheet')?.classList.contains('open'))return false;
   const ms=getXPMilestones(), last=ms[ms.length-1];
   if(TRADES.length<last.n)return false;
   const k='sc_grad_seen_'+SESSION.uid;
@@ -2266,7 +2276,7 @@ function breakdownModule(fs, src){
   BD_SRC = src || null;
   return `<div class="bd fade-up">
     <div class="bd-h"><b>تحلیل عملکرد</b>
-      <span style="font-size:9.5px;color:var(--muted);margin-inline-start:auto">سود/زیان به تفکیک</span></div>
+      <span style="font-size:11px;color:var(--muted);margin-inline-start:auto">سود/زیان به تفکیک</span></div>
     <div class="bd-tabs">${BREAKDOWNS.map(([k,l]) =>
       `<button class="${dashBreak===k?'on':''}" onclick="setBreakdown('${k}')">${l}</button>`).join('')}</div>
     <div id="bd-body">${breakdownBody(fs)}</div>
@@ -2382,6 +2392,14 @@ function handleEditRoute(){
   if (!id || !/^[a-z0-9]{6,40}$/i.test(id)) return;
   q.delete('edit'); history.replaceState(null, '', `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`);
   if (TRADES.find(t => t.id === id)) editTrade(id); else showToast('این ترید پیدا نشد — شاید هنوز همگام نشده؛ صفحه را تازه کن');
+}
+// v26.16: لینکِ «دیدن در ژورنال» در پیامِ نظرِ استاد ⇒ همان معامله باز می‌شود
+function handleTradeRoute(){
+  const q = new URLSearchParams(location.search), id = q.get('trade');
+  if (!id || !/^[a-z0-9_-]{1,40}$/i.test(id)) return;
+  q.delete('trade'); history.replaceState(null, '', `${location.pathname}${q.toString() ? '?' + q.toString() : ''}`);
+  if (TRADES.find(t => t.id === id)) { nav('trades', document.querySelector('[data-screen="trades"]')); showDetail(id); }
+  else showToast('این معامله پیدا نشد — شاید هنوز همگام نشده؛ صفحه را تازه کن');
 }
 // ترید از تلگرام ثبت شده و اپ در پس‌زمینه باز بوده ⇒ با برگشتن، بی‌صدا تازه شود (فقط داشبورد و ژورنال، نه وسطِ فرم)
 let TRADES_SYNCED_AT = Date.now();
@@ -2751,6 +2769,42 @@ function renderTrades(){
   el.innerHTML = tradesSummary(list) + itemsHTML + (totalPages>1 ? buildTradesPager(totalPages, list.length) : '');
 }
 
+// ── v26.16 — چطور بسته شد (بازبینی U8، به دلار؛ مالک: «R» نه) ──
+// خروج نزدیکِ حد ضرر/حد سود (۰٫۱۵٪ ورود یا ۱۰٪ فاصله، هر کدام بزرگ‌تر — لغزش و گرد کردن) همان حد حساب می‌شود.
+function exitKind(t){
+  const e = +t.entry, x = +t.exit, sl = +t.stopLoss, tp = +t.takeProfit;
+  if (!(e > 0) || !(x > 0) || !(sl > 0 || tp > 0)) return null;
+  const dir = t.direction === 'Short' ? -1 : 1, near = (lvl, gap) => Math.abs(x - lvl) <= Math.max(e * 0.0015, gap * 0.1);
+  if (sl > 0 && near(sl, Math.abs(e - sl))) return 'sl';
+  if (tp > 0 && near(tp, Math.abs(tp - e))) return 'tp';
+  if (sl > 0 && (x - sl) * dir < 0) return 'beyondSl';
+  if (tp > 0 && (x - tp) * dir > 0) return 'beyondTp';
+  return (x - e) * dir >= 0 ? 'earlyWin' : 'earlyLoss';
+}
+// سود اگر به حد سود برسد (همان فرمولِ سود/زیان؛ کارمزد کم می‌شود)
+function tradeTarget(t){
+  const e = +t.entry, tp = +t.takeProfit, m = +t.size, L = +t.leverage || 1;
+  return e > 0 && tp > 0 && m > 0 ? Math.abs(tp - e) / e * m * L - (+t.fees || 0) : null;
+}
+function exitStoryHTML(t){
+  const $ = (v, sign = true) => `<bdi dir="ltr">${fmtUSD(v, sign)}</bdi>`;   // مبلغ در جمله‌ی فارسی برعکس نشود
+  const risk = tradeRisk(t), goal = tradeTarget(t);
+  const plan = [risk != null ? `اگر حد ضرر بخورد ${$(-risk)}` : 'حد ضرر ثبت نشده', goal != null ? `اگر به حد سود برسد ${$(goal)}` : ''].filter(Boolean).join('، ');
+  if (!t.exit) return `<div class="xs xs-open"><b>برنامه‌ی این ترید</b><span>${plan}</span></div>`;
+  const k = exitKind(t), pnl = calcPnl(t);
+  if (!k || pnl == null) return '';
+  const long = t.direction !== 'Short';
+  const S = {
+    sl:        ['xs-sl',   'به حد ضرر خورد', risk != null ? `${$(pnl)} — همان ضرری که پیش از ورود پذیرفته بودی` : $(pnl)],
+    tp:        ['xs-tp',   'به حد سود رسید', $(pnl) + (goal != null ? ' — همان هدفِ برنامه' : '')],
+    beyondSl:  ['xs-bad',  long ? 'پایین‌تر از حد ضرر بسته شد' : 'بالاتر از حد ضرر بسته شد',
+                `${$(pnl)}${risk != null ? ` به جای ${$(-risk)} — ضرر از برنامه بیشتر شد` : ''}`],
+    beyondTp:  ['xs-tp',   long ? 'بالاتر از حد سود بسته شد' : 'پایین‌تر از حد سود بسته شد', $(pnl) + (goal != null ? ` — بیشتر از هدفِ ${$(goal)}` : '')],
+    earlyWin:  ['xs-early','دستی، پیش از حد سود بسته شد', $(pnl) + (goal != null ? ` از ${$(goal)} هدف` : '')],
+    earlyLoss: ['xs-early','دستی، پیش از حد ضرر بسته شد', $(pnl) + (risk != null ? ` به جای ${$(-risk)}` : '')]
+  }[k];
+  return `<div class="xs ${S[0]}"><b>${S[1]}</b><span>${S[2]}</span><em>برنامه: ${plan}</em></div>`;
+}
 function showDetail(id){
   const t=TRADES.find(x=>x.id===id);if(!t)return;
   const pnl=t.exit?calcPnl(t):null,rr=calcRR(t);
@@ -2778,7 +2832,9 @@ function showDetail(id){
       <div class="sl"><u>حد ضرر</u><b dir="ltr">${esc(t.stopLoss||(isIsolatedBudget(t)?'ایزوله':'—'))}</b></div>
       <div class="tp"><u>حد سود</u><b dir="ltr">${esc(t.takeProfit||'—')}</b></div>
     </div>
+    ${legsHTML(t)}
     ${rr?`<div class="dt-rr">R:R <b dir="ltr">۱:${fmtRR(rr)}</b>${t.timeframe?` · حداقلِ <bdi dir="ltr">${esc(t.timeframe)}</bdi> ۱:${fmtRR(rrMinFor(t.timeframe))}`:''}</div>`:''}
+    ${exitStoryHTML(t)}
 
     ${er.length?`<div class="reason-section"><div class="reason-label">دلایل ورود</div><div class="reason-tags">${er.map(r=>`<span class="reason-tag rt-entry">${esc(r)}</span>`).join('')}</div></div>`:''}
     ${sl.length?`<div class="reason-section"><div class="reason-label">دلیل حد ضرر</div><div class="reason-tags">${sl.map(r=>`<span class="reason-tag rt-sl">${esc(r)}</span>`).join('')}</div></div>`:''}
@@ -2791,8 +2847,8 @@ function showDetail(id){
       ${[['تاریخ',fmtDateFa(t.date)+' '+(t.time||'')],['استراتژی',t.strategy],['احساس',t.emotion?emoLabel(t.emotion):'—'],['لوریج',t.leverage+'x'+(t.sizeMode?' · حالت '+faNum(t.sizeMode):'')],['مارجین','$'+(+t.size||0).toLocaleString()],['کارمزد','$'+(+t.fees||0).toFixed(2)]].map(([k,v])=>`
         <div class="dt-cell"><u>${k}</u><b>${esc(v)}</b></div>`).join('')}
     </div>
-    ${t.notes?`<div style="background:var(--surface);border-radius:10px;padding:11px;margin-bottom:12px"><div style="font-size:10px;font-weight:700;color:var(--muted);margin-bottom:5px">یادداشت</div><div style="font-size:12px;line-height:1.7;color:var(--text2)">${esc(t.notes)}</div></div>`:''}
-    ${t.tags?`<div style="margin-bottom:14px">${t.tags.split(',').map(tg=>`<span style="background:rgba(200,168,75,.1);color:var(--gold);border-radius:6px;padding:3px 9px;font-size:10px;margin-left:5px">#${esc(tg.trim())}</span>`).join('')}</div>`:''}
+    ${t.notes?`<div style="background:var(--surface);border-radius:10px;padding:11px;margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px">یادداشت</div><div style="font-size:12px;line-height:1.7;color:var(--text2)">${esc(t.notes)}</div></div>`:''}
+    ${t.tags?`<div style="margin-bottom:14px">${t.tags.split(',').map(tg=>`<span style="background:rgba(200,168,75,.1);color:var(--gold);border-radius:6px;padding:3px 9px;font-size:11px;margin-left:5px">#${esc(tg.trim())}</span>`).join('')}</div>`:''}
     ${FEEDBACK[t.id]?`<div class="fb-box"><div class="fb-head">💬 نظر استاد</div><div class="fb-text">${esc(FEEDBACK[t.id].text)}</div>${FEEDBACK[t.id].at?`<div class="fb-date">${fmtDateFa(FEEDBACK[t.id].at.slice(0,10))}</div>`:''}</div>`:''}
     <div style="display:flex;gap:9px">
       <button class="btn btn-ghost" style="flex:1" onclick="editTrade('${t.id}')">✏️ ویرایش</button>
@@ -2820,6 +2876,12 @@ async function delTrade(id){
 // ══════════════════════════════════════════════════════
 // TRADE FORM
 // ══════════════════════════════════════════════════════
+// v26.16: احساس با یک لمس (دوباره زدن ⇒ برداشتن)؛ مقدار همان select پنهانِ f-emot است تا ذخیره عوض نشود
+function setEmotion(v){
+  const f = document.getElementById('f-emot'); if (!f) return;
+  f.value = f.value === v ? '' : v;
+  document.querySelectorAll('.emo-chips button').forEach(b => { const on = b.dataset.v === f.value; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); });
+}
 function chipGroup(id,options,selected=[],cls='selected'){
   const sel=Array.isArray(selected)?selected:[];
   return`<div class="chip-group" id="cg-${id}">${options.map(o=>`<div class="chip ${sel.includes(o)?cls:''}" data-value="${esc(o)}" onclick="toggleChip('${id}',this.dataset.value,'${cls}')">${esc(o)}</div>`).join('')}</div>`;
@@ -3185,6 +3247,87 @@ function jdRender(){
     <div class="jd-grid">${cells}</div>
     <div class="jd-foot"><button type="button" onclick="jdPick('${today}')">امروز</button></div>`;
 }
+// ══ v26.16 — ورود و خروجِ پله‌ای ══
+// entry/size/exit همان میانگین‌ها می‌مانند (بالای فایلِ tools/legs_pack.py)؛ پله‌ها در t.entries / t.exits.
+function legsCalc(ins, outs){
+  const I = ins.filter(r => r.p > 0 && r.m > 0), O = outs.filter(r => r.p > 0 && r.q > 0);
+  const M = I.reduce((a, r) => a + r.m, 0), E = I.length ? M / I.reduce((a, r) => a + r.m / r.p, 0) : null;
+  const Q = O.reduce((a, r) => a + r.q, 0), X = O.length && Math.abs(Q - 100) < 1e-6 ? O.reduce((a, r) => a + r.p * r.q, 0) / 100 : null;
+  return { I, O, M, E, Q, X };
+}
+const legFmt = v => String(+(+v).toPrecision(8));
+function legRows(kind){
+  const k = kind === 'in' ? 'm' : 'q';
+  return [...document.querySelectorAll(`#leg-${kind} .leg-r`)].map(r => ({ p: +r.querySelector('[data-k=p]').value || 0, [k]: +r.querySelector(`[data-k=${k}]`).value || 0 }));
+}
+function legRowHTML(kind, r = {}){
+  const [k, ph] = kind === 'in' ? ['m', 'مارجین $'] : ['q', 'درصدِ پوزیشن'];
+  const inp = (key, hint, v) => `<input class="fi" type="number" inputmode="decimal" step="any" data-k="${key}" placeholder="${hint}" aria-label="${hint}" value="${esc(v ?? '')}" oninput="legRecalc()">`;
+  return `<div class="leg-r">${inp('p', 'قیمت', r.p)}${inp(k, ph, r[k])}<button type="button" class="leg-x" aria-label="حذفِ این پله" onclick="this.parentNode.remove();legRecalc()">×</button></div>`;
+}
+function legOpen(kind, rows){
+  const box = document.getElementById('leg-' + kind); if (!box) return;
+  const g = id => document.getElementById(id)?.value || '';
+  rows = rows || (kind === 'in' ? [{ p: g('f-entry'), m: g('f-size') }, {}] : [{ p: g('f-exit'), q: g('f-exit') ? 50 : '' }, {}]);
+  const isIn = kind === 'in';
+  box.innerHTML = `<div class="leg-h"><b>${isIn ? 'ورودِ پله‌ای' : 'خروجِ پله‌ای'}</b><span>${isIn ? 'قیمت و مارجینِ هر پله؛ میانگینِ ورود و مارجینِ کل خودکار حساب می‌شوند.' : 'قیمت و درصدی از پوزیشن که در هر پله بستی؛ تا جمع به ۱۰۰٪ نرسد، ترید باز می‌ماند.'}</span></div>
+    <div class="leg-cols" aria-hidden="true"><span>قیمت</span><span>${isIn ? 'مارجین $' : 'درصدِ پوزیشن'}</span></div>
+    <div class="leg-rows">${rows.map(r => legRowHTML(kind, r)).join('')}</div>
+    <div class="leg-foot"><button type="button" class="leg-add" onclick="legAdd('${kind}')">+ پله‌ی دیگر</button><button type="button" class="leg-off" onclick="legToggle('${kind}')">حذفِ پله‌ها</button></div>
+    <div class="leg-sum" id="leg-${kind}-sum"></div>`;
+  box.hidden = false;
+  document.getElementById('leg-' + kind + '-tog').hidden = true;
+}
+function legsInit(d){
+  const ins = Array.isArray(d.entries) && d.entries.length > 1 ? d.entries : null, outs = Array.isArray(d.exits) && d.exits.length ? d.exits : null;
+  if (ins) legOpen('in', ins);
+  if (outs) legOpen('out', outs);
+  if (ins || outs) legRecalc();
+}
+function legToggle(kind){
+  const box = document.getElementById('leg-' + kind); if (!box) return;
+  if (box.hidden) { legOpen(kind); legRecalc(); return; }
+  box.hidden = true; box.innerHTML = ''; document.getElementById('leg-' + kind + '-tog').hidden = false;
+  for (const id of kind === 'in' ? ['f-entry', 'f-size'] : ['f-exit']) { const e = document.getElementById(id); if (e) { e.readOnly = false; e.classList.remove('ro'); } }
+  updatePnlPreview();
+}
+function legAdd(kind){ document.querySelector(`#leg-${kind} .leg-rows`)?.insertAdjacentHTML('beforeend', legRowHTML(kind)); }
+const legOn = k => { const b = document.getElementById('leg-' + k); return !!(b && !b.hidden); };
+function legRecalc(){
+  const c = legsCalc(legOn('in') ? legRows('in') : [], legOn('out') ? legRows('out') : []);
+  const set = (id, v) => { const e = document.getElementById(id); if (e) { e.value = v; e.readOnly = true; e.classList.add('ro'); } };
+  if (legOn('in')) {
+    if (c.E) { set('f-entry', legFmt(c.E)); set('f-size', String(Math.round(c.M * 100) / 100)); }
+    const s = document.getElementById('leg-in-sum');
+    if (s) s.innerHTML = c.I.length ? `میانگینِ ورود <bdi dir="ltr">${legFmt(c.E)}</bdi>، مارجینِ کل <bdi dir="ltr">${fmtUSD(c.M, false)}</bdi>` : 'قیمت و مارجینِ پله‌ها را بنویس.';
+  }
+  if (legOn('out')) {
+    set('f-exit', c.X != null ? legFmt(c.X) : '');
+    const s = document.getElementById('leg-out-sum');
+    if (s) {
+      const e = +document.getElementById('f-entry')?.value, m = +document.getElementById('f-size')?.value, L = +document.getElementById('f-lev')?.value || 1;
+      const dir = document.getElementById('f-dir')?.value === 'Short' ? -1 : 1;
+      const real = e > 0 && m > 0 ? c.O.reduce((a, r) => a + r.q / 100 * dir * (r.p - e) / e * m * L, 0) : null;
+      s.innerHTML = c.Q > 100.0001 ? `<b class="neg">جمعِ درصدها ${faNum(+c.Q.toFixed(2))}٪ است؛ بیشتر از ۱۰۰٪ نمی‌شود.</b>`
+        : c.X != null ? `کلِ پوزیشن بسته شد؛ میانگینِ خروج <bdi dir="ltr">${legFmt(c.X)}</bdi>`
+        : c.O.length ? `${faNum(+c.Q.toFixed(2))}٪ بسته شد${real != null ? `، سود/زیانِ همین بخش <bdi dir="ltr">${fmtUSD(real)}</bdi>` : ''}؛ ${faNum(+(100 - c.Q).toFixed(2))}٪ هنوز باز است.`
+        : 'قیمت و درصدِ هر خروج را بنویس.';
+    }
+  }
+  updatePnlPreview();
+}
+function legsRead(){
+  const c = legsCalc(legOn('in') ? legRows('in') : [], legOn('out') ? legRows('out') : []);
+  return { entries: c.I.length >= 2 ? c.I.map(r => ({ p: legFmt(r.p), m: String(r.m) })) : null,
+           exits: c.O.length ? c.O.map(r => ({ p: legFmt(r.p), q: +r.q.toFixed(2) })) : null, Q: c.Q };
+}
+// جزئیاتِ ترید: پله‌ها
+function legsHTML(t){
+  const ins = Array.isArray(t.entries) && t.entries.length > 1 ? t.entries : null, outs = Array.isArray(t.exits) && t.exits.length ? t.exits : null;
+  if (!ins && !outs) return '';
+  const q = outs ? outs.reduce((a, x) => a + (+x.q || 0), 0) : 0;
+  return `<div class="legs-d">${ins ? `<div><u>ورودِ پله‌ای</u>${ins.map(x => `<span><bdi dir="ltr">${esc(x.p)}</bdi><small><bdi dir="ltr">${fmtUSD(+x.m, false)}</bdi></small></span>`).join('')}</div>` : ''}${outs ? `<div><u>خروجِ پله‌ای</u>${outs.map(x => `<span><bdi dir="ltr">${esc(x.p)}</bdi><small>${faNum(+x.q)}٪</small></span>`).join('')}${q < 99.999 ? `<em>${faNum(+(100 - q).toFixed(2))}٪ هنوز باز</em>` : ''}</div>` : ''}</div>`;
+}
 function renderTradeForm(t){
   const isEdit=!!t;
   // آستانه‌ی همین ترید: ویرایش ⇒ جایگاه خودش، ترید تازه ⇒ جایگاهِ بعدی
@@ -3238,6 +3381,8 @@ function renderTradeForm(t){
         <div class="fg"><div class="fl"><i class="fdot red"></i>حد ضرر</div>${num('f-sl', d.stopLoss, ' oninput="refreshProCalc();updateRRPreview()"')}</div>
         <div class="fg"><div class="fl"><i class="fdot green"></i>حد سود</div>${num('f-tp', d.takeProfit, ' oninput="updateRRPreview()"')}</div>
       </div>
+      <div class="leg-tools"><button type="button" class="leg-tog" id="leg-in-tog" onclick="legToggle('in')">+ ورودِ پله‌ای</button><button type="button" class="leg-tog" id="leg-out-tog" onclick="legToggle('out')">+ خروجِ پله‌ای (حد سودِ اول و دوم)</button></div>
+      <div id="leg-in" class="legs" hidden></div><div id="leg-out" class="legs" hidden></div>
       <div id="rr-prev"></div>
       ${FORM_NEED===PRO_PRINCIPLES||ownerJournal()?proCalcCard(isEdit?d.id:null):''}
       <div class="fgrid tf-gap">
@@ -3257,6 +3402,9 @@ function renderTradeForm(t){
       <div id="sl-chip-wrap">${chipGroup('slr',SL_REASONS(d.direction),sl,'selected-red')}</div>
       <div class="rs-h"><b>🎯 دلیل حد سود</b><span class="rs-need" id="tp-dir-label">${reasonSideLabel('tp', d.direction)}</span><span class="rs-cnt" id="cnt-tpr"></span></div>
       <div id="tp-chip-wrap">${chipGroup('tpr',TP_REASONS(d.direction),tp,'selected-green')}</div>
+      <div class="rs-h"><b>🧠 احساسِ لحظه‌ی ورود</b><span class="rs-need">۱۰٪ نمره‌ی انضباط</span></div>
+      <div class="emo-chips" role="radiogroup" aria-label="احساسِ لحظه‌ی ورود">${getDynList('sc_emotions',EMOTIONS).map(x=>`<button type="button" role="radio" aria-checked="${d.emotion===x}" class="${d.emotion===x?'on':''}" data-v="${esc(x)}" onclick="setEmotion(this.dataset.v)">${esc(EMOTIONS_FA[x]||x)}</button>`).join('')}</div>
+      ${sel('f-emot', getDynList('sc_emotions',EMOTIONS), d.emotion, ' hidden aria-hidden="true" tabindex="-1"')}
     </section>
 
     <section class="tf-sec">
@@ -3264,7 +3412,6 @@ function renderTradeForm(t){
       <div class="fgrid">
         <div class="fg"><div class="fl">استراتژی</div>${sel('f-strat', getDynList('sc_strategies',STRATEGIES), d.strategy)}</div>
         <div class="fg"><div class="fl">سشن</div>${sel('f-sess', getDynList('sc_sessions',SESSIONS), d.session)}</div>
-        <div class="fg"><div class="fl">احساس</div>${sel('f-emot', getDynList('sc_emotions',EMOTIONS), d.emotion, '', x=>esc(emoLabel(x)))}</div>
         <div class="fg"><div class="fl">کارمزد $</div>${num('f-fees', d.fees, ' oninput="updatePnlPreview()"')}</div>
         <div class="fg full"><div class="fl">تگ‌ها</div><input id="f-tags" class="fi" value="${esc(d.tags||'')}" placeholder="فاندامنتال, خبر"/></div>
         <div class="fg full"><div class="fl">لینک نمودار TradingView <span class="fl-note">اختیاری</span></div><input id="f-chart" class="fi" type="url" inputmode="url" dir="ltr" value="${esc(d.chartUrl||'')}" placeholder="https://www.tradingview.com/x/…"/><div class="tf-hint">در TradingView: دکمه‌ی دوربین ← «کپی لینک تصویر». استاد هم همین نمودار را می‌بیند.</div></div>
@@ -3283,6 +3430,7 @@ function renderTradeForm(t){
   updatePnlPreview();
   updateCoinInfo();
   refreshPrinciplesMeter();
+  legsInit(d);
 }
 
 function updatePnlPreview(){
@@ -3393,6 +3541,11 @@ function saveTrade(id){
   const prevT=TRADES.find(x=>x.id===id);
   if(prevT) for(const k of ['capital','sizeMode','marginType','feeReserve','afterLimit','source']) if(prevT[k]!=null&&prevT[k]!=='') t[k]=prevT[k];
   if(!t.chartUrl) delete t.chartUrl;
+  // v26.16: ورود/خروجِ پله‌ای — entry/size/exit همین الان میانگین‌اند؛ پله‌ها کنارشان می‌مانند
+  const legs=legsRead();
+  if(legs.Q>100.0001){alert('جمعِ درصدِ خروج‌های پله‌ای بیشتر از ۱۰۰٪ است. اصلاحش کن و دوباره ثبت کن.');return}
+  if(legs.entries) t.entries=legs.entries;
+  if(legs.exits) t.exits=legs.exits;
   if(document.getElementById('pro-calc')){
     const cap=+document.getElementById('pc-b')?.value; if(cap>0) t.capital=cap;
     // حالتی که ترید با آن اندازه گرفته شد: فقط اگر «اعمال در فرم» زده شده، یا
@@ -3428,10 +3581,11 @@ function saveTrade(id){
   saveStudentPrefs(t); // ذخیره پیش‌فرض کوین/تایم‌فریم/لوریج برای دفعه بعد
   showToast('⏳ در حال ذخیره...');
   saveTrades(SESSION.uid,TRADES).then((res)=>{
+    // v26.16: قبلاً پیامِ موفقیت بلافاصله با «فقط روی این دستگاه» پوشانده می‌شد
     if(res===true) showToast(exists?'✅ ترید ویرایش شد':'✅ ترید ثبت شد');
-    if(+t.exit>0&&calcPnl(t)<0) setTimeout(tiltAfterSave,500);
     else if(res?.paywall){ showToast('⛔ اشتراک لازم است — ترید روی همین دستگاه ماند'); loadBilling().then(B=>B.openPlans('write')).catch(()=>{}); }
     else showToast('💾 روی این دستگاه ذخیره شد — در اولین اتصال همگام می‌شود');
+    if(+t.exit>0&&calcPnl(t)<0) setTimeout(tiltAfterSave,500);
   });
   nav('trades',document.querySelector('[data-screen="trades"]'));
 }
@@ -4565,7 +4719,7 @@ function cohortMentorCard(){
   if(!flags.length) return '';
   return `<div class="card fade-up ch-card">
     <div class="card-title">👥 نیازمند توجه</div>
-    <div style="font-size:10.5px;color:var(--muted);line-height:1.9;margin-bottom:10px">
+    <div style="font-size:11px;color:var(--muted);line-height:1.9;margin-bottom:10px">
       بر پایه‌ی مقایسه با میانه‌ی همین کلاس (${faNum(d.students)} دانشجو).
       «اصول ورود» یعنی ${faNum(3)} دلیل ورود، ${faNum(2)} دلیل حد ضرر و ${faNum(2)} دلیل حد سود.</div>
     ${flags.map(x=>`<div class="ch-mrow">
@@ -4595,7 +4749,7 @@ async function mentorPersonalJournal(){
   if(!back) L.s('sc_mentor_restore', SESSION);
   TRADES = await loadTrades(MENTOR_UID);
   FEEDBACK = {};
-  dashRange='all'; calOffset=0;
+  dashRange='all'; calOffset=0; calAuto=true;
   XQ={ map:{}, loaded:false, busy:false, pending:0, failed:0 };
   COHORT={ data:null, loaded:false, busy:false };
   SESSION = { role:'student', uid:MENTOR_UID, name:'ژورنال شخصی من', isViewOnly:false, personal:true };
@@ -4629,7 +4783,7 @@ function mentorPersonalCard(){
       فضای خصوصی خودت با <b>همان ابزارها و هشدارهای دانشجوها</b>، ولی بدون محدودیت (سقف اهرم، قفل ماشین‌حساب): ثبت ترید، ورود از فایل و صرافی،
       کیفیت خروج، پایبندی به پلن، کامل‌بودنِ ژورنال و هشدار قیمت.
       ${n!==null?`<br>الان <b>${faNum(n)}</b> ترید شخصی داری.`:''}
-      <br><span style="color:var(--muted);font-size:10.5px">این تریدها در هیچ آمار کلاسی دیده نمی‌شوند و هیچ دانشجویی به آن‌ها دسترسی ندارد.</span>
+      <br><span style="color:var(--muted);font-size:11px">این تریدها در هیچ آمار کلاسی دیده نمی‌شوند و هیچ دانشجویی به آن‌ها دسترسی ندارد.</span>
     </div>
     <button class="btn btn-ghost xq-cta" onclick="mentorPersonalJournal()">ورود به ژورنال شخصی</button>
   </div>`;
@@ -5027,12 +5181,48 @@ function mentorAttention(rows){
           ${r.sig.flags.slice(0,2).map(f => `<span class="mtag${f.hard?'':' warn'}">${f.t}</span>`).join('')}
         </div>
       </div>`).join('')}
-    ${flagged.length > 6 ? `<div style="font-size:10px;color:var(--muted);padding-top:9px">
+    ${flagged.length > 6 ? `<div style="font-size:11px;color:var(--muted);padding-top:9px">
       و ${faNum(flagged.length - 6)} نفر دیگر — در فهرست پایین</div>` : ''}
   </div>`;
 }
 
+// ── v26.16 (بازبینی U14): جدولِ دانشجوها در دسکتاپ — مرتب‌سازی روی هر ستون؛ گوشی همان فهرست ──
+let MTBL = { k: 'attention', dir: -1 };
+const MTBL_COLS = [['name','دانشجو'],['count','معامله'],['days','آخرین فعالیت'],['adh','پایبندی'],['disc','کامل‌بودنِ ژورنال'],['pnl30','سود/زیانِ ۳۰ روز'],['dd','بیشترین افت'],['over','بعد از سقف (۷ روز)'],['attention','وضعیت']];
+function mtblSet(k){ MTBL = { k, dir: MTBL.k === k ? -MTBL.dir : (k === 'name' || k === 'days' ? 1 : -1) }; renderMentorMain(); if (document.getElementById('dash-content')?.querySelector('.mtbl')) _renderMentorDashboard(); }
+function mentorTableRows(rows){
+  const since30 = isoLocal(new Date(Date.now() - 30 * 864e5)), since7 = isoLocal(new Date(Date.now() - 7 * 864e5));
+  return rows.map(r => {
+    const pb = asStudent(r.uid, () => playbookStats());
+    const pnl30 = r.sig.closed.filter(t => String(t.date || '') >= since30).reduce((a, t) => a + (calcPnl(t) || 0), 0);
+    return { ...r, adh: pb ? pb.avgAdh : null, pnl30, has30: r.sig.closed.some(t => String(t.date || '') >= since30),
+      dd: r.sig.st ? r.sig.st.maxDD : null, over: r.sig.all.filter(t => t.afterLimit && String(t.date || '') >= since7).length };
+  });
+}
+function mentorTable(rows, actions){
+  const R = mentorTableRows(rows), k = MTBL.k, nil = v => v == null;
+  const val = r => k === 'name' ? String(r.st.name || '') : k === 'count' ? r.count : k === 'days' ? r.sig.days : k === 'adh' ? r.adh
+    : k === 'disc' ? r.disc : k === 'pnl30' ? (r.has30 ? r.pnl30 : null) : k === 'dd' ? r.dd : k === 'over' ? r.over : r.sig.weight;
+  R.sort((a, b) => { const x = val(a), y = val(b); return nil(x) ? (nil(y) ? 0 : 1) : nil(y) ? -1 : (typeof x === 'string' ? x.localeCompare(y, 'fa') : x - y) * MTBL.dir; });
+  const tone = (v, g, o) => v == null ? 'var(--muted)' : v >= g ? 'var(--green)' : v >= o ? 'var(--gold-light)' : 'var(--red)';
+  const th = MTBL_COLS.map(([c, l]) => `<th scope="col" aria-sort="${k === c ? (MTBL.dir > 0 ? 'ascending' : 'descending') : 'none'}"><button type="button" onclick="mtblSet('${c}')">${l}<i aria-hidden="true">${k === c ? (MTBL.dir > 0 ? '▲' : '▼') : ''}</i></button></th>`).join('') + (actions ? '<th scope="col" class="np"></th>' : '');
+  return `<div class="tbl-wrap mtbl fade-up"><table class="ttbl"><thead><tr>${th}</tr></thead><tbody>${R.map(r => {
+    const ago = r.sig.days == null ? 'بدون فعالیت' : r.sig.days === 0 ? 'امروز' : `${faNum(r.sig.days)} روز پیش`;
+    return `<tr tabindex="0" onclick="selectStudent('${r.uid}')" onkeydown="if(event.key==='Enter')selectStudent('${r.uid}')">
+      <td><b>${esc(r.st.name)}</b>${vipTag(r.st)}<small class="mt-sub" dir="ltr">${esc(r.uid)}</small></td>
+      <td class="tb-num">${faNum(r.count)}<small>بودجه ${faNum(currentBudget(r.count))}$</small></td>
+      <td style="color:${r.sig.days == null || r.sig.days >= 14 ? 'var(--red)' : r.sig.days >= 7 ? 'var(--gold-light)' : 'var(--text)'}">${ago}</td>
+      <td class="tb-num" style="color:${tone(r.adh, 75, 45)}">${r.adh == null ? '—' : faNum(Math.round(r.adh)) + '٪'}</td>
+      <td class="tb-num" style="color:${tone(r.disc, 75, 45)}">${r.disc == null ? '—' : faNum(r.disc)}</td>
+      <td class="tb-num">${r.has30 ? `<b style="color:${r.pnl30 >= 0 ? 'var(--green)' : 'var(--red)'}"><bdi dir="ltr">${fmtUSD(r.pnl30)}</bdi></b>` : '<span style="color:var(--muted)">بدون معامله</span>'}</td>
+      <td class="tb-num" style="color:${r.dd ? 'var(--red)' : 'var(--muted)'}">${r.dd ? `<bdi dir="ltr">${fmtUSD(-r.dd)}</bdi>` : '—'}</td>
+      <td class="tb-num" style="color:${r.over ? 'var(--red)' : 'var(--muted)'}">${faNum(r.over)}</td>
+      <td>${r.sig.flags.slice(0, 2).map(f => `<span class="mtag${f.hard ? '' : ' warn'}">${f.t}</span>`).join(' ') || '<span style="color:var(--green);font-size:12px">در مسیر</span>'}</td>
+      ${actions ? `<td onclick="event.stopPropagation()"><button class="btn btn-ghost btn-sm" onclick="mentorViewAs('${r.uid}')">👁️ ورود به عنوان</button></td>` : ''}
+    </tr>`; }).join('')}</tbody></table></div>`;
+}
 function mentorList(rows){
+  if (isWide()) return `<div class="card fade-up mtbl-card"><div class="card-title">دانشجویان</div>${mentorTable(rows)}</div>`;
   const opts = [['attention','نیازمند توجه'],['discipline','دیسیپلین'],['activity','فعالیت'],
                 ['pnl','سود/زیان'],['name','نام']];
   const sorted = [...rows];
@@ -5094,6 +5284,7 @@ function _renderMentorDashboard(){
 
     ${mentorAttention(rows)}
 
+    ${REVIEW.loaded ? (n => n ? `<button type="button" class="rv-cta fade-up" onclick="mentorTab='review';mentorSelected=null;nav('mentor',document.querySelector('[data-screen=&quot;mentor&quot;]'))"><b>💬 ${faNum(n)} معامله منتظرِ نظرِ توست</b><span>ضرر بیشتر از حد ضرر، بعد از سقفِ روزانه، قانونِ شکسته — صفِ بازبینی</span></button>` : '')(reviewItems().length) : ((REVIEW.p || loadReview().then(() => { if (SESSION?.role === 'mentor' && document.getElementById('screen-dashboard')?.classList.contains('active')) _renderMentorDashboard(); })), '')}
     ${mentorList(rows)}
 
     ${mentorPersonalCard()}
@@ -5125,11 +5316,91 @@ async function saveFeedbackFromEditor(uid,tradeId,del=false){
   const fb=await saveFeedbackEntry(uid,tradeId,del?'':text);
   if(!fb){ savedOrWarn(false); return; }     // برگه باز می‌ماند تا متن از دست نرود
   MENTOR_FB={_uid:uid,_loaded:true,data:fb};
+  REVIEW.fb[uid]=fb; REVIEW.touched[uid]=1;   // v26.16: صفِ بازبینی همان لحظه به‌روز شود
   closeSheet();
   showToast(del?'🗑️ نظر حذف شد':'✅ نظر برای دانشجو ثبت شد');
   renderMentorMain();
 }
 
+// ══ v26.16 — صفِ بازبینی (بازبینی U13) ══
+// معامله‌هایی که نظرِ استاد را لازم دارند، از همه‌ی دانشجوها در یک صفحه. فقط معامله‌های ژورنال‌شده (نه واردشده‌ی دست‌نخورده)
+// و فقط قانون‌های رفتاری (حد ضرر، R:R، اهرم، انتقام) — کمبودِ دلیل کارِ «کامل‌بودنِ ژورنال» است، نه نظرِ استاد.
+// «دیده شد» در kv مشترکِ sc_review_seen می‌ماند (۶۰ روز). هر قضاوت با نوعِ حسابِ همان دانشجو (سقفِ اهرمِ دوره فقط CIP).
+const REVIEW_RULES = ['stop', 'rr', 'lev', 'revenge'];
+let REVIEW = { fb: {}, seen: {}, touched: {}, loaded: false, p: null, days: 30, n: 30 };   // touched: نظرِ همین‌جا ذخیره‌شده — بارگذاریِ کهنه‌تر رویش ننشیند
+function asStudent(uid, fn){
+  const keep = SESSION;
+  SESSION = { ...SESSION, accountType: STUDENTS[uid] ? 'cip' : (VIPS[uid] ? 'vip' : 'pro'), personal: false };
+  try { return withTrades((ALL_TRADES[uid] || []).filter(t => !t._deleted), fn); } finally { SESSION = keep; }
+}
+// یک بارگذاری در جریان ⇒ همه‌ی فراخوان‌ها همان promise را می‌گیرند (وگرنه هر رندر رندرِ بعدی را صدا می‌زد و صفحه قفل می‌شد)
+function loadReview(force){
+  if (REVIEW.loaded && !force) return Promise.resolve();
+  if (REVIEW.p) return REVIEW.p;
+  const uids = Object.keys(ROSTER());
+  REVIEW.p = Promise.all([cloudGet('sc_review_seen').catch(() => null), ...uids.map(u => loadFeedback(u).catch(() => ({})))])
+    .then(([seen, ...fbs]) => {
+      REVIEW.seen = { ...(seen && typeof seen === 'object' ? seen : {}), ...REVIEW.seen };
+      uids.forEach((u, i) => { if (!REVIEW.touched[u]) REVIEW.fb[u] = fbs[i] || {}; });
+      REVIEW.loaded = true;
+    }).finally(() => { REVIEW.p = null; });
+  return REVIEW.p;
+}
+function reviewItems(){
+  const since = isoLocal(new Date(Date.now() - REVIEW.days * 864e5)), out = [];
+  for (const [uid, st] of Object.entries(ROSTER())) {
+    const all = (ALL_TRADES[uid] || []).filter(t => !t._deleted);
+    const recent = all.filter(t => t.exit && String(t.date || '') >= since && !(REVIEW.fb[uid] || {})[t.id] && !REVIEW.seen[uid + ':' + t.id]);
+    if (!recent.length) continue;
+    const ev = asStudent(uid, () => { const m = new Map(); for (const a of pbAnnotate(all.filter(t => t.exit))) m.set(a.id, pbEvaluate(a)); return m; });
+    for (const t of recent) {
+      const flags = [], k = exitKind(t);
+      if (k === 'beyondSl') flags.push({ t: 'ضرر بیشتر از حد ضرر', w: 10, hard: true });
+      if (t.afterLimit) flags.push({ t: 'بعد از سقفِ روزانه', w: 9, hard: true });
+      const e = tradeTouched(t) ? ev.get(t.id) : null;
+      const broke = e ? PLAYBOOK_RULES.filter(r => REVIEW_RULES.includes(r.id) && e[r.id] === false) : [];
+      for (const r of broke) flags.push({ t: asStudent(uid, () => r.label) + ' — رعایت نشد', w: r.id === 'stop' ? 8 : 5, hard: r.id === 'stop' || r.id === 'revenge' });
+      if (t.chartUrl) flags.push({ t: 'نمودار TradingView دارد', w: 2, hard: false });
+      if (flags.length) out.push({ uid, st, t, flags, w: flags.reduce((a, f) => a + f.w, 0) });
+    }
+  }
+  return out.sort((a, b) => b.w - a.w || String(b.t.date || '').localeCompare(String(a.t.date || '')));
+}
+async function reviewSeen(uid, id){
+  const now = isoLocal(), keepFrom = isoLocal(new Date(Date.now() - 60 * 864e5));
+  const next = Object.fromEntries(Object.entries({ ...REVIEW.seen, [uid + ':' + id]: now }).filter(([, d]) => d >= keepFrom));
+  REVIEW.seen = next; renderMentorMain();
+  if (!savedOrWarn(await cloudSet('sc_review_seen', next))) { delete REVIEW.seen[uid + ':' + id]; renderMentorMain(); }
+}
+function reviewFeedback(uid, id){
+  MENTOR_FB = { _uid: uid, _loaded: true, data: REVIEW.fb[uid] || {} };
+  openFeedbackEditor(uid, id);
+}
+function renderReview(){
+  if (!REVIEW.loaded) { if (!REVIEW.p) loadReview().then(() => { if (mentorTab === 'review' && !mentorSelected) renderMentorMain(); }); return '<div class="empty"><div class="empty-t">در حال آماده کردنِ صفِ بازبینی…</div></div>'; }
+  const items = reviewItems(), shown = items.slice(0, REVIEW.n);
+  const head = `<div class="rv-head"><div><b>برای بازبینی</b><span>${items.length ? `${faNum(items.length)} معامله در ${faNum(REVIEW.days)} روزِ اخیر نظرِ تو را لازم دارد` : ''}</span></div>
+    <div class="ph-seg">${[7, 30, 90].map(d => `<button type="button" class="${REVIEW.days === d ? 'on' : ''}" onclick="REVIEW.days=${d};REVIEW.n=30;renderMentorMain()">${faNum(d)} روز</button>`).join('')}</div></div>`;
+  if (!items.length) return head + `<div class="mflag" style="border-color:rgba(45,208,138,.22)"><div class="mflag-t" style="color:var(--green)">صفِ بازبینی خالی است</div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.9">در این بازه معامله‌ای با ضررِ بیشتر از حد ضرر، بعد از سقفِ روزانه یا قانونِ شکسته نیست که نظری رویش نداده باشی.</div></div>`;
+  return head + shown.map(({ uid, st, t, flags }) => {
+    const pnl = calcPnl(t);
+    return `<div class="rv-card fade-up">
+      <div class="rv-top">
+        ${coinLogo(t.coin, 'width:34px;height:34px;font-size:11px')}
+        <div class="rv-id"><b>${esc(st.name)}${vipTag(st)}</b><span>${esc(t.coin)} <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span> · ${fmtDateFa(t.date)}</span></div>
+        <b class="rv-pnl" style="color:${pnl == null ? 'var(--muted)' : pnl >= 0 ? 'var(--green)' : 'var(--red)'}"><bdi dir="ltr">${pnl == null ? '—' : fmtUSD(pnl)}</bdi></b>
+      </div>
+      <div class="rv-flags">${flags.map(f => `<span class="mtag${f.hard ? '' : ' warn'}">${esc(f.t)}</span>`).join('')}</div>
+      <div class="rv-act">
+        <button class="btn btn-primary btn-sm" onclick="reviewFeedback('${uid}','${t.id}')">💬 نظر</button>
+        ${t.chartUrl ? `<a class="btn btn-ghost btn-sm" href="${esc(t.chartUrl)}" target="_blank" rel="noopener">📈 نمودار</a>` : ''}
+        <button class="btn btn-ghost btn-sm" onclick="selectStudent('${uid}')">پرونده</button>
+        <button class="btn btn-ghost btn-sm rv-seen" onclick="reviewSeen('${uid}','${t.id}')">✓ دیده شد</button>
+      </div>
+    </div>`;
+  }).join('') + (items.length > shown.length ? `<button class="btn btn-ghost ms-more" onclick="REVIEW.n+=30;renderMentorMain()">نمایش ${faNum(Math.min(30, items.length - shown.length))} مورد بعدی</button>` : '');
+}
 function selectStudent(uid){mentorSelected=uid;nav('mentor',document.querySelector('[data-screen="mentor"]'))}
 
 function renderMentorMain(){
@@ -5179,7 +5450,7 @@ function renderMentorMain(){
           const fb=MENTOR_FB.data[t.id];
           return`<div class="ms-row">
             <div class="ms-r">
-            ${coinLogo(t.coin,'width:34px;height:34px;font-size:10px')}
+            ${coinLogo(t.coin,'width:34px;height:34px;font-size:11px')}
             <div class="ms-ri">
               <div class="ms-rc">${esc(t.coin)}/${esc(t.pair)} <span class="badge ${badgeCls(t.direction)}">${esc(t.direction)}</span></div>
               <div class="ms-rm">${fmtDateFa(t.date)}${t.strategy?` · ${esc(t.strategy)}`:''}</div>
@@ -5200,6 +5471,7 @@ function renderMentorMain(){
 
   el.innerHTML=`
     <div class="tab-bar mtabs">
+      <button class="tab-btn ${mentorTab==='review'?'active':''}" onclick="mentorTab='review';renderMentorMain()"><i>💬</i>بازبینی${REVIEW.loaded?` <em class="rv-n">${faNum(reviewItems().length)}</em>`:''}</button>
       <button class="tab-btn ${mentorTab==='students'?'active':''}" onclick="mentorTab='students';renderMentorMain()"><i>👥</i>دانشجویان</button>
       <button class="tab-btn ${mentorTab==='add'?'active':''}" onclick="mentorTab='add';renderMentorMain()"><i>➕</i>افزودن</button>
       <button class="tab-btn ${mentorTab==='codes'?'active':''}" onclick="mentorTab='codes';renderMentorMain()"><i>🔑</i>کدها</button>
@@ -5207,7 +5479,8 @@ function renderMentorMain(){
       <button class="tab-btn ${mentorTab==='settings'?'active':''}" onclick="mentorTab='settings';renderMentorMain()"><i>⚙️</i>تنظیمات</button>
       <button class="tab-btn ${mentorTab==='billing'?'active':''}" onclick="mentorTab='billing';renderMentorMain()"><i>💳</i>اشتراک</button>
     </div>
-    ${mentorTab==='students'?renderStudentCards():''}
+    ${mentorTab==='review'?renderReview():''}
+    ${mentorTab==='students'?(isWide()?mentorTable(mentorRows(),true):renderStudentCards()):''}
     ${mentorTab==='add'?renderAddStudent():''}
     ${mentorTab==='codes'?renderCodes():''}
     ${mentorTab==='reasons'?renderReasonSettings():''}
@@ -5229,20 +5502,20 @@ function renderStudentCards(){
         <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
           <div>
             <div style="font-weight:700;font-size:13px">${esc(st.name)}${vipTag(st)}</div>
-            <div style="font-size:10.5px;color:var(--muted);margin-top:2px">${faNum(count)} ترید · <span style="color:${xp.levelColor}">${xp.levelTitle}</span></div>
-            <div style="font-size:10px;color:var(--muted);margin-top:1px;font-family:var(--f-mono)">${uid}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">${faNum(count)} ترید · <span style="color:${xp.levelColor}">${xp.levelTitle}</span></div>
+            <div style="font-size:11px;color:var(--muted);margin-top:1px;font-family:var(--f-mono)">${uid}</div>
           </div>
           <div style="text-align:left">
             <div style="font-family:var(--f-mono);font-size:13px;font-weight:700;color:${(ss?.total||0)>=0?'var(--green)':'var(--red)'}">${fmtUSD(ss?.total||0)}</div>
-            <div style="font-size:10.5px;color:${parseFloat(ss?.winRate||0)>=50?'var(--green)':'var(--red)'}">${ss?`وین‌ریت ${faNum(Math.round(+ss.winRate))}٪`:'بدون ترید بسته'}</div>
+            <div style="font-size:11px;color:${parseFloat(ss?.winRate||0)>=50?'var(--green)':'var(--red)'}">${ss?`وین‌ریت ${faNum(Math.round(+ss.winRate))}٪`:'بدون ترید بسته'}</div>
           </div>
         </div>
         <div style="height:5px;background:var(--dim);border-radius:3px;overflow:hidden">
           <div style="height:100%;width:${xp.pct}%;background:linear-gradient(90deg,${xp.levelColor},${xp.levelColor}88);border-radius:3px"></div>
         </div>
         <div style="display:flex;justify-content:space-between;margin-top:4px">
-          <span style="font-size:10px;color:var(--muted)">${faNum(count)}/${faNum(getXPMilestones().slice(-1)[0].n)} ترید · 💵 ${faNum(currentBudget(count))}$</span>
-          <span style="font-size:10px;color:${xp.levelColor}">${faNum(xp.pct.toFixed(0))}٪</span>
+          <span style="font-size:11px;color:var(--muted)">${faNum(count)}/${faNum(getXPMilestones().slice(-1)[0].n)} ترید · 💵 ${faNum(currentBudget(count))}$</span>
+          <span style="font-size:11px;color:${xp.levelColor}">${faNum(xp.pct.toFixed(0))}٪</span>
         </div>
       </div>
       <div style="display:flex;gap:7px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
@@ -5323,7 +5596,7 @@ function renderReasonSettings() {
 
   const itemsHTML = list.map((item,i) => `
     <div id="rsitem-${i}" style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border)">
-      <div style="width:22px;height:22px;border-radius:6px;background:var(--dim);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);font-family:var(--f-mono);flex-shrink:0">${i+1}</div>
+      <div style="width:22px;height:22px;border-radius:6px;background:var(--dim);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);font-family:var(--f-mono);flex-shrink:0">${i+1}</div>
       <div id="rslabel-${i}" style="flex:1;font-size:13px;color:var(--text)">${esc(item)}</div>
       <input id="rsinput-${i}" class="fi" style="display:none;flex:1;padding:7px 10px;font-size:12px" value="${esc(item)}" onkeydown="if(event.key==='Enter')saveInlineEdit(${i})"/>
       <div id="rsbtn-${i}" style="display:flex;gap:5px;flex-shrink:0">
@@ -5483,6 +5756,7 @@ function setLoginMode(m){
   if(h) h.textContent=m==='mentor'?'ورود منتور':'خوش آمدی';
   if(hint) hint.textContent=m==='mentor'?'با رمز عبور منتور وارد شو':'با شماره موبایل و PIN چهاررقمی که استاد به تو داده وارد شو';
   const help=document.getElementById('lg-help'); if(help) help.style.display=m==='mentor'?'none':'';
+  const tg=document.getElementById('lg-tg'); if(tg) tg.style.display=m==='mentor'?'none':'';
   const su=document.getElementById('su-link'); if(su) su.style.display=m==='mentor'?'none':'';
   document.getElementById('lerr').style.display='none';
 }
@@ -5501,12 +5775,73 @@ function setLoginBusy(busy){
   b.innerHTML=busy?'<span class="lg-spin" aria-hidden="true"></span>در حال بررسی…':'ورود';
 }
 (function(){ const y=document.getElementById('lg-year'); if(y) y.textContent=new Date().getFullYear(); })();
+// v26.16 (بازبینی U2): دکمه‌ی «منتور» فقط با آدرسِ خودش (/app/?mentor) یا روی دستگاهی که قبلاً منتور واردش شده؛
+// دانشجو فقط فرمِ خودش را می‌بیند و درِ ورودِ مدیریتی به همه نشان داده نمی‌شود.
+(function(){
+  const q = new URLSearchParams(location.search), seg = document.querySelector('#login-screen .lg-seg');
+  const show = q.has('mentor') || !!L.g('sc_offline_ok_mentor');
+  if (seg && !show) seg.style.display = 'none';
+  if (q.has('mentor')) setTimeout(() => setLoginMode('mentor'), 0);
+})();
 
 // v26.12: قفل پله‌ای است (۱۵ دقیقه ← ۱ ساعت ← ۲۴ ساعت) — زمانِ واقعی از پاسخِ سرور
 function loginLockText(until){
   const m=Math.ceil((Date.parse(until)-Date.now())/6e4);
   const w=!(m>0)?'چند دقیقه‌ی':m>=55?`${faNum(Math.round(m/60))} ساعتِ`:`${faNum(m)} دقیقه‌ی`;
   return `🔒 به دلیل تلاشِ اشتباهِ زیاد، ورود قفل شد؛ ${w} دیگر دوباره امتحان کنید`;
+}
+// ── v26.16 (بازبینی U1): ورود با تلگرام و PINِ تازه — لینکِ یک‌بارمصرف در تلگرامِ خودِ کاربر ──
+function loginNote(msg, ok){
+  const e = document.getElementById('lerr'); if (!e) return;
+  e.textContent = msg; e.style.display = 'block'; e.classList.toggle('ok', !!ok);
+}
+async function tgLoginStart(purpose){
+  const code = (document.getElementById('code-input')?.value || '').replace(/[^0-9]/g, '');
+  const what = purpose === 'reset' ? 'ساختنِ PINِ تازه' : 'ورود به ژورنال';
+  if (code.length !== 11 || !code.startsWith('09')) { document.getElementById('code-input')?.focus(); return loginNote(`⚠️ اول شماره موبایلت را بنویس، بعد «${purpose === 'reset' ? 'ساختنِ PINِ تازه با تلگرام' : 'ورود با تلگرام'}» را بزن`); }
+  setLoginBusy(true);
+  const r = await apiFetch('/api/tg-login/start', { method: 'POST', body: JSON.stringify({ phone: code, purpose }) });
+  setLoginBusy(false);
+  if (r === undefined) return loginNote('⚠️ سرور در دسترس نیست. اینترنت را بررسی کن و دوباره تلاش کن.');
+  loginNote(`💬 اگر این شماره به تلگرام وصل باشد، همین الان در ربات SamadiCapital پیامی با دکمه‌ی «${what}» برایت آمد. دکمه را بزن؛ ۱۰ دقیقه اعتبار دارد. پیامی نیامد؟ تلگرامت هنوز به ژورنال وصل نیست — از استاد بخواه PIN بسازد.`, true);
+}
+async function tgLoginRedeem(tl){
+  const q = new URLSearchParams(location.search); q.delete('tl');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+  const ls = document.getElementById('login-screen'); ls.style.display = 'flex'; ls.classList.add('fade-in');
+  loginNote('⏳ در حال ورود با تلگرام…', true);
+  const r = await apiFetch('/api/tg-login/redeem', { method: 'POST', body: JSON.stringify({ token: tl }) });
+  if (r === undefined) return loginNote('⚠️ سرور در دسترس نیست. اینترنت را بررسی کن و دوباره روی دکمه‌ی تلگرام بزن.');
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    // این دستگاه از قبل وارد بوده ⇒ با همان نشست ادامه، نه برگشت به صفحه‌ی ورود
+    let saved = null; try { saved = JSON.parse(sessionStorage.getItem('sc_session')); } catch (e) {}
+    if (d.error !== 'blocked' && saved?.uid && TOKEN) { startSession(saved); setTimeout(() => showToast('⚠️ لینکِ تلگرام منقضی یا استفاده شده بود؛ با حسابِ همین دستگاه ادامه بده'), 600); return; }
+  }
+  if (!r.ok) return loginNote(d.error === 'blocked' ? '⛔ این حساب غیرفعال شده است؛ با پشتیبانی تماس بگیرید' : '⚠️ این لینک منقضی یا استفاده شده است. دوباره «ورود با تلگرام» را بزن.');
+  document.getElementById('lerr').style.display = 'none';
+  setToken(d.token); L.s('sc_offline_ok_' + d.uid, d.name || true); L.s('sc_acct_' + d.uid, d.accountType || 'cip');
+  startSession({ role: 'student', uid: d.uid, name: d.name, accountType: d.accountType || 'cip' });
+  if (d.pinTicket) setTimeout(() => openPinReset(d.pinTicket), 900);
+}
+function openPinReset(ticket){
+  const pin = id => `<input id="${id}" class="fi lg-in lg-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="4" placeholder="${id === 'np1' ? 'PINِ تازه' : 'تکرارِ PIN'}" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,4)">`;
+  document.getElementById('det-content').innerHTML = `<div class="bs-title">🔑 PINِ تازه</div>
+    <div class="tf-hint" style="margin-bottom:12px">یک PINِ چهاررقمیِ تازه بساز؛ از این به بعد با همین وارد می‌شوی. بقیه‌ی دستگاه‌ها از حسابت خارج می‌شوند.</div>
+    ${pin('np1')}<div style="height:10px"></div>${pin('np2')}
+    <div id="np-err" class="err-msg" style="display:none"></div>
+    <button class="btn btn-primary" style="margin-top:14px" onclick="savePinReset('${ticket}')">ذخیره‌ی PIN</button>`;
+  document.getElementById('det-sheet').classList.add('open');
+}
+async function savePinReset(ticket){
+  const a = document.getElementById('np1').value, b = document.getElementById('np2').value, e = document.getElementById('np-err');
+  const fail = m => { e.textContent = m; e.style.display = 'block'; };
+  if (!/^\d{4}$/.test(a)) return fail('⚠️ PIN باید چهار رقم باشد');
+  if (a !== b) return fail('⚠️ دو PIN یکی نیستند');
+  const r = await apiFetch('/api/pin/reset', { method: 'POST', body: JSON.stringify({ ticket, pin: a }) });
+  if (r === undefined) return fail('⚠️ سرور در دسترس نیست؛ دوباره امتحان کن');
+  if (!r.ok) return fail(r.status === 410 ? '⚠️ مهلتِ ساختنِ PIN تمام شده؛ از صفحه‌ی ورود دوباره «ساختنِ PINِ تازه با تلگرام» را بزن' : '⚠️ ذخیره نشد؛ دوباره امتحان کن');
+  closeSheet(); showToast('✅ PINِ تازه ذخیره شد');
 }
 function doLogin(){
   setLoginBusy(true);
@@ -5553,7 +5888,7 @@ function doLogin(){
       else if(r.status===403)fail('⛔ این حساب غیرفعال شده است؛ با پشتیبانی تماس بگیرید');
       else if(r.status===423)fail(loginLockText(d.until));
       // v26.12: سرور دیگر نمی‌گوید «شماره ثبت نشده» یا «PIN ساخته نشده» (هر کسی می‌توانست عضویت را بپرسد) — یک پیام برای همه
-      else fail('⚠️ شماره یا PIN درست نیست'+(d.left?` (${faNum(d.left)} تلاش مانده)`:'')+'. اگر PIN ندارید یا فراموش کرده‌اید، به استاد پیام بدهید.');
+      else fail('⚠️ شماره یا PIN درست نیست'+(d.left?` (${faNum(d.left)} تلاش مانده)`:'')+'. اگر PIN ندارید یا فراموش کرده‌اید، «ساختنِ PINِ تازه با تلگرام» را بزنید.');
       setLoginBusy(false);
     });
   }
@@ -5611,6 +5946,7 @@ function startSession(s){
       // v13: فیدبک استاد + اعلان نظرهای دیده‌نشده
       loadFeedback(s.uid).then(fb=>{
         FEEDBACK=fb||{};
+        handleTradeRoute();
         const k='sc_fb_seen_'+s.uid,seen=L.g(k)||[];
         const unseen=Object.keys(FEEDBACK).filter(id=>!seen.includes(id));
         if(unseen.length)setTimeout(()=>showToast('💬 '+faNum(unseen.length)+' نظر جدید از استاد داری'),900);
@@ -5639,7 +5975,7 @@ async function mentorViewAs(uid){
   // v26.9: بی‌اتصال، loadTrades فقط حافظه‌ی همین دستگاه را دارد؛ داده‌ی بارشده‌ی پنل کامل‌تر است
   TRADES = studentTrades.length ? studentTrades : (ALL_TRADES[uid] || []).filter(t => t && !t._deleted);
   FEEDBACK = await loadFeedback(uid); // v13: نظرها در حالت ناظر هم دیده شوند
-  dashRange='all';calOffset=0;
+  dashRange='all';calOffset=0;calAuto=true;
   SESSION = {role:'student', uid, name: st.name + ' (ناظر)', isViewOnly: true, ...(st.type==='vip'?{accountType:'vip'}:{})};
   // update UI
   document.getElementById('u-av').textContent = st.name.slice(0,2);
@@ -5801,15 +6137,15 @@ function renderMSXP(){
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center">
       <div style="width:36px;height:36px;border-radius:50%;background:${m.color}22;border:2px solid ${m.color};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0" data-raw>${esc(m.icon||'⭐')}</div>
       <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div class="fg"><div class="fl" style="font-size:9px">نام پله</div><input class="fi" style="padding:7px 10px;font-size:12px" id="xp-title-${i}" value="${esc(m.title)}"/></div>
-        <div class="fg"><div class="fl" style="font-size:9px">تعداد ترید</div><input class="fi" style="padding:7px 10px;font-size:12px" type="number" id="xp-n-${i}" value="${m.n}" min="1" max="500"/></div>
-        <div class="fg"><div class="fl" style="font-size:9px">آیکون</div>
+        <div class="fg"><div class="fl" style="font-size:11px">نام پله</div><input class="fi" style="padding:7px 10px;font-size:12px" id="xp-title-${i}" value="${esc(m.title)}"/></div>
+        <div class="fg"><div class="fl" style="font-size:11px">تعداد ترید</div><input class="fi" style="padding:7px 10px;font-size:12px" type="number" id="xp-n-${i}" value="${m.n}" min="1" max="500"/></div>
+        <div class="fg"><div class="fl" style="font-size:11px">آیکون</div>
           <select class="fi" style="padding:7px 10px;font-size:14px" id="xp-icon-${i}">
             ${icons.map(ic=>`<option value="${ic}" ${m.icon===ic?'selected':''}>${ic}</option>`).join('')}
             ${icons.includes(m.icon)?'':`<option value="${esc(m.icon)}" selected>${esc(m.icon)}</option>`}
           </select>
         </div>
-        <div class="fg"><div class="fl" style="font-size:9px">💵 بودجه (دلار)</div><input class="fi" style="padding:7px 10px;font-size:12px" type="number" id="xp-budget-${i}" value="${m.budget}" min="0"/></div>
+        <div class="fg"><div class="fl" style="font-size:11px">💵 بودجه (دلار)</div><input class="fi" style="padding:7px 10px;font-size:12px" type="number" id="xp-budget-${i}" value="${m.budget}" min="0"/></div>
       </div>
     </div>`).join('')}
   </div>
@@ -5915,7 +6251,7 @@ function doLogout(){
   SESSION=null;L.d('sc_session');L.d('sc_mentor_restore');
   try{sessionStorage.removeItem('sc_session')}catch(e){}
   FEEDBACK={};MENTOR_FB={_uid:null,_loaded:false,data:{}};
-  dashRange='all';calOffset=0;
+  dashRange='all';calOffset=0;calAuto=true;
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
 }
@@ -6042,7 +6378,7 @@ function _renderPriceAlerts(el){
     ${alarmPrefCard()}
     ${renderStudentChannelStatus()}
     <div id="alert-editor-slot">${ALERT_EDITOR?renderAlertEditor():''}</div>
-    <div class="alert-layout"><section class="alert-panel"><div class="alert-panel-head"><div><div class="alert-panel-title">هشدارهای من</div><div style="font-size:9px;color:var(--muted);margin-top:4px">شرط‌ها فقط هنگام عبور واقعی قیمت فعال می‌شوند</div></div><button class="btn btn-primary" style="width:auto;margin:0;padding:9px 15px;min-height:40px" onclick="openAlertEditor()">＋ هشدار جدید</button></div>${alerts.length?renderAlertList(alerts):alertEmptyMarkup('هنوز هشداری نساخته‌ای؛ اولین قیمت مهم خود را ثبت کن.')}</section><aside style="display:grid;gap:14px;align-content:start">${renderPushCard()}${renderTelegramCard()}${renderAlertInbox()}${renderAlertTimeline()}</aside></div>`}
+    <div class="alert-layout"><section class="alert-panel"><div class="alert-panel-head"><div><div class="alert-panel-title">هشدارهای من</div><div style="font-size:11px;color:var(--muted);margin-top:4px">شرط‌ها فقط هنگام عبور واقعی قیمت فعال می‌شوند</div></div><button class="btn btn-primary" style="width:auto;margin:0;padding:9px 15px;min-height:40px" onclick="openAlertEditor()">＋ هشدار جدید</button></div>${alerts.length?renderAlertList(alerts):alertEmptyMarkup('هنوز هشداری نساخته‌ای؛ اولین قیمت مهم خود را ثبت کن.')}</section><aside style="display:grid;gap:14px;align-content:start">${renderPushCard()}${renderTelegramCard()}${renderAlertInbox()}${renderAlertTimeline()}</aside></div>`}
   </div>`;
   if(ALERT_EDITOR)updateAlertEditorPrice();
   refreshAlertCardPrices();
@@ -6357,8 +6693,8 @@ function renderAlertEditor(){
   const d=ALERT_EDITOR,knownCoins=alertKnownCoins(),custom=!knownCoins.includes(d.symbol),channels=d.channels||{telegram:true,push:true,inApp:true};
   const allowed=ALERT_STATE.channels?.policy||{},system=ALERT_STATE.channels?.settings||{};
   const canTelegram=allowed.telegramAllowed!==false&&system.telegramEnabled!==false,canPush=allowed.pushAllowed!==false&&system.pushEnabled!==false,canInApp=allowed.inAppAllowed!==false&&system.inAppEnabled!==false;
-  return`<section class="alert-panel alert-editor"><div class="alert-panel-head"><div><div class="alert-panel-title">${d.id?'ویرایش هشدار':'ساخت هشدار جدید'}</div><div style="font-size:9px;color:var(--muted);margin-top:4px">قیمت مرجع: بازار لحظه‌ای جفت USDT · کانال‌ها زیر کنترل سیاست مدیر هستند</div></div><button class="icon-btn" onclick="cancelAlertEditor()" aria-label="بستن">×</button></div>
-  <div class="alert-form-grid"><label class="fg"><span class="fl">رمزارز <span class="req">*</span> <span class="fl-note">${faNum(knownCoins.length)} رمزارز</span></span><input id="al-symbol-search" class="fi coin-search" type="search" autocomplete="off" dir="auto" value="${esc(d._q||'')}" placeholder="🔍 جستجو — مثلاً PAXG، gold یا طلا" oninput="filterAlertSymbols(this.value)"><select id="al-symbol" class="fi" style="margin-top:7px" onchange="handleAlertSymbolSelect(this.value)">${alertSymbolOptions(d)}</select><span id="al-symbol-hint" class="coin-hint">${alertSymbolHint(d)}</span>${custom?`<input id="al-custom-symbol" class="fi" style="margin-top:7px;text-transform:uppercase;direction:ltr;text-align:left" maxlength="12" value="${esc(d.symbol)}" placeholder="SYMBOL مثل POL" oninput="setCustomAlertSymbol(this.value)">`:''}<span id="al-current" class="price-context"><span>قیمت فعلی</span><strong>${custom&&!d.symbol?'پس از ورود Symbol':'در حال دریافت…'}</strong></span></label><label class="fg"><span class="fl">قیمت هدف (USDT) <span class="req">*</span></span><input id="al-target" class="fi" type="number" min="0" step="any" inputmode="decimal" value="${esc(d.targetPrice)}" placeholder="مثلاً 120000" oninput="setAlertDraft('targetPrice',this.value)"><span style="font-size:9px;color:var(--muted)">قیمت باید عددی مثبت و دقیق باشد.</span></label></div>
+  return`<section class="alert-panel alert-editor"><div class="alert-panel-head"><div><div class="alert-panel-title">${d.id?'ویرایش هشدار':'ساخت هشدار جدید'}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">قیمت مرجع: بازار لحظه‌ای جفت USDT · کانال‌ها زیر کنترل سیاست مدیر هستند</div></div><button class="icon-btn" onclick="cancelAlertEditor()" aria-label="بستن">×</button></div>
+  <div class="alert-form-grid"><label class="fg"><span class="fl">رمزارز <span class="req">*</span> <span class="fl-note">${faNum(knownCoins.length)} رمزارز</span></span><input id="al-symbol-search" class="fi coin-search" type="search" autocomplete="off" dir="auto" value="${esc(d._q||'')}" placeholder="🔍 جستجو — مثلاً PAXG، gold یا طلا" oninput="filterAlertSymbols(this.value)"><select id="al-symbol" class="fi" style="margin-top:7px" onchange="handleAlertSymbolSelect(this.value)">${alertSymbolOptions(d)}</select><span id="al-symbol-hint" class="coin-hint">${alertSymbolHint(d)}</span>${custom?`<input id="al-custom-symbol" class="fi" style="margin-top:7px;text-transform:uppercase;direction:ltr;text-align:left" maxlength="12" value="${esc(d.symbol)}" placeholder="SYMBOL مثل POL" oninput="setCustomAlertSymbol(this.value)">`:''}<span id="al-current" class="price-context"><span>قیمت فعلی</span><strong>${custom&&!d.symbol?'پس از ورود Symbol':'در حال دریافت…'}</strong></span></label><label class="fg"><span class="fl">قیمت هدف (USDT) <span class="req">*</span></span><input id="al-target" class="fi" type="number" min="0" step="any" inputmode="decimal" value="${esc(d.targetPrice)}" placeholder="مثلاً 120000" oninput="setAlertDraft('targetPrice',this.value)"><span style="font-size:11px;color:var(--muted)">قیمت باید عددی مثبت و دقیق باشد.</span></label></div>
   <div class="fg" style="margin-top:15px"><span class="fl">شرط فعال‌شدن</span><div class="mode-grid"><button class="mode-option ${d.condition==='above'?'active':''}" onclick="chooseAlertMode('condition','above',this)"><b>↗ عبور رو به بالا</b><span>قیمت از پایین به هدف برسد یا عبور کند</span></button><button class="mode-option ${d.condition==='below'?'active':''}" onclick="chooseAlertMode('condition','below',this)"><b>↘ عبور رو به پایین</b><span>قیمت از بالا به هدف برسد یا پایین‌تر رود</span></button><button class="mode-option ${d.condition==='zone'?'active':''}" onclick="chooseAlertMode('condition','zone',this)"><b>◎ ورود به محدوده</b><span>ورود از هر جهت به ناحیه تصمیم</span></button></div></div>${d.condition==='zone'?`<label class="fg" style="margin-top:12px;max-width:260px"><span class="fl">تلرانس محدوده (درصد)</span><input id="al-tolerance" class="fi" type="number" min="0.05" max="5" step="0.05" value="${esc(d.tolerance)}" oninput="setAlertDraft('tolerance',this.value)"></label>`:''}
   <div class="fg" style="margin-top:15px"><span class="fl">اهمیت هشدار</span><div class="severity-grid"><button class="severity-option ${d.severity==='normal'?'active':''}" onclick="chooseAlertMode('severity','normal',this)"><b>عادی</b><span>اعلان سبک و قابل آرشیو</span></button><button class="severity-option ${d.severity==='important'?'active':''}" onclick="chooseAlertMode('severity','important',this)"><b>مهم</b><span>اولویت بالاتر و ویبره فعال</span></button><button class="severity-option ${d.severity==='critical'?'active':''}" onclick="chooseAlertMode('severity','critical',this)"><b>بحرانی</b><span>امکان عبور از ساعات سکوت طبق تنظیم مدیر</span></button></div></div>
   <div class="fg" style="margin-top:15px"><span class="fl">کانال‌های تحویل</span><div class="channel-picks"><label class="channel-pick ${channels.telegram&&canTelegram?'active':''} ${canTelegram?'':'blocked'}"><input type="checkbox" ${channels.telegram&&canTelegram?'checked':''} ${canTelegram?'':'disabled'} onchange="toggleAlertChannel('telegram',this)">Telegram</label><label class="channel-pick ${channels.push&&canPush?'active':''} ${canPush?'':'blocked'}"><input type="checkbox" ${channels.push&&canPush?'checked':''} ${canPush?'':'disabled'} onchange="toggleAlertChannel('push',this)">Push دستگاه</label><label class="channel-pick ${channels.inApp&&canInApp?'active':''} ${canInApp?'':'blocked'}"><input type="checkbox" ${channels.inApp&&canInApp?'checked':''} ${canInApp?'':'disabled'} onchange="toggleAlertChannel('inApp',this)">داخل ژورنال</label></div></div>
@@ -6944,7 +7280,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     sp.style.transition='opacity .5s';sp.style.opacity='0';
     setTimeout(()=>{sp.style.display='none';
       let saved=null;try{saved=JSON.parse(sessionStorage.getItem('sc_session'))}catch(e){}
-      if(saved?.uid&&TOKEN){startSession(saved)}
+      const tl=new URLSearchParams(location.search).get('tl');   // v26.16: لینکِ ورود از تلگرام
+      if(tl&&/^[0-9a-f]{48}$/.test(tl)){tgLoginRedeem(tl)}
+      else if(saved?.uid&&TOKEN){startSession(saved)}
       else{document.getElementById('login-screen').style.display='flex';document.getElementById('login-screen').classList.add('fade-in');
         if(/[?&]signup=1/.test(location.search)) openSignup();}
     },500);

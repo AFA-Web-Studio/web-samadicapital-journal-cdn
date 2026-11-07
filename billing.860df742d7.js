@@ -63,7 +63,7 @@
   .bl-terms{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:14px;background:#110f0d;border:1px solid var(--border);margin-bottom:14px}
   .bl-terms button{position:relative;min-height:46px;border:0;border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
   .bl-terms button.on{background:rgba(200,168,75,.15);color:var(--gold-light);box-shadow:inset 0 0 0 1px rgba(200,168,75,.5)}
-  .bl-terms small{font-size:9.5px;font-weight:700;color:var(--green);background:rgba(34,201,122,.12);padding:1px 7px;border-radius:99px}
+  .bl-terms small{font-size:11px;font-weight:700;color:var(--green);background:rgba(34,201,122,.12);padding:1px 7px;border-radius:99px}
   .bl-plans{display:grid;gap:10px;margin-bottom:14px}
   @media(min-width:700px){.bl-plans{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}
   .bl-plan{position:relative;text-align:right;padding:15px 15px 14px;border-radius:16px;border:1px solid var(--border2);background:linear-gradient(160deg,rgba(255,255,255,.03),rgba(255,255,255,.008));color:var(--text);font:inherit;cursor:pointer;transition:border-color .18s,box-shadow .18s,transform .12s}
@@ -72,7 +72,7 @@
   .bl-plan[disabled]{opacity:.45;cursor:not-allowed}
   .bl-ph{display:flex;align-items:center;gap:8px;margin-bottom:3px}
   .bl-ph b{font-size:15px}
-  .bl-badge{font-size:9.5px;font-weight:800;padding:2px 9px;border-radius:99px;background:rgba(200,168,75,.16);color:var(--gold-light);border:1px solid rgba(200,168,75,.4)}
+  .bl-badge{font-size:11px;font-weight:800;padding:2px 9px;border-radius:99px;background:rgba(200,168,75,.16);color:var(--gold-light);border:1px solid rgba(200,168,75,.4)}
   .bl-badge.vip{background:rgba(155,120,255,.15);color:#c9b6ff;border-color:rgba(155,120,255,.4)}
   .bl-radio{margin-inline-start:auto;width:18px;height:18px;border-radius:50%;border:2px solid var(--border2);flex:none}
   .bl-plan.on .bl-radio{border-color:var(--gold);background:radial-gradient(circle,var(--gold) 45%,transparent 50%)}
@@ -84,7 +84,7 @@
   .bl-per s{color:var(--muted);margin-inline:4px}
   .bl-per em{font-style:normal;color:var(--green);font-weight:800}
   .bl-pf{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-  .bl-pf span{font-size:10.5px;padding:3px 9px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
+  .bl-pf span{font-size:11px;padding:3px 9px;border-radius:99px;background:var(--surface);border:1px solid var(--border);color:var(--text2)}
   .bl-pf span.off{opacity:.5;text-decoration:line-through}
   .bl-pf span.dim{opacity:.55}
   #su-panel a.btn{text-decoration:none}
@@ -97,7 +97,7 @@
   .bl-cmp .yes{color:var(--green);font-weight:800}
   .bl-cmp .no{color:var(--muted)}
   .bl-cmp tr:last-child td{border-bottom:0}
-  .bl-note{font-size:10.5px;color:var(--muted);line-height:1.9;text-align:center;margin:6px 4px 0}
+  .bl-note{font-size:11px;color:var(--muted);line-height:1.9;text-align:center;margin:6px 4px 0}
   .bl-cta{position:fixed;inset-inline:0;bottom:0;z-index:5;padding:10px 16px calc(12px + var(--safe-bottom,0px));background:linear-gradient(0deg,rgba(11,10,9,.98) 70%,transparent)}
   .bl-cta .btn{max-width:728px;margin:0 auto;display:flex;min-height:52px;font-size:14.5px;font-weight:800}
   .bl-box{border:1px solid var(--border2);border-radius:16px;padding:14px;background:var(--surface);margin-bottom:12px}
@@ -156,10 +156,10 @@
   .ab-tabs::-webkit-scrollbar{display:none}
   .ab-tabs button{flex:0 0 auto;min-height:36px;padding:0 14px;border-radius:99px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:inherit;font-size:12px;font-weight:700;cursor:pointer}
   .ab-tabs button.on{background:rgba(200,168,75,.15);border-color:rgba(200,168,75,.5);color:var(--gold-light)}
-  .ab-tabs button em{font-style:normal;margin-inline-start:5px;padding:0 6px;border-radius:99px;background:var(--red);color:#fff;font-size:10px}
+  .ab-tabs button em{font-style:normal;margin-inline-start:5px;padding:0 6px;border-radius:99px;background:var(--red);color:#fff;font-size:11px}
   .ab-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
   .ab-kpis div{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px}
-  .ab-kpis small{display:block;font-size:10px;color:var(--muted)}
+  .ab-kpis small{display:block;font-size:11px;color:var(--muted)}
   .ab-kpis b{display:block;font-family:var(--f-mono);font-size:19px;margin-top:3px}
   .ab-check{display:grid;gap:6px;margin-bottom:12px}
   .ab-check div{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--text2);padding:9px 11px;border-radius:10px;border:1px solid var(--border)}
@@ -168,8 +168,8 @@
   .ab-rh{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer}
   .ab-rh .who{flex:1;min-width:0}
   .ab-rh .who b{display:block;font-size:13px}
-  .ab-rh .who span{display:block;font-size:10.5px;color:var(--muted);font-family:var(--f-mono)}
-  .ab-chip{font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);white-space:nowrap}
+  .ab-rh .who span{display:block;font-size:11px;color:var(--muted);font-family:var(--f-mono)}
+  .ab-chip{font-size:11px;font-weight:800;padding:3px 9px;border-radius:99px;border:1px solid var(--border2);color:var(--text2);white-space:nowrap}
   .ab-chip.g{color:var(--green);border-color:rgba(34,201,122,.4)} .ab-chip.r{color:var(--red);border-color:rgba(232,80,91,.4)}
   .ab-chip.y{color:#f3c643;border-color:rgba(240,185,11,.4)} .ab-chip.v{color:#c9b6ff;border-color:rgba(155,120,255,.4)}
   .ab-rb{padding:0 12px 12px;display:none}
@@ -193,7 +193,7 @@
   .ab-prices input{direction:ltr;text-align:center;font-family:var(--f-mono)}
   .ab-tg{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--text2)}
   .ab-tg label{display:flex;align-items:center;gap:6px;cursor:pointer}
-  .ab-disc{font-size:10.5px;color:var(--green);margin-top:6px;line-height:1.8}
+  .ab-disc{font-size:11px;color:var(--green);margin-top:6px;line-height:1.8}
   .ab-search{margin-bottom:10px}
   `;
   const styleEl = document.createElement('style'); styleEl.textContent = css; document.head.appendChild(styleEl);
