@@ -6281,6 +6281,7 @@ function demoAlertDashboard(){
     {title:'هشدار BTC بروزرسانی شد',text:'هدف جدید ۱۱۹٬۵۰۰ دلار · امروز'},
     {title:'تلگرام متصل شد',text:'ارسال آزمایشی با موفقیت انجام شد · ۲ روز قبل'}
   ],alerts:[
+    {id:'demo-btcc',symbol:'BTC',targetPrice:118000,condition:'above',candleTf:'15m',candleSide:'near',deliveryMode:'standard',frequency:'once',severity:'critical',channels:{telegram:true,push:true,inApp:true},note:'شکستِ سقفِ رنج؛ فقط با بسته شدنِ کندل',status:'active',lastPrice:117842.30,lastTriggeredAt:null,createdAt:'2026-08-26T10:00:00Z'},
     {id:'demo-btc',symbol:'BTC',targetPrice:119500,condition:'above',deliveryMode:'standard',frequency:'once',severity:'important',channels:{telegram:true,push:true,inApp:true},note:'بررسی ستاپ تایم‌فریم 1H',status:'active',lastPrice:117842.30,lastTriggeredAt:null,createdAt:'2026-08-25T10:00:00Z'},
     {id:'demo-eth',symbol:'ETH',targetPrice:4660,condition:'zone',tolerance:0.35,deliveryMode:'persistent',frequency:'cross',severity:'critical',channels:{telegram:true,push:true,inApp:true},note:'ناحیه تصمیم؛ قبل از ورود چک‌لیست بررسی شود',status:'triggered',lastPrice:4664.12,lastTriggeredAt:'2026-08-28T17:52:00Z',createdAt:'2026-08-24T10:00:00Z'},
     {id:'demo-sol',symbol:'SOL',targetPrice:198,condition:'below',deliveryMode:'silent',frequency:'once',severity:'normal',channels:{telegram:false,push:true,inApp:true},note:'فقط رصد حمایت روزانه',status:'paused',lastPrice:204.38,lastTriggeredAt:null,createdAt:'2026-08-23T10:00:00Z'}
@@ -6469,8 +6470,28 @@ function alertAgo(v){
   const s = Math.max(0, (Date.now() - t) / 1000);
   return s < 60 ? `${faNum(Math.max(1, Math.round(s)))} ثانیه پیش` : s < 3600 ? `${faNum(Math.round(s / 60))} دقیقه پیش` : s < 86400 ? `${faNum(Math.round(s / 3600))} ساعت پیش` : `${faNum(Math.round(s / 86400))} روز پیش`;
 }
+// v26.17: هشدارِ «بسته شدنِ کندل» — همان بالا/پایین، با یک تایم‌فریم (سرور: candle_tf)
+const CANDLE_TFS = [['', 'لحظه‌ای'], ['5m', '۵ دقیقه'], ['15m', '۱۵ دقیقه'], ['1h', '۱ ساعت'], ['4h', '۴ ساعت'], ['1d', 'روزانه']];
+const CANDLE_TF_LBL = { '5m': '۵ دقیقه‌ای', '15m': '۱۵ دقیقه‌ای', '1h': '۱ ساعته', '4h': '۴ ساعته', '1d': 'روزانه' };
+const CANDLE_ICO = 'M9 3v3M9 15v6M15 3v5M15 16v5M7 6h4v9H7zM13 8h4v8h-4z';
+function candleHint(d){
+  if (!d.candleTf) return 'به محضِ اینکه قیمتِ لحظه‌ای به هدف برسد یا از آن عبور کند.';
+  const side = d.condition === 'below' ? 'پایینِ' : 'بالای';
+  return `فقط وقتی یک کندلِ ${CANDLE_TF_LBL[d.candleTf]} ${side} هدف <b>بسته شود</b>؛ سایه و نوسانِ گذرای وسطِ کندل هشدار نمی‌دهد. اگر قیمت همین الان آن طرفِ هدف است، اول باید کندلی این طرف بسته شود (شکستِ واقعی).`;
+}
+// متنِ فاصله برای کارت: هشدارِ کندلی «در هدف» نمی‌شود، منتظرِ بسته شدن است
+function alertDistFor(a, x){
+  const dt = alertDistText(x);
+  if (!a.candleTf || !CANDLE_TF_LBL[a.candleTf]) return dt;
+  // برچسبِ بالای کارت «بسته شدنِ کندل» را گفته؛ اینجا کوتاه، تا ستونِ قیمت در گوشی بیرون نزند
+  if (x && x.inside) return a.candleSide === 'beyond'
+    ? { big: 'آن طرفِ هدف', small: 'اول باید برگردد' }
+    : { big: 'آن طرفِ هدف', small: 'منتظرِ بسته شدنِ کندل' };
+  return dt;
+}
 const ALERT_COND = { above: ['عبور رو به بالا', 'M7 17 17 7M9 7h8v8'], below: ['عبور رو به پایین', 'M7 7l10 10M17 9v8H9'], zone: ['ورود به محدوده', 'M4 9h16M4 15h16'] };
 function alertCondChip(a){
+  if (a.candleTf && CANDLE_TF_LBL[a.candleTf]) return `<span class="pa2-cond pa2-candle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${CANDLE_ICO}"/></svg>بسته شدنِ کندلِ ${CANDLE_TF_LBL[a.candleTf]} ${a.condition === 'below' ? 'پایینِ' : 'بالای'} هدف</span>`;
   const c = ALERT_COND[a.condition] || ALERT_COND.zone;
   const lbl = a.condition === 'zone' ? `محدوده ±${faNum(a.tolerance || .5).replace('.', '٫')}٪` : c[0];
   return `<span class="pa2-cond"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${c[1]}"/></svg>${lbl}</span>`;
@@ -6493,7 +6514,7 @@ const PA2_ICO = {
 const pa2Btn = (k, label, on, cls = '') => `<button type="button" class="pa2-btn ${cls}" onclick="${on}" title="${label}" aria-label="${label}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${PA2_ICO[k]}</svg><span>${label}</span></button>`;
 function renderPriceAlertCard(a){
   const id = alertSafeId(a.id), st = String(a.status || 'active'), sev = a.severity || 'normal', sym = String(a.symbol || '?');
-  const x = alertDistance(a), dt = alertDistText(x), tr = alertTrack(a), live = st === 'active';
+  const x = alertDistance(a), dt = alertDistFor(a, x), tr = alertTrack(a), live = st === 'active';
   const scale = alertScaleOff(a.lastPrice, a.targetPrice);
   const when = st === 'active' ? (a.lastCheckedAt ? `بررسی ${alertAgo(a.lastCheckedAt)}` : '') : (a.lastTriggeredAt ? `ارسال ${alertAgo(a.lastTriggeredAt)}` : '');
   return `<article class="pa2 st-${st} sev-${sev}${x && x.inside ? ' inside' : ''}" data-aid="${id}" data-sym="${esc(sym)}" data-live="${live ? 1 : 0}">
@@ -6554,7 +6575,7 @@ async function alertLiveTick(){
   for (const c of cards) {
     const p = Number(prices[c.dataset.sym]); if (!(p > 0) || !document.body.contains(c)) continue;
     const a = (ALERT_STATE.alerts || []).find(z => alertSafeId(z.id) === c.dataset.aid); if (!a) continue;
-    const prev = Number(c.dataset.p || a.lastPrice), x = alertDistance(a, p), dt = alertDistText(x), tr = alertTrack(a, p);
+    const prev = Number(c.dataset.p || a.lastPrice), x = alertDistance(a, p), dt = alertDistFor(a, x), tr = alertTrack(a, p);
     c.dataset.p = p;
     const q = sel => c.querySelector(sel);
     q('[data-ap-price]').innerHTML = `<bdi dir="ltr">${alertPrice(p)}</bdi>`;
@@ -6633,7 +6654,7 @@ function renderAlertTimeline(){const events=(ALERT_STATE.events||[]).slice(0,4);
 
 function openAlertEditor(id){
   const found=id?(ALERT_STATE.alerts||[]).find(a=>alertSafeId(a.id)===alertSafeId(id)):null;
-  ALERT_EDITOR=found?{...found,channels:{telegram:found.channels?.telegram!==false,push:found.channels?.push!==false,inApp:found.channels?.inApp!==false}}:{id:null,symbol:'BTC',targetPrice:'',condition:'above',tolerance:.5,deliveryMode:'standard',frequency:'once',severity:'important',channels:{telegram:true,push:true,inApp:true},note:'',expiresAt:''};renderPriceAlerts();
+  ALERT_EDITOR=found?{...found,channels:{telegram:found.channels?.telegram!==false,push:found.channels?.push!==false,inApp:found.channels?.inApp!==false}}:{id:null,symbol:'BTC',targetPrice:'',condition:'above',candleTf:'',tolerance:.5,deliveryMode:'standard',frequency:'once',severity:'important',channels:{telegram:true,push:true,inApp:true},note:'',expiresAt:''};renderPriceAlerts();
   setTimeout(()=>document.querySelector('.alert-editor')?.scrollIntoView({behavior:'smooth',block:'start'}),30);
 }
 function cancelAlertEditor(){ALERT_EDITOR=null;renderPriceAlerts()}
@@ -6641,8 +6662,9 @@ function setAlertDraft(key,value){if(ALERT_EDITOR)ALERT_EDITOR[key]=value}
 function chooseAlertMode(key,value,el){
   if(!ALERT_EDITOR)return;
   ALERT_EDITOR[key]=value;
-  // «محدوده» فیلد تلرانس را می‌آورد/می‌برد، پس ساختار فرم عوض می‌شود
-  if(key==='condition'){renderAlertEditorSlot();return}
+  // «محدوده» فیلد تلرانس را می‌آورد/می‌برد، پس ساختار فرم عوض می‌شود؛ v26.17: «محدوده» کندلی ندارد
+  if(key==='condition'){if(value==='zone')ALERT_EDITOR.candleTf='';renderAlertEditorSlot();return}
+  if(key==='candleTf'){renderAlertEditorSlot();return}
   // اهمیت و رفتار اعلان ساختار را عوض نمی‌کنند: فقط انتخاب را جابه‌جا کن
   if(el&&el.parentElement){[...el.parentElement.children].forEach(b=>b.classList.toggle('active',b===el));return}
   renderAlertEditorSlot();
@@ -6695,7 +6717,7 @@ function renderAlertEditor(){
   const canTelegram=allowed.telegramAllowed!==false&&system.telegramEnabled!==false,canPush=allowed.pushAllowed!==false&&system.pushEnabled!==false,canInApp=allowed.inAppAllowed!==false&&system.inAppEnabled!==false;
   return`<section class="alert-panel alert-editor"><div class="alert-panel-head"><div><div class="alert-panel-title">${d.id?'ویرایش هشدار':'ساخت هشدار جدید'}</div><div style="font-size:11px;color:var(--muted);margin-top:4px">قیمت مرجع: بازار لحظه‌ای جفت USDT · کانال‌ها زیر کنترل سیاست مدیر هستند</div></div><button class="icon-btn" onclick="cancelAlertEditor()" aria-label="بستن">×</button></div>
   <div class="alert-form-grid"><label class="fg"><span class="fl">رمزارز <span class="req">*</span> <span class="fl-note">${faNum(knownCoins.length)} رمزارز</span></span><input id="al-symbol-search" class="fi coin-search" type="search" autocomplete="off" dir="auto" value="${esc(d._q||'')}" placeholder="🔍 جستجو — مثلاً PAXG، gold یا طلا" oninput="filterAlertSymbols(this.value)"><select id="al-symbol" class="fi" style="margin-top:7px" onchange="handleAlertSymbolSelect(this.value)">${alertSymbolOptions(d)}</select><span id="al-symbol-hint" class="coin-hint">${alertSymbolHint(d)}</span>${custom?`<input id="al-custom-symbol" class="fi" style="margin-top:7px;text-transform:uppercase;direction:ltr;text-align:left" maxlength="12" value="${esc(d.symbol)}" placeholder="SYMBOL مثل POL" oninput="setCustomAlertSymbol(this.value)">`:''}<span id="al-current" class="price-context"><span>قیمت فعلی</span><strong>${custom&&!d.symbol?'پس از ورود Symbol':'در حال دریافت…'}</strong></span></label><label class="fg"><span class="fl">قیمت هدف (USDT) <span class="req">*</span></span><input id="al-target" class="fi" type="number" min="0" step="any" inputmode="decimal" value="${esc(d.targetPrice)}" placeholder="مثلاً 120000" oninput="setAlertDraft('targetPrice',this.value)"><span style="font-size:11px;color:var(--muted)">قیمت باید عددی مثبت و دقیق باشد.</span></label></div>
-  <div class="fg" style="margin-top:15px"><span class="fl">شرط فعال‌شدن</span><div class="mode-grid"><button class="mode-option ${d.condition==='above'?'active':''}" onclick="chooseAlertMode('condition','above',this)"><b>↗ عبور رو به بالا</b><span>قیمت از پایین به هدف برسد یا عبور کند</span></button><button class="mode-option ${d.condition==='below'?'active':''}" onclick="chooseAlertMode('condition','below',this)"><b>↘ عبور رو به پایین</b><span>قیمت از بالا به هدف برسد یا پایین‌تر رود</span></button><button class="mode-option ${d.condition==='zone'?'active':''}" onclick="chooseAlertMode('condition','zone',this)"><b>◎ ورود به محدوده</b><span>ورود از هر جهت به ناحیه تصمیم</span></button></div></div>${d.condition==='zone'?`<label class="fg" style="margin-top:12px;max-width:260px"><span class="fl">تلرانس محدوده (درصد)</span><input id="al-tolerance" class="fi" type="number" min="0.05" max="5" step="0.05" value="${esc(d.tolerance)}" oninput="setAlertDraft('tolerance',this.value)"></label>`:''}
+  <div class="fg" style="margin-top:15px"><span class="fl">شرط فعال‌شدن</span><div class="mode-grid"><button class="mode-option ${d.condition==='above'?'active':''}" onclick="chooseAlertMode('condition','above',this)"><b>↗ عبور رو به بالا</b><span>قیمت از پایین به هدف برسد یا عبور کند</span></button><button class="mode-option ${d.condition==='below'?'active':''}" onclick="chooseAlertMode('condition','below',this)"><b>↘ عبور رو به پایین</b><span>قیمت از بالا به هدف برسد یا پایین‌تر رود</span></button><button class="mode-option ${d.condition==='zone'?'active':''}" onclick="chooseAlertMode('condition','zone',this)"><b>◎ ورود به محدوده</b><span>ورود از هر جهت به ناحیه تصمیم</span></button></div></div>${d.condition!=='zone'?`<div class="fg ctf" style="margin-top:12px"><span class="fl">زمانِ تأیید <span class="fl-note">لحظه‌ای، یا با بسته شدنِ کندل</span></span><div class="ctf-seg" role="radiogroup" aria-label="زمانِ تأیید">${CANDLE_TFS.map(([k,l])=>`<button type="button" role="radio" aria-checked="${(d.candleTf||'')===k}" class="${(d.candleTf||'')===k?'on':''}" onclick="chooseAlertMode('candleTf','${k}',this)">${k?`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${CANDLE_ICO}"/></svg>`:''}${l}</button>`).join('')}</div><div class="ctf-hint" id="ctf-hint">${candleHint(d)}</div></div>`:''}${d.condition==='zone'?`<label class="fg" style="margin-top:12px;max-width:260px"><span class="fl">تلرانس محدوده (درصد)</span><input id="al-tolerance" class="fi" type="number" min="0.05" max="5" step="0.05" value="${esc(d.tolerance)}" oninput="setAlertDraft('tolerance',this.value)"></label>`:''}
   <div class="fg" style="margin-top:15px"><span class="fl">اهمیت هشدار</span><div class="severity-grid"><button class="severity-option ${d.severity==='normal'?'active':''}" onclick="chooseAlertMode('severity','normal',this)"><b>عادی</b><span>اعلان سبک و قابل آرشیو</span></button><button class="severity-option ${d.severity==='important'?'active':''}" onclick="chooseAlertMode('severity','important',this)"><b>مهم</b><span>اولویت بالاتر و ویبره فعال</span></button><button class="severity-option ${d.severity==='critical'?'active':''}" onclick="chooseAlertMode('severity','critical',this)"><b>بحرانی</b><span>امکان عبور از ساعات سکوت طبق تنظیم مدیر</span></button></div></div>
   <div class="fg" style="margin-top:15px"><span class="fl">کانال‌های تحویل</span><div class="channel-picks"><label class="channel-pick ${channels.telegram&&canTelegram?'active':''} ${canTelegram?'':'blocked'}"><input type="checkbox" ${channels.telegram&&canTelegram?'checked':''} ${canTelegram?'':'disabled'} onchange="toggleAlertChannel('telegram',this)">Telegram</label><label class="channel-pick ${channels.push&&canPush?'active':''} ${canPush?'':'blocked'}"><input type="checkbox" ${channels.push&&canPush?'checked':''} ${canPush?'':'disabled'} onchange="toggleAlertChannel('push',this)">Push دستگاه</label><label class="channel-pick ${channels.inApp&&canInApp?'active':''} ${canInApp?'':'blocked'}"><input type="checkbox" ${channels.inApp&&canInApp?'checked':''} ${canInApp?'':'disabled'} onchange="toggleAlertChannel('inApp',this)">داخل ژورنال</label></div></div>
   <div class="fg" style="margin-top:15px"><span class="fl">رفتار اعلان</span><div class="mode-grid"><button class="mode-option ${d.deliveryMode==='silent'?'active':''}" onclick="chooseAlertMode('deliveryMode','silent',this)"><b>بی‌صدا</b><span>برای رصد کم‌اهمیت؛ بدون صدای تلگرام</span></button><button class="mode-option ${d.deliveryMode==='standard'?'active':''}" onclick="chooseAlertMode('deliveryMode','standard',this)"><b>عادی</b><span>یک اعلان فوری در کانال‌های انتخابی</span></button><button class="mode-option ${d.deliveryMode==='persistent'?'active':''}" onclick="chooseAlertMode('deliveryMode','persistent',this)"><b>پیگیر تا تأیید</b><span>تکرار طبق سیاست مدیر تا زدن «دیدم»</span></button></div></div>
@@ -6725,7 +6747,7 @@ function alertAlreadyPassed(condition, price, target){
   if(!(price > 0) || !(target > 0)) return false;
   return (condition === 'above' && price >= target) || (condition === 'below' && price <= target);
 }
-async function confirmAlertScale(symbol, target, condition){
+async function confirmAlertScale(symbol, target, condition, candleTf = null){
   let price = null;
   try{ price = alertDemoMode() ? ALERT_PRICE_DEMO[symbol] : await livePrice(symbol) }catch(_){ }
   // v26.11: سرور گفت این نماد در هیچ منبعی قیمت ندارد ⇒ هشدار هرگز فعال نمی‌شود؛ ساخته نشود
@@ -6733,7 +6755,14 @@ async function confirmAlertScale(symbol, target, condition){
     alert(`قیمت ${symbol} در منابعِ قیمتِ ژورنال (Hyperliquid، Coinbase، OKX) پیدا نشد؛ هشدار روی آن هرگز فعال نمی‌شود.\n\nنماد را بررسی کن یا رمزارز دیگری انتخاب کن.`);
     return false;
   }
-  if(alertAlreadyPassed(condition, price, target)){
+  if(candleTf && alertAlreadyPassed(condition, price, target)){
+    // v26.17: هشدارِ کندلی فقط شکستِ واقعی را خبر می‌دهد
+    const up = condition === 'above';
+    if(!confirm(`⚠️ قیمت فعلی ${symbol} (${alertPrice(price)}) همین الان ${up ? 'بالای' : 'زیر'} هدف تو (${alertPrice(target)}) است.` + '\n\n'
+      + `هشدارِ «بسته شدنِ کندلِ ${CANDLE_TF_LBL[candleTf]}» فقط شکستِ واقعی را خبر می‌دهد: اول باید کندلی ${up ? 'زیرِ' : 'بالای'} ${alertPrice(target)} بسته شود و بعد کندلی ${up ? 'بالای' : 'زیرِ'} آن.` + '\n\n'
+      + 'با همین شرط ثبت شود؟')) return false;
+  }
+  else if(alertAlreadyPassed(condition, price, target)){
     const up = condition === 'above';
     if(!confirm(`⚠️ قیمت فعلی ${symbol} (${alertPrice(price)}) همین الان ${up ? 'بالای' : 'زیر'} هدف تو (${alertPrice(target)}) است.` + '\n\n'
       + `هشدارِ «عبور رو به ${up ? 'بالا' : 'پایین'}» فقط وقتی می‌آید که قیمت از هدف عبور کند؛ پس این هشدار تا قیمت اول ${up ? 'زیر' : 'بالای'} ${alertPrice(target)} نرود و دوباره برنگردد، نمی‌آید.` + '\n\n'
@@ -6752,8 +6781,9 @@ async function confirmAlertScale(symbol, target, condition){
 async function savePriceAlert(){
   const target=Number(ALERT_EDITOR?.targetPrice),tol=Number(ALERT_EDITOR?.tolerance||.5);if(!ALERT_EDITOR||!/^[A-Z0-9]{1,12}$/.test(ALERT_EDITOR.symbol)){showToast('نماد معتبر رمزارز را وارد یا انتخاب کنید');document.getElementById('al-custom-symbol')?.focus();return}if(!Number.isFinite(target)||target<=0){showToast('قیمت هدف معتبر وارد کنید');document.getElementById('al-target')?.focus();return}if(ALERT_EDITOR.condition==='zone'&&(tol<.05||tol>5)){showToast('تلرانس باید بین ۰٫۰۵ تا ۵ درصد باشد');return}
   const channels=ALERT_EDITOR.channels||{};if(!channels.telegram&&!channels.push&&!channels.inApp){showToast('حداقل یک کانال اعلان را انتخاب کنید');return}
-  if(!(await confirmAlertScale(ALERT_EDITOR.symbol, target, ALERT_EDITOR.condition))) return;
-  const payload={symbol:ALERT_EDITOR.symbol,targetPrice:target,condition:ALERT_EDITOR.condition,tolerance:tol,deliveryMode:ALERT_EDITOR.deliveryMode,frequency:ALERT_EDITOR.frequency,severity:ALERT_EDITOR.severity||'normal',telegramEnabled:!!channels.telegram,pushEnabled:!!channels.push,inAppEnabled:!!channels.inApp,note:String(ALERT_EDITOR.note||'').slice(0,500),expiresAt:ALERT_EDITOR.expiresAt||null};const btn=document.getElementById('al-save');if(btn)btn.disabled=true;
+  const candleTf=ALERT_EDITOR.condition==='zone'?null:(ALERT_EDITOR.candleTf||null);
+  if(!(await confirmAlertScale(ALERT_EDITOR.symbol, target, ALERT_EDITOR.condition, candleTf))) return;
+  const payload={symbol:ALERT_EDITOR.symbol,targetPrice:target,condition:ALERT_EDITOR.condition,candleTf,tolerance:tol,deliveryMode:ALERT_EDITOR.deliveryMode,frequency:ALERT_EDITOR.frequency,severity:ALERT_EDITOR.severity||'normal',telegramEnabled:!!channels.telegram,pushEnabled:!!channels.push,inAppEnabled:!!channels.inApp,note:String(ALERT_EDITOR.note||'').slice(0,500),expiresAt:ALERT_EDITOR.expiresAt||null};const btn=document.getElementById('al-save');if(btn)btn.disabled=true;
   if(alertDemoMode()){
     const id=ALERT_EDITOR.id||`demo-${Date.now()}`;const old=(ALERT_STATE.alerts||[]).find(a=>a.id===id);const record={...old,...payload,channels:{telegram:payload.telegramEnabled,push:payload.pushEnabled,inApp:payload.inAppEnabled},id,status:old?.status==='paused'?'paused':'active',lastPrice:ALERT_PRICE_DEMO[payload.symbol]||null,createdAt:old?.createdAt||new Date().toISOString()};ALERT_STATE.alerts=old?ALERT_STATE.alerts.map(a=>a.id===id?record:a):[record,...ALERT_STATE.alerts];ALERT_STATE.stats.active=ALERT_STATE.alerts.filter(a=>a.status==='active'||a.status==='triggered').length;ALERT_EDITOR=null;showToast(old?'هشدار بروزرسانی شد':'هشدار جدید وارد چرخه پایش شد');renderPriceAlerts();return;
   }
