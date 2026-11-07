@@ -2312,6 +2312,9 @@ const ANNOUNCEMENTS = [
                : v === 2 ? ['🔓 حالت ۲ باز شد — مارجین ثابت', 'از این به بعد اهرم را هم ماشین‌حساب برایت حساب می‌کند']
                : ['💎 به فاز حرفه‌ای خوش آمدی', 'سه ابزار مدیریت سرمایه، قدم‌به‌قدم برایت باز می‌شود'],
     render: proModesAnnouncement },
+  // v26.18: هشدارِ «بسته شدنِ کندل» — یک بار، برای هر شاگردی که خودش ژورنال را می‌نویسد
+  { id: 'candle-alert', audience: () => SESSION?.role === 'student' && !SESSION.isViewOnly && !annIsRead('candle-alert', 1),
+    version: () => 1, teaser: () => ['🔔 هشدار با بسته شدنِ کندل', 'فقط وقتی کندل آن طرفِ سطحِ تو بسته شود، نه با یک سایه'], render: candleAlertAnnouncement },
   // v26.6: یک بار، برای هر کسی که خودش ترید ثبت می‌کند
   { id: 'tg-log', audience: () => SESSION?.role === 'student' && !SESSION.isViewOnly && !annIsRead('tg-log', 1),   // خوانده شد ⇒ دیگر نمی‌آید
     version: () => 1, teaser: () => ['✈️ ثبت ترید با یک پیام تلگرام', 'بدون باز کردن ژورنال، همان وسطِ معامله'], render: tgLogAnnouncement }
@@ -2429,6 +2432,48 @@ function tgLogAnnouncement(){
     <div class="ann-foot">مارجین و اهرم را اگر ننویسی، از آخرین تریدت برداشته می‌شود. ربات بعد از ثبت یک دکمه می‌دهد: «تکمیل در ژورنال». فقط کافی است تلگرامت یک بار از بخش «هشدار قیمت ← اتصال امن تلگرام» وصل شده باشد.</div>
     <button class="btn btn-primary" onclick="closeSheet();nav('alerts',document.getElementById('nav-alerts'))">رفتن به اتصال تلگرام</button>
   </div>`;
+}
+// ── v26.18: اطلاعیهٔ هشدارِ بسته شدنِ کندل ──
+function candleAlertAnnouncement(){
+  // نمودارِ کوچک: سطح، کندلی که فقط سایه‌اش رد شد، و کندلی که آن طرف بسته شد
+  const fig = `<svg class="cnd-fig" viewBox="0 0 320 158" dir="ltr" role="img" aria-label="سایه از سطح رد می‌شود ولی هشدار نمی‌آید؛ کندلی که بالای سطح بسته شود هشدار می‌دهد">
+    <line x1="14" y1="58" x2="306" y2="58" class="cnd-lvl"/>
+    <text x="111" y="50" text-anchor="middle" class="cnd-lbl gold">سطحِ تو</text>
+    <g class="cnd-mute"><line x1="62" y1="30" x2="62" y2="112"/><rect x="51" y="72" width="22" height="32" rx="3"/></g>
+    <circle cx="62" cy="30" r="4" class="cnd-pin"/>
+    <text x="62" y="134" text-anchor="middle" class="cnd-lbl">فقط سایه</text>
+    <text x="62" y="148" text-anchor="middle" class="cnd-lbl dim">هشدار نمی‌آید</text>
+    <g class="cnd-mute"><line x1="160" y1="64" x2="160" y2="112"/><rect x="149" y="70" width="22" height="30" rx="3"/></g>
+    <g class="cnd-up"><line x1="258" y1="26" x2="258" y2="96"/><rect x="247" y="36" width="22" height="50" rx="3"/></g>
+    <circle cx="258" cy="36" r="4.5" class="cnd-hit"/>
+    <text x="258" y="134" text-anchor="middle" class="cnd-lbl ok">بسته شد بالای سطح</text>
+    <text x="258" y="148" text-anchor="middle" class="cnd-lbl dim">هشدار، با قیمتِ بسته شدن</text>
+  </svg>`;
+  return `<div class="ann-sheet">
+    <div class="ann-hero"><span class="ann-badge">🔔 تازه در هشدارِ قیمت</span><h3>هشدار با بسته شدنِ کندل</h3>
+      <p>شکستِ یک سطح با یک سایه ثابت نمی‌شود. حالا می‌توانی هشدار را طوری تنظیم کنی که فقط وقتی کندل بالای (یا پایینِ) قیمتِ تو <b>بسته شد</b> خبرت کند.</p></div>
+    ${fig}
+    <div class="cnd-cmp">
+      <div><b>لحظه‌ای</b><span>همان لحظه که قیمت به سطح برسد؛ حتی با یک سایهٔ گذرا.</span></div>
+      <div class="on"><b>با بسته شدنِ کندل</b><span>فقط وقتی کندلِ تایم‌فریمِ انتخابیِ تو آن طرفِ سطح بسته شود.</span></div>
+    </div>
+    <div class="cnd-tfs"><span>۵ دقیقه</span><span>۱۵ دقیقه</span><span>۱ ساعت</span><span>۴ ساعت</span><span>روزانه</span></div>
+    <ol class="cnd-steps">
+      <li>«هشدارِ قیمت» ← هشدارِ تازه</li>
+      <li>شرط را «بالای هدف» یا «پایینِ هدف» بگذار</li>
+      <li>در ردیفِ <b>«زمانِ تأیید»</b> تایم‌فریم را انتخاب کن</li>
+    </ol>
+    <div class="ann-foot"><b>فقط شکستِ واقعی:</b> اگر هنگامِ ساختِ هشدار قیمت از قبل آن طرفِ سطح باشد، هشدار صبر می‌کند تا قیمت برگردد و دوباره بشکند.<br>پیام چند ثانیه بعد از بسته شدنِ کندل، با قیمتِ بسته شدن و ساعتِ کندل به وقتِ تهران، به تلگرام و گوشی‌ات می‌رسد. کندلِ روزانه ساعتِ ۳:۳۰ بامدادِ تهران بسته می‌شود.</div>
+    <button class="btn btn-primary" onclick="annGoCandleAlert()">ساختنِ هشدارِ کندلی</button>
+  </div>`;
+}
+// دکمهٔ اطلاعیه: صفحهٔ هشدار؛ اگر اشتراک فعال است، فرمِ تازه با «۱۵ دقیقه» از پیش انتخاب‌شده
+async function annGoCandleAlert(){
+  closeSheet(); nav('alerts', document.getElementById('nav-alerts'));
+  for (let i = 0; i < 40 && !ALERT_STATE.loaded; i++) await new Promise(r => setTimeout(r, 150));
+  if (!(ALERT_STATE.entitlement?.active || alertDemoMode())) return;
+  if (!ALERT_EDITOR) openAlertEditor();
+  if (ALERT_EDITOR && !ALERT_EDITOR.id && ALERT_EDITOR.condition !== 'zone' && !ALERT_EDITOR.candleTf) { ALERT_EDITOR.candleTf = '15m'; renderAlertEditorSlot(); }
 }
 function annCardHTML(a){
   const v = a.version(), read = annIsRead(a.id, v), [title, sub] = a.teaser(v);

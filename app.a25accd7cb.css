@@ -1782,3 +1782,24 @@ body::before{opacity:.5;background-size:180px 180px;mask-image:none;-webkit-mask
 .ctf-seg button.on{color:#f6e3ae;border-color:rgba(236,211,145,.45);background:linear-gradient(180deg,rgba(236,211,145,.18),rgba(207,174,98,.06))}
 .ctf-hint{margin-top:8px;font-size:12px;line-height:1.85;color:var(--text2)}.ctf-hint b{color:var(--gold-light)}
 .pa2-candle{color:var(--gold-light)}
+
+/* v26.18 — اطلاعیهٔ هشدارِ بسته شدنِ کندل */
+.cnd-fig{display:block;width:100%;max-width:340px;height:auto;margin:2px auto 12px;padding:10px 8px 4px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid var(--border2)}
+.cnd-lvl{stroke:var(--gold);stroke-width:1.5;stroke-dasharray:6 5;opacity:.85}
+.cnd-lbl{font:600 10.5px var(--f-body);fill:var(--text2)}
+.cnd-lbl.gold{fill:var(--gold-light)}.cnd-lbl.ok{fill:var(--green)}.cnd-lbl.dim{fill:var(--muted);font-weight:500;font-size:9.5px}
+.cnd-mute line,.cnd-up line{stroke-width:1.6;stroke-linecap:round}
+.cnd-mute line{stroke:var(--muted)}.cnd-mute rect{fill:rgba(255,255,255,.06);stroke:var(--muted);stroke-width:1.3}
+.cnd-up line{stroke:var(--green)}.cnd-up rect{fill:rgba(53,212,147,.22);stroke:var(--green);stroke-width:1.3}
+.cnd-pin{fill:none;stroke:var(--muted);stroke-width:1.4;stroke-dasharray:2 2}
+.cnd-hit{fill:var(--green);stroke:rgba(53,212,147,.35);stroke-width:5}
+.cnd-cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+.cnd-cmp div{border:1px solid var(--border2);border-radius:12px;padding:10px 11px;background:var(--surface)}
+.cnd-cmp div.on{border-color:rgba(236,211,145,.38);background:linear-gradient(180deg,rgba(236,211,145,.10),rgba(207,174,98,.03))}
+.cnd-cmp b{display:block;font-size:12.5px;color:var(--text);margin-bottom:4px}.cnd-cmp div.on b{color:var(--gold-light)}
+.cnd-cmp span{display:block;font-size:11px;line-height:1.85;color:var(--text2)}
+.cnd-tfs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:0 0 12px}
+.cnd-tfs span{font-size:11px;padding:5px 11px;border-radius:99px;background:var(--surface);border:1px solid var(--border2);color:var(--text)}
+.cnd-steps{list-style:persian;margin:0 0 10px;padding:10px 30px 10px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px dashed var(--border2);font-size:12px;line-height:2.05;color:var(--text)}
+.cnd-steps b{color:var(--gold-light)}
+.ann-foot b{color:var(--text2)}
