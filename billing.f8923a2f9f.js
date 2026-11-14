@@ -745,7 +745,7 @@
     toggleMem: uid => { st.openMem = st.openMem === uid ? null : uid; drawAdmin(); },
     invFilter: f => { st.invFilter = f; drawAdmin(); },
     async member(uid, body, ask) {
-      if (ask && !confirm(ask)) return;
+      if (ask && !await uiConfirm(ask)) return;
       const r = await jfetch('/api/mentor/billing/members/' + uid, { method: 'POST', body: JSON.stringify(body) });
       showToast(r.ok ? '✅ انجام شد' : 'انجام نشد'); if (r.ok) await renderAdmin(adminEl());
     },
@@ -755,12 +755,12 @@
       await api.member(uid, { grant: { planId, days } });
     },
     async approve(id, ref) {
-      if (!confirm('این صورت‌حساب تأیید و اشتراک فعال شود؟')) return;
+      if (!await uiConfirm('این صورت‌حساب تأیید و اشتراک فعال شود؟')) return;
       const r = await jfetch(`/api/mentor/billing/invoices/${id}/approve`, { method: 'POST', body: JSON.stringify(ref ? { ref } : {}) });
       showToast(r.ok ? '✅ تأیید و فعال شد' : 'انجام نشد: ' + (r.body?.error || '')); if (r.ok) await renderAdmin(adminEl());
     },
     async reject(id) {
-      if (!confirm('این صورت‌حساب رد شود؟ به عضو خبر داده می‌شود.')) return;
+      if (!await uiConfirm('این صورت‌حساب رد شود؟ به عضو خبر داده می‌شود.')) return;
       const r = await jfetch(`/api/mentor/billing/invoices/${id}/reject`, { method: 'POST', body: '{}' });
       showToast(r.ok ? 'رد شد' : 'انجام نشد'); if (r.ok) await renderAdmin(adminEl());
     },
@@ -784,7 +784,7 @@
     delFeat(i) { stashPlans(); st.admin.config.features.splice(i, 1); drawAdmin(); },
     moveFeat(i, d) { stashPlans(); const f = st.admin.config.features, j = i + d; if (j < 0 || j >= f.length) return; [f[i], f[j]] = [f[j], f[i]]; drawAdmin(); },
     addPlan() { st.admin.config.plans = stashPlans().concat([{ id: 'plan' + (st.admin.config.plans.length + 1), name: 'پلن تازه', tagline: '', prices: { 1: 5 }, alerts: 0, audience: 'public', ai: false, featured: false, active: false, bullets: [] }]); drawAdmin(); },
-    delPlan(i) { const ps = stashPlans(); if (ps.length <= 1) return showToast('دست‌کم یک پلن لازم است'); if (!confirm(`پلن «${ps[i].name}» حذف شود؟ اشتراک‌های فعالِ آن تا پایان دوره می‌مانند.`)) return; ps.splice(i, 1); st.admin.config.plans = ps; drawAdmin(); },
+    async delPlan(i) { const ps = stashPlans(); if (ps.length <= 1) return showToast('دست‌کم یک پلن لازم است'); if (!await uiConfirm(`پلن «${ps[i].name}» حذف شود؟ اشتراک‌های فعالِ آن تا پایان دوره می‌مانند.`)) return; ps.splice(i, 1); st.admin.config.plans = ps; drawAdmin(); },
     savePlans() {
       const plans = collectPlans();
       if (plans.some(p => !/^[a-z0-9_-]{2,20}$/.test(p.id))) return showToast('⚠️ شناسه‌ی پلن فقط حروف انگلیسی کوچک، عدد، - و _');
