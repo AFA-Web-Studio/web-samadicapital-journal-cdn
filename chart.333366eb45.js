@@ -27,6 +27,9 @@
    (گوشی: فهرستِ کشویی مثلِ اپِ TradingView)، نوعِ نمودار (شمعی/توخالی/میله‌ای/خطی/ناحیه‌ای/هیکن‌آشی)، مقیاسِ لگاریتمی و درصدی،
    دکمه‌ی «بازگشت به آخرین کندل» و Alt+R، عکسِ نمودار، تنظیماتِ نمودار (رنگِ شمع‌ها، خطِ وضعیت، خطِ قیمت، سقف/کف، شبکه)،
    هفت اندیکاتورِ تازه با جست‌وجو، کپی/چسباندنِ شکل (Ctrl+C/V) و نامِ نقطه‌های ابزارِ پوزیشن.
+   v26.43 (مالک: «حالتِ واچ‌لیست هم کامل داشته باشم»): واچ‌لیستِ کامل مثلِ TradingView — پنلِ کنارِ نمودار (دسکتاپ) /
+   کشوی رویِ نمودار (گوشی)، چند لیستِ نام‌دار، قیمت و تغییرِ ۲۴ساعته‌ی زنده (/api/chart/quotes)، چشمکِ تغییرِ قیمت،
+   افزودن/حذف، جابه‌جایی با کشیدن، مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ بعدی؛ در prefs.wl.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -181,13 +184,14 @@
   function levelFigs(k, out, yAt, valAt, x0, x1, opt = {}) {
     const lv = levels(k);
     if (k.x.f !== false) for (let i = 0; i + 1 < lv.length; i++) out.push(F.poly(rectPts(x0, yAt(lv[i].l), x1, yAt(lv[i + 1].l)), hexA(lv[i + 1].col, fillA(k, 0.12))));
-    const right = k.x.lpos === 1, outside = right ? x1 + 130 < k.W : x0 > 104;
+    const center = k.x.lpos === 2, right = k.x.lpos === 1, outside = center ? false : right ? x1 + 130 < k.W : x0 > 104;
     const vp = [0, 1, 2].includes(k.x.lvp) ? k.x.lvp : (outside ? 1 : 0), dy = [-2, 0, 2][vp], base = ['bottom', 'middle', 'top'][vp];
     for (const o of lv) {
       const y = yAt(o.l), t = opt.noPrice || k.x.lp === false ? String(o.l) : `${o.l} (${fmt(valAt(o.l))})`;
       out.push(F.line([{ x: x0, y }, { x: x1, y }], o.col, k.w, k.s), F.hit([{ x: x0, y }, { x: x1, y }]));
       if (k.x.lb === false) continue;
-      if (right) out.push(F.txt(outside ? x1 + 6 : x1 - 4, y + dy, t, { color: o.col, align: outside ? 'left' : 'right', base, size: 11 }));
+      if (center) out.push(F.txt((x0 + x1) / 2, y + dy, t, { color: o.col, align: 'center', base, size: 11 }));
+      else if (right) out.push(F.txt(outside ? x1 + 6 : x1 - 4, y + dy, t, { color: o.col, align: outside ? 'left' : 'right', base, size: 11 }));
       else out.push(F.txt(outside ? x0 - 6 : x0 + 4, y + dy, t, { color: o.col, align: outside ? 'right' : 'left', base, size: 11 }));
     }
     if (k.x.f !== false && lv.length > 1) out.push(F.hit(rectPts(x0, yAt(lv[0].l), x1, yAt(lv[lv.length - 1].l)), true));
@@ -235,8 +239,8 @@
     const p = { x: ray ? a.x : 0, y: a.y }, q = { x: k.W, y: a.y };
     const out = [F.line([p, q], k.col, k.w, k.s), F.hit([p, q])];
     if (k.x.text) {
-      const left = k.x.lpos === 0, vp = [0, 1, 2].includes(k.x.lvp) ? k.x.lvp : 0;
-      out.push(F.txt(left ? (ray ? a.x + 8 : 10) : k.W - 10, a.y + [-4, 0, 4][vp], k.x.text, { color: k.col, align: left ? 'left' : 'right', base: ['bottom', 'middle', 'top'][vp], size: 12, family: SANS, weight: 600,
+      const left = k.x.lpos === 0, mid = k.x.lpos === 2, vp = [0, 1, 2].includes(k.x.lvp) ? k.x.lvp : 0;
+      out.push(F.txt(mid ? ((ray ? a.x : 0) + k.W) / 2 : left ? (ray ? a.x + 8 : 10) : k.W - 10, a.y + [-4, 0, 4][vp], k.x.text, { color: k.col, align: mid ? 'center' : left ? 'left' : 'right', base: ['bottom', 'middle', 'top'][vp], size: 12, family: SANS, weight: 600,
         ...(vp === 1 ? { bg: TH().bg, pad: 3 } : {}) }));
     }
     return out;
@@ -350,7 +354,7 @@
     for (const o of lv) {
       const L = [at(p, o.l), at(q, o.l)];
       out.push(F.line(L, o.col, k.w, k.s), F.hit(L));
-      if (k.x.lb !== false) out.push(k.x.lpos === 1
+      if (k.x.lb !== false) out.push(k.x.lpos === 2 ? F.txt((L[0].x + L[1].x) / 2, L[0].y / 2 + L[1].y / 2 - 2, String(o.l), { color: o.col, align: 'center', base: 'bottom', size: 11 }) : k.x.lpos === 1
         ? F.txt(L[1].x + (L[1].x + 40 < k.W ? 4 : -4), L[1].y, String(o.l), { color: o.col, align: L[1].x + 40 < k.W ? 'left' : 'right', base: 'middle', size: 11 })
         : F.txt(L[0].x - 4, L[0].y, String(o.l), { color: o.col, align: 'right', base: 'middle', size: 11 }));
     }
@@ -641,6 +645,10 @@
     chev: svg('<path d="M6 9l6 6 6-6"/>'),
     close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
     full: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+    wl: svg('<path d="M4 6h10M4 12h10M4 18h7"/><path d="M18 13.5l1.4 2.8 3.1.5-2.2 2.1.5 3.1-2.8-1.5-2.8 1.5.5-3.1-2.2-2.1 3.1-.5z"/>'),
+    plus: svg('<path d="M12 5v14M5 12h14"/>'),
+    pen: svg('<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>'),
+    grip: svg('<circle cx="9" cy="6" r="1.2" fill="currentColor"/><circle cx="15" cy="6" r="1.2" fill="currentColor"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/><circle cx="15" cy="12" r="1.2" fill="currentColor"/><circle cx="9" cy="18" r="1.2" fill="currentColor"/><circle cx="15" cy="18" r="1.2" fill="currentColor"/>'),
     camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
     rt: svg('<path d="M6 7l5 5-5 5M13 7l5 5-5 5"/>'),
     sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
@@ -1490,7 +1498,7 @@
     const textOpts = opts.filter(inText), styleOpts = opts.filter(k => !inText(k) && k !== 'lv');
     const lposDef = ['scHLine', 'scHRay'].includes(m.n) ? 1 : 0;
     const posRow = (key, lab) => key === 'lpos'
-      ? `<div class="chs-r"><span class="chs-l">${lab}</span>${seg('lpos', [[0, tr('چپ', 'Left'), tr('چپ', 'Left')], [1, tr('راست', 'Right'), tr('راست', 'Right')]], m.x.lpos === 0 || m.x.lpos === 1 ? m.x.lpos : lposDef)}</div>`
+      ? `<div class="chs-r"><span class="chs-l">${lab}</span><div dir="ltr">${seg('lpos', [[0, tr('چپ', 'Left'), tr('چپ', 'Left')], [2, tr('وسط', 'Center'), tr('وسط', 'Center')], [1, tr('راست', 'Right'), tr('راست', 'Right')]], [0, 1, 2].includes(m.x.lpos) ? m.x.lpos : lposDef)}</div></div>`
       : `<div class="chs-r"><span class="chs-l">${lab}</span>${seg('lvp', [[-1, tr('خودکار', 'Auto'), tr('خودکار', 'Auto')], [0, tr('بالا', 'Top'), tr('بالا', 'Top')], [1, tr('وسط', 'Middle'), tr('وسط', 'Middle')], [2, tr('پایین', 'Bottom'), tr('پایین', 'Bottom')]], [0, 1, 2].includes(m.x.lvp) ? m.x.lvp : -1)}</div>`;
     const tabs = [['style', tr('ظاهر', 'Style')]];
     if (textOpts.length) tabs.push(['text', tr('متن', 'Text')]);
@@ -1507,7 +1515,20 @@
       const h = [];
       if (colorOk) h.push(`<div class="chs-r"><span class="chs-l">${lineOk ? tr('خط', 'Line') : tr('رنگ', 'Color')}</span><div class="chs-c">${sw('c', colOf())}`
         + (lineOk ? seg('w', [1, 2, 3, 4].map(w => [w, WIDTH_IC(w), w + 'px']), m.w || 1) + seg('s', [[0, STYLE_IC(0), tr('پیوسته', 'Solid')], [1, STYLE_IC(1), tr('خط‌چین', 'Dashed')], [2, STYLE_IC(2), tr('نقطه‌چین', 'Dotted')]], m.s || 0) : '') + '</div></div>');
-      for (const key of styleOpts) {
+      // مثلِ TradingView: «برچسب‌ها» (نمایش، قیمت، جای افقی و عمودی) درست زیرِ خط، بی نیاز به پیمایش
+      const LBL = { lb: tr('نمایشِ برچسب‌ها', 'Show labels'), lp: tr('قیمت در برچسب', 'Prices in labels'), lpos: tr('جای افقی', 'Horizontal position'), lvp: tr('جای عمودی', 'Vertical position') };
+      const lblKeys = ['lb', 'lp', 'lpos', 'lvp'].filter(k => styleOpts.includes(k));
+      const ordered = styleOpts.filter(k => !lblKeys.includes(k));
+      if (lblKeys.length) {
+        // دو ردیفِ فشرده مثلِ TradingView: [نمایشِ برچسب‌ها | چپ وسط راست] و [قیمت | خودکار بالا وسط پایین]
+        const segH = lblKeys.includes('lpos') ? posRow('lpos', LBL.lpos).replace(/^<div class="chs-r"><span class="chs-l">[^<]*<\/span>/, '').replace(/<\/div>$/, '') : '';
+        const segV = lblKeys.includes('lvp') ? posRow('lvp', LBL.lvp).replace(/^<div class="chs-r"><span class="chs-l">[^<]*<\/span>/, '').replace(/<\/div>$/, '') : '';
+        h.push(`<div class="chs-h">${tr('برچسب‌ها', 'Labels')}</div>`);
+        h.push(lblKeys.includes('lb') ? ck('lb', optOn('lb'), LBL.lb, segH) : segH ? `<div class="chs-r"><span class="chs-l">${LBL.lpos}</span>${segH}</div>` : '');
+        h.push(lblKeys.includes('lp') ? ck('lp', optOn('lp'), LBL.lp, segV) : segV ? `<div class="chs-r"><span class="chs-l">${LBL.lvp}</span>${segV}</div>` : '');
+        if (ordered.length) h.push(`<div class="chs-h">${tr('گزینه‌ها', 'Options')}</div>`);
+      }
+      for (const key of ordered) {
         const [type, lf, le] = OPT[key], lab = tr(lf, le);
         if (type === 'bool' || type === 'boolOn') {
           const fo = key === 'f' && FO_DEF[m.n] != null ? (isNum(m.x.fo) ? m.x.fo : FO_DEF[m.n]) : null;
@@ -1695,6 +1716,7 @@
         <button type="button" class="ch-fullb ch-bb" id="ch-cset" onclick="SCCHART.chartSettings()">${ICON.gear}</button>
         <button type="button" class="ch-fullb ch-bb" id="ch-shot" onclick="SCCHART.snapshot()">${ICON.camera}</button>
         <button type="button" class="ch-fullb" id="ch-full" onclick="SCCHART.max()" aria-pressed="false">${ICON.full}</button>
+        <button type="button" class="ch-fullb ch-bb" id="ch-wlb" onclick="SCCHART.watchlist()" aria-pressed="false">${ICON.wl}</button>
       </div>
       <div class="ch-main" dir="ltr">
         <div class="ch-tb" id="ch-tools" role="toolbar" aria-label="${tr('ابزارهای رسم', 'Drawing tools')}"></div>
@@ -1715,6 +1737,7 @@
           <div class="ch-indm" id="ch-indm" dir="${d}" hidden></div>
           <div class="ch-modal" id="ch-modal" dir="${d}" hidden></div>
         </div>
+        <aside class="ch-wl" id="ch-wl" dir="${d}" hidden></aside>
       </div>
       <div class="ch-foot"><span id="ch-save" class="ch-save"></span><span id="ch-srcinfo"></span></div>
     </div>`;
@@ -1863,10 +1886,11 @@
     if (typeof closeSheet === 'function') closeSheet();
     if (c === S.coin) return;
     cancelDrawing(); S.coin = c; S.hist = []; S.redo = [];
+    paintWL();
     remember(); const logo = $('ch-logo'); if (logo && typeof coinLogo === 'function') logo.innerHTML = coinLogo(c);
     loadSeries();
   }
-  function setSrc(src) { if (!SOURCES.some(s => s.id === src) || src === S.src) return; cancelDrawing(); S.src = src; remember(); loadSeries(); }
+  function setSrc(src) { if (!SOURCES.some(s => s.id === src) || src === S.src) return; cancelDrawing(); S.src = src; remember(); loadSeries(); S.q = {}; paintWL(); wlPoll(); }
   function setTf(tf) { if (!TFS.some(t => t.id === tf) || tf === S.tf) return; cancelDrawing(); S.tf = tf; remember(); loadSeries(); }
   function remember() { if (!S.store) return; S.store.last = { src: S.src, coin: S.coin, tf: S.tf }; if (!readOnly()) { L.s(cacheKey(), S.store); clearTimeout(S.saveTimer); S.saveTimer = setTimeout(save, 2500); } }
 
@@ -1882,6 +1906,7 @@
     else if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); undo(); }
     else if (ev.altKey && ev.shiftKey && ev.code === 'KeyR') { ev.preventDefault(); startTool('scRect'); }
     else if (ev.altKey && !ev.shiftKey && !ev.ctrlKey && ev.code === 'KeyR') { ev.preventDefault(); resetView(); }
+    else if (wlOpen() && !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !S.drawingId) { ev.preventDefault(); wlStep(ev.key === 'ArrowDown' ? 1 : -1); }
     else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyC' && S.selected && !String(window.getSelection?.() || '')) { if (copySel()) ev.preventDefault(); }
     else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyV' && S.clip) { if (pasteClip()) ev.preventDefault(); }
     else if (ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyF') { ev.preventDefault(); setMax(); }
@@ -1944,6 +1969,10 @@
     // کشیدن یا دوبار-کلیکِ محورِ قیمت هم حالتِ خودکار را عوض می‌کند ⇒ دکمه‌ی A همگام بماند
     for (const t of ['pointerup', 'dblclick']) cv.addEventListener(t, () => setTimeout(paintAuto, 0));
     padEvents($('ch-pad'));
+    const wlp = $('ch-wl'); wlp.addEventListener('click', wlClick); wlp.addEventListener('pointerdown', wlPointerDown);
+    wlp.addEventListener('keydown', e => { if (e.target.id === 'ch-wlname') { if (e.key === 'Enter') { e.preventDefault(); wlSaveName(); } else if (e.key === 'Escape') { e.stopPropagation(); S.wlRename = null; paintWL(); } } });
+    setInterval(() => wlPoll(), 8000);
+    if (pf.wlo && wide()) toggleWL(true);
     document.addEventListener('keydown', onKey);
     document.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', () => { S.ctrl = false; });
@@ -1963,7 +1992,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -2148,9 +2177,191 @@
     set('ch-ctb', tr('نوعِ نمودار: ', 'Chart type: ') + ctName(S.ct || 'candle'), b => { b.innerHTML = CT_IC[S.ct || 'candle']; });
     set('ch-cset', tr('تنظیماتِ نمودار', 'Chart settings'));
     set('ch-shot', tr('عکس از نمودار', 'Take a snapshot'));
+    set('ch-wlb', tr('واچ‌لیست', 'Watchlist'), b => { const on = wlOpen(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     set('ch-rt', tr('بازگشت به آخرین کندل (Alt+R)', 'Scroll to the most recent bar (Alt+R)'));
     set('ch-log', tr('مقیاسِ لگاریتمی', 'Log scale'), b => { const on = S.ys === 'log'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     set('ch-pct', tr('مقیاسِ درصدی', 'Percent scale'), b => { const on = S.ys === 'pct'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+  }
+  // ── واچ‌لیست (مثلِ TradingView): چند فهرستِ نام‌دار، قیمت و تغییرِ ۲۴ساعته‌ی زنده، کلیک = همان نماد روی نمودار،
+  //    افزودن/حذف/جابه‌جایی با کشیدن/مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ قبلی/بعدی. همه در prefs.wl (روی همه‌ی دستگاه‌ها).
+  const WL_MAX_LISTS = 10, WL_MAX_ITEMS = 100;
+  function wlData() {
+    const fresh = () => ({ lists: [{ id: 'w1', name: '', items: POPULAR.slice() }], cur: 'w1' });
+    const p = S.store?.prefs; if (!p) return fresh();
+    if (!p.wl || !Array.isArray(p.wl.lists) || !p.wl.lists.length) p.wl = fresh();
+    return p.wl;
+  }
+  const wlCur = () => { const w = wlData(); return w.lists.find(l => l.id === w.cur) || w.lists[0]; };
+  const wlName = l => l.name || tr('واچ‌لیست', 'Watchlist');
+  function wlItems(l = wlCur()) {
+    const it = (l.items || []).slice(), so = l.sort; if (!so) return it;
+    const k = so.replace('-', ''), dir = so[0] === '-' ? -1 : 1, val = c => k === 'sym' ? c : k === 'p' ? S.q?.[c]?.p : S.q?.[c]?.c;
+    return it.sort((a, b) => { const x = val(a), y = val(b); if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1; return (k === 'sym' ? String(x).localeCompare(String(y)) : x - y) * dir; });
+  }
+  const wlSave = () => { if (!readOnly()) scheduleSave(); };
+  const wlOpen = () => !!$('ch-wl') && !$('ch-wl').hidden;
+  const wide = () => window.matchMedia('(min-width: 900px)').matches;
+  function toggleWL(on) {
+    const p = $('ch-wl'); if (!p) return;
+    on = on === undefined ? p.hidden : !!on;
+    p.hidden = !on; S.wlEdit = false; S.wlMenu = false; S.wlRename = null;
+    if (!on) p.innerHTML = '';   // بسته = خالی (با تعویضِ زبان، متنِ کهنه پنهان نماند)
+    if (S.store && wide()) { if (on) S.store.prefs.wlo = true; else delete S.store.prefs.wlo; wlSave(); }
+    const b = $('ch-wlb'); if (b) { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }
+    if (on) { paintWL(); wlPoll(); }
+    requestAnimationFrame(() => S.chart?.resize());
+  }
+  const fmtQ = p => isNum(p) ? fmtP(p) : '—';
+  const fmtC = c => isNum(c) ? (c > 0 ? '+' : c < 0 ? '−' : '') + Math.abs(c).toFixed(2) + '%' : '—';
+  const chgCls = c => isNum(c) ? (c > 0 ? 'up' : c < 0 ? 'down' : '') : '';
+  function paintWL() {
+    const p = $('ch-wl'); if (!p || p.hidden || S.wlDrag) return;
+    const w = wlData(), l = wlCur(), ro = readOnly(), items = wlItems(l), so = l.sort || '';
+    const arrow = k => so === k ? ' ▲' : so === '-' + k ? ' ▼' : '';
+    const row = c => {
+      const q = S.q?.[c], on = c === S.coin;
+      return `<div class="ch-wlr${on ? ' on' : ''}" role="listitem" data-c="${esc(c)}" aria-current="${on}">`
+        + (ro || so ? '' : `<span class="ch-wlg" data-drag="${esc(c)}" title="${tr('برای جابه‌جایی بکش', 'Drag to reorder')}">${ICON.grip}</span>`)
+        + `<span class="ch-wls">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<b dir="ltr">${esc(c)}</b></span>`
+        + `<span class="ch-wlp" dir="ltr">${fmtQ(q?.p)}</span><span class="ch-wlch ${chgCls(q?.c)}" dir="ltr">${fmtC(q?.c)}</span>`
+        + (ro ? '<span></span>' : `<button type="button" class="ch-wlrm" data-rm="${esc(c)}" title="${tr('حذف از لیست', 'Remove from watchlist')}" aria-label="${tr('حذفِ ', 'Remove ') + esc(c)}">${ICON.close}</button>`) + '</div>';
+    };
+    const menu = !S.wlMenu ? '' : `<div class="ch-wlm" role="menu">${w.lists.map(x => `<button type="button" role="menuitemradio" aria-checked="${x.id === l.id}" class="ch-popi${x.id === l.id ? ' on' : ''}" data-wl="${x.id}"><i></i><span><b${x.name ? ' class="ch-utext"' : ''}>${esc(wlName(x))}</b></span><small dir="ltr">${num((x.items || []).length)}</small></button>`).join('')}`
+      + (ro ? '' : `<hr><button type="button" class="ch-wlmi" data-wa="new">${tr('+ لیستِ تازه', '+ Create new list')}</button><button type="button" class="ch-wlmi" data-wa="rename">${tr('تغییرِ نامِ این لیست', 'Rename this list')}</button>`
+        + (w.lists.length > 1 ? `<button type="button" class="ch-wlmi del" data-wa="del">${tr('حذفِ این لیست', 'Delete this list')}</button>` : '')) + '</div>';
+    const ren = !S.wlRename ? '' : `<div class="ch-wlin"><input class="fi" id="ch-wlname" maxlength="30" dir="auto" value="${esc(S.wlRename.mode === 'rename' ? l.name || '' : '')}" placeholder="${tr('نامِ لیست', 'List name')}" aria-label="${tr('نامِ لیست', 'List name')}">`
+      + `<button type="button" class="btn btn-primary" data-wa="nameok">${tr('ثبت', 'Ok')}</button><button type="button" class="ch-wlbtn" data-wa="namecancel" aria-label="${tr('انصراف', 'Cancel')}">${ICON.close}</button></div>`;
+    p.classList.toggle('edit', !!S.wlEdit);
+    p.innerHTML = `<div class="ch-wlh"><button type="button" class="ch-wlsel" data-wa="menu" aria-haspopup="true" aria-expanded="${!!S.wlMenu}" title="${tr('لیست‌های من', 'My watchlists')}"><b${l.name ? ' class="ch-utext"' : ''}>${esc(wlName(l))}</b><small dir="ltr">${num(items.length)}</small>${ICON.chev}</button>`
+      + (ro ? '' : `<button type="button" class="ch-wlbtn" data-wa="add" title="${tr('افزودنِ نماد', 'Add symbol')}" aria-label="${tr('افزودنِ نماد', 'Add symbol')}">${ICON.plus}</button>`
+        + `<button type="button" class="ch-wlbtn${S.wlEdit ? ' on' : ''}" data-wa="edit" aria-pressed="${!!S.wlEdit}" title="${tr('ویرایشِ لیست (حذف و جابه‌جایی)', 'Edit list (remove and reorder)')}" aria-label="${tr('ویرایشِ لیست', 'Edit list')}">${ICON.pen}</button>`)
+      + `<button type="button" class="ch-wlbtn" data-wa="close" title="${tr('بستنِ واچ‌لیست', 'Close watchlist')}" aria-label="${tr('بستنِ واچ‌لیست', 'Close watchlist')}">${ICON.close}</button></div>`
+      + menu + ren
+      + `<div class="ch-wlcols" role="row"><button type="button" data-sort="sym">${tr('نماد', 'Symbol')}${arrow('sym')}</button><button type="button" data-sort="p">${tr('آخرین', 'Last')}${arrow('p')}</button><button type="button" data-sort="c">${tr('تغییر٪', 'Chg%')}${arrow('c')}</button><span></span></div>`
+      + `<div class="ch-wll" role="list" aria-label="${tr('واچ‌لیست', 'Watchlist')}">${items.length ? items.map(row).join('') : `<div class="ch-pempty">${tr('این لیست خالی است — با «+» نماد اضافه کن.', 'This list is empty — add symbols with «+».')}</div>`}</div>`
+      + `<div class="ch-wlf">${tr('قیمت‌ها از ', 'Prices from ') + srcName()}</div>`;
+    if (S.wlRename) setTimeout(() => $('ch-wlname')?.focus(), 30);
+  }
+  // فقط عددها (بی بازسازیِ فهرست تا اسکرول و کشیدن نپرد) + چشمکِ سبز/قرمز مثلِ TradingView
+  function updQuotes(prev) {
+    const p = $('ch-wl'); if (!p || p.hidden || S.wlDrag) return;
+    const so = wlCur().sort || ''; if (so && so.replace('-', '') !== 'sym') { paintWL(); return; }
+    p.querySelectorAll('.ch-wlr').forEach(r => {
+      const c = r.dataset.c, q = S.q?.[c], pe = r.querySelector('.ch-wlp'), ce = r.querySelector('.ch-wlch'), old = prev?.[c]?.p;
+      pe.textContent = fmtQ(q?.p); ce.textContent = fmtC(q?.c); ce.className = 'ch-wlch ' + chgCls(q?.c);
+      if (isNum(old) && isNum(q?.p) && q.p !== old) { pe.classList.remove('fu', 'fd'); void pe.offsetWidth; pe.classList.add(q.p > old ? 'fu' : 'fd'); }
+    });
+  }
+  let wlBusy = false;
+  async function wlPoll() {
+    if (!wlOpen() || wlBusy || document.hidden || !$('screen-chart')?.classList.contains('active')) return;
+    const items = (wlCur().items || []).slice(0, WL_MAX_ITEMS); if (!items.length) return;
+    wlBusy = true; const src = S.src;
+    try {
+      const chunks = []; for (let i = 0; i < items.length; i += 40) chunks.push(items.slice(i, i + 40));
+      const res = await Promise.all(chunks.map(ch => apiFetch('/api/chart/quotes?src=' + src + '&coins=' + encodeURIComponent(ch.join(',')), {}, { retries: 0 })
+        .then(r => r && r.ok ? r.json() : null).catch(() => null)));
+      if (src !== S.src) return;
+      const prev = S.qSrc === src ? (S.q || {}) : {}, next = { ...prev };
+      for (const d of res) if (d?.quotes) Object.assign(next, d.quotes);
+      S.q = next; S.qSrc = src; updQuotes(prev);
+    } finally { wlBusy = false; }
+  }
+  function wlToggleItem(c, addOnly) {
+    c = String(c || '').toUpperCase(); if (!/^[A-Z0-9]{1,15}$/.test(c) || readOnly()) return;
+    const l = wlCur(); l.items = Array.isArray(l.items) ? l.items : [];
+    if (l.items.includes(c)) { if (addOnly) return; l.items = l.items.filter(x => x !== c); }
+    else { if (l.items.length >= WL_MAX_ITEMS) { showToast(tr(`حداکثر ${fa(WL_MAX_ITEMS)} نماد در هر لیست`, `Up to ${WL_MAX_ITEMS} symbols per list`)); return; } l.items.push(c); }
+    wlSave(); paintWL(); wlPoll();
+  }
+  function wlCycleSort(k) {
+    const l = wlCur(), s = l.sort || '', first = k === 'sym' ? k : '-' + k, second = k === 'sym' ? '-' + k : k;
+    l.sort = s === first ? second : s === second ? '' : first; if (!l.sort) delete l.sort;
+    wlSave(); paintWL();
+  }
+  function wlStep(d) {
+    const items = wlItems(); if (!items.length) return;
+    const i = items.indexOf(S.coin), n = items.length;
+    setCoin(items[i < 0 ? 0 : (i + d + n) % n]);
+  }
+  async function wlDeleteList() {
+    const w = wlData(), l = wlCur(); if (w.lists.length < 2) return;
+    const q = EN() ? `⁦Delete the list «${wlName(l)}»?⁩` : `لیستِ «${wlName(l)}» حذف شود؟`;
+    if (!await uiConfirm(q, EN() ? { ok: 'Delete', cancel: 'Cancel' } : undefined)) return;
+    w.lists = w.lists.filter(x => x.id !== l.id); w.cur = w.lists[0].id; S.wlMenu = false;
+    wlSave(); paintWL(); wlPoll();
+  }
+  function wlSaveName() {
+    const w = wlData(), v = String($('ch-wlname')?.value || '').trim().slice(0, 30), mode = S.wlRename?.mode;
+    if (mode === 'new') {
+      if (w.lists.length >= WL_MAX_LISTS) { showToast(tr(`حداکثر ${fa(WL_MAX_LISTS)} لیست`, `Up to ${WL_MAX_LISTS} lists`)); return; }
+      const id = 'w' + Date.now().toString(36); w.lists.push({ id, name: v || tr('لیستِ تازه', 'New list'), items: [] }); w.cur = id;
+    } else if (mode === 'rename') wlCur().name = v;
+    S.wlRename = null; wlSave(); paintWL(); wlPoll();
+  }
+  function wlClick(ev) {
+    const t = ev.target, a = t.closest('[data-wa]')?.dataset.wa;
+    if (a === 'close') { toggleWL(false); return; }
+    if (a === 'menu') { S.wlMenu = !S.wlMenu; S.wlRename = null; paintWL(); return; }
+    if (a === 'add') { wlPickAdd(); return; }
+    if (a === 'edit') { S.wlEdit = !S.wlEdit; paintWL(); return; }
+    if (a === 'new' || a === 'rename') { S.wlRename = { mode: a }; S.wlMenu = false; paintWL(); return; }
+    if (a === 'del') { wlDeleteList(); return; }
+    if (a === 'nameok') { wlSaveName(); return; }
+    if (a === 'namecancel') { S.wlRename = null; paintWL(); return; }
+    const lid = t.closest('[data-wl]')?.dataset.wl;
+    if (lid) { wlData().cur = lid; S.wlMenu = false; wlSave(); paintWL(); wlPoll(); return; }
+    const so = t.closest('[data-sort]')?.dataset.sort; if (so) { wlCycleSort(so); return; }
+    const rm = t.closest('[data-rm]')?.dataset.rm; if (rm) { wlToggleItem(rm); return; }
+    if (t.closest('[data-drag]')) return;
+    const c = t.closest('.ch-wlr')?.dataset.c;
+    if (c) { if (c !== S.coin) setCoin(c); if (!wide()) toggleWL(false); else paintWL(); }
+  }
+  // جابه‌جاییِ ردیف با کشیدنِ دستگیره (موس و انگشت)
+  function wlPointerDown(ev) {
+    const h = ev.target.closest('[data-drag]'); if (!h || readOnly() || wlCur().sort) return;
+    ev.preventDefault();
+    const row = h.closest('.ch-wlr'), list = row.parentElement;
+    // روی سند گوش می‌دهیم، نه خودِ دستگیره: جابه‌جا کردنِ ردیف در DOM اتصالِ اشاره‌گر (pointer capture) را قطع می‌کند
+    S.wlDrag = true; row.classList.add('drag');
+    const move = e => {
+      let before = null;
+      for (const r of list.querySelectorAll('.ch-wlr')) { if (r === row) continue; const b = r.getBoundingClientRect(); if (e.clientY < b.top + b.height / 2) { before = r; break; } }
+      if (before) { if (row.nextSibling !== before) list.insertBefore(row, before); } else if (list.lastElementChild !== row) list.appendChild(row);
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up);
+      row.classList.remove('drag'); S.wlDrag = false;
+      const order = [...list.querySelectorAll('.ch-wlr')].map(r => r.dataset.c), l = wlCur();
+      if (JSON.stringify(order) !== JSON.stringify(l.items)) { l.items = order; wlSave(); }
+      paintWL();
+    };
+    document.addEventListener('pointermove', move); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+  }
+  // افزودن: همان برگه‌ی انتخابِ نماد، با تیک برای نمادهای داخلِ لیست؛ چند نماد پشتِ هم، بعد «تمام»
+  async function wlPickAdd() {
+    const l = wlCur(), has = c => (l.items || []).includes(c);
+    const chip = c => `<button type="button" class="ch-pchip${has(c) ? ' on' : ''}" data-wadd="${esc(c)}" aria-pressed="${has(c)}">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<span dir="ltr">${esc(c)}</span><i aria-hidden="true">${has(c) ? '✓' : '+'}</i></button>`;
+    $('det-content').innerHTML = `<div class="ch-pick" dir="${dirOf()}"><h3>${tr('افزودن به ', 'Add to ') + esc(wlName(l))}</h3>
+      <input id="ch-wsearch" class="fi" dir="ltr" placeholder="${tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips" id="ch-wpop"></div>
+      <div class="ch-plab">${tr('همه‌ی نمادهای ', 'All symbols on ') + srcName()}</div><div class="ch-plist ch-pchips" id="ch-wall"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div>
+      <button type="button" class="btn btn-primary ch-wdone" id="ch-wdone">${tr('تمام', 'Done')}</button></div>`;
+    document.getElementById('det-sheet').classList.add('open');
+    const box = $('det-content').querySelector('.ch-pick'), input = $('ch-wsearch');
+    let all = [];
+    const norm = () => String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const draw = () => {
+      const q = norm(); let items = all.filter(s => !q || s.includes(q)).slice(0, 120);
+      if (q && !items.includes(q) && /^[A-Z0-9]{1,15}$/.test(q)) items = [q, ...items];
+      $('ch-wpop').innerHTML = POPULAR.map(chip).join('');
+      $('ch-wall').innerHTML = items.length ? items.map(chip).join('') : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
+    };
+    box.onclick = ev => { const b = ev.target.closest('[data-wadd]'); if (b) { wlToggleItem(b.dataset.wadd); draw(); return; } if (ev.target.id === 'ch-wdone' && typeof closeSheet === 'function') closeSheet(); };
+    input.oninput = draw;
+    input.onkeydown = ev => { if (ev.key === 'Enter') { const q = norm(); if (q) { wlToggleItem(q, true); input.value = ''; draw(); } } };
+    draw();
+    all = await symbolsOf(S.src); if ($('ch-wall')) draw();
   }
   // ── تمِ تیره/روشن ──
   function setTheme(t) {
@@ -2207,13 +2418,13 @@
   }
   function paintLang() {
     const d = dirOf(), w = S.root?.querySelector('.ch-wrap'); if (w) w.setAttribute('dir', d);
-    for (const id of ['ch-hint', 'ch-sel', 'ch-fly', 'ch-pop', 'ch-ctx', 'ch-tree', 'ch-indm', 'ch-modal']) $(id)?.setAttribute('dir', d);
+    for (const id of ['ch-hint', 'ch-sel', 'ch-fly', 'ch-pop', 'ch-ctx', 'ch-tree', 'ch-indm', 'ch-modal', 'ch-wl']) $(id)?.setAttribute('dir', d);
     const al = (id, v) => $(id)?.setAttribute('aria-label', v);
     al('ch-coinb', tr('انتخابِ نماد و منبع', 'Symbol search')); al('ch-srcs', tr('منبعِ داده', 'Data source')); al('ch-tfs', tr('تایم‌فریم', 'Time interval'));
     al('ch-tools', tr('ابزارهای رسم', 'Drawing tools')); al('ch-lang', tr('زبانِ نمودار', 'Chart language'));
     const il = $('ch-indl'); if (il) il.textContent = tr('اندیکاتور', 'Indicators');
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax(); paintTheme(); paintAuto(); paintBar();
+    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax(); paintTheme(); paintAuto(); paintBar(); paintWL();
     if (S.saveState || readOnly()) status(S.saveState);
     if (S.hintArgs) hint(...S.hintArgs);
   }
@@ -2227,7 +2438,7 @@
     removeSelected: () => S.selected && removeId(S.selected), color: setColor, width: setWidth, lstyle: setLineStyle,
     colorMenu, widthMenu, styleMenu, settings: () => openSettings(), lock: () => toggleLock(), clone: () => cloneSel(), editText: () => editText(), ctx: ctxAction,
     pickObj: id => { selectId(id); paintTree(); }, objHide: id => { toggleHideOne(id); paintTree(); }, objLock: id => { toggleLock(id); paintTree(); }, objDel: id => { removeId(id); paintTree(); },
-    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
+    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, watchlist: on => toggleWL(on), _wlPoll: wlPoll, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator, indSet: openIndSettings, indFind: q => { S.indQ = String(q || '').slice(0, 40); paintInd(true); },
     tfMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
