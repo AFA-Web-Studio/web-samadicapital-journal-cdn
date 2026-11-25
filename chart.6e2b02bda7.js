@@ -11,6 +11,14 @@
      ۳) دو کلیک/ضربه‌ی سریع وسطِ رسم، شکل را با نقطه‌های ناقص «تمام» می‌کرد ⇒ همان ضربه یک نقطه می‌گذارد.
    v26.39 (درخواستِ مالک ۱۴۰۵/۰۹/۰۴: «انگلیسی هم مثلِ TradingView باشد و فارسی هم بشود انتخاب کرد»): زبانِ نمودار
    فارسی (پیش‌فرض) یا English با همان نام‌های TradingView؛ دکمه‌ی «فا | EN» در سرِ نمودار، ذخیره در prefs.lang.
+   v26.40 (درخواستِ مالک ۱۴۰۵/۰۹/۰۴: «صفحه‌ی نمودار را حرفه‌ای و اصولی بزرگ کن مثلِ بقیه»): حالتِ تمام‌صفحه مثلِ TradingView
+   (دکمه‌ی کنارِ اندیکاتور و Shift+F): کلاسِ ch-max روی <html> همه‌ی پنجره را به نمودار می‌دهد و اگر مرورگر اجازه دهد
+   Fullscreen API نوارهای مرورگر را هم پنهان می‌کند (گوشیِ اندروید: چرخش به افقی هم آزاد می‌شود). Esc، دکمه‌ی «بازگشت»ِ
+   گوشی یا رفتن به صفحه‌ی دیگر از آن بیرون می‌آورد.
+   v26.40 (همان روز: «هر تنظیمی که هر دانشجو می‌زند روی نمودارش بماند»): مثلِ TradingView آخرین ظاهرِ هر ابزار
+   (رنگ/ضخامت/نوعِ خط/گزینه‌ها مثلِ سطوحِ فیبو) پیش‌فرضِ شکلِ بعدیِ همان ابزار می‌شود (prefs.td، با «بازگشت به پیش‌فرض»)؛
+   زوم (prefs.bs)، ارتفاعِ پنلِ اندیکاتور (prefs.ph)، دوره‌های اندیکاتور (prefs.ip، پنجره‌ی تنظیمات) و «پنهانِ همه» (prefs.hid)
+   هم ذخیره می‌شوند — همه در sc_chart_<uid>، روی همه‌ی دستگاه‌ها.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -36,7 +44,7 @@
     tool: 'cursor', recs: new Map(), selected: null, drawingId: null, hidden: false, mag: 1, magLast: 1, stay: false, lockAll: false,
     hist: [], redo: [], store: null, rev: null, loadedStore: false, saveTimer: null, saving: false, saveAgain: false, panes: {}, symbols: {}, gen: 0,
     quiet: false, ctrl: false, lastPtr: null, measureId: null, fly: null, pop: null, touch: false, tol: 6, magTol: 16, stroke: null,
-    debug: false, lastFigs: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null
+    debug: false, lastFigs: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false
   };
   const readOnly = () => !!SESSION?.isViewOnly;
   const storeKey = () => 'sc_chart_' + (SESSION?.uid || 'guest');
@@ -596,7 +604,9 @@
     textEdit: svg('<path d="M5 6.5V4.5h14v2M12 4.5v15M9 19.5h6"/>'),
     ind: svg('<path d="M3 17l5-6 4 3 6-8 3 3"/>'),
     chev: svg('<path d="M6 9l6 6 6-6"/>'),
-    close: svg('<path d="M6 6l12 12M18 6L6 18"/>')
+    close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
+    full: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+    unfull: svg('<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>')
   };
 
   // ── ثبتِ شکل‌ها در موتور ──
@@ -684,6 +694,25 @@
   // ── وصله‌ها روی خودِ موتور (یک بار) ──
   let patched = false;
   function patchEngine(chart) {
+    // v26.40: رسم و کشیدنِ شکل همیشه روی پنلِ اصلی. کتابخانه شکل را به پنلی می‌برد که اولین ضربه آن‌جا بود
+    // (حجم/RSI ⇒ «قیمتِ» نقطه عددِ حجم می‌شد) و ضربه‌ی بعدی در پنلِ دیگر را نادیده می‌گرفت ⇒ شکلِ نیمه‌کاره.
+    // حالا وسطِ رسم/کشیدن، اشاره روی پنلِ اندیکاتور = همان قیمت آن‌سوی لبه‌ی پایینِ نمودارِ اصلی.
+    const ce = chart._chartEvent;
+    if (ce && typeof ce._findWidgetByEvent === 'function' && !ce.__scPane) {
+      const find = ce._findWidgetByEvent.bind(ce); ce.__scPane = true;
+      ce._findWidgetByEvent = e => {
+        const r = find(e);
+        try {
+          if (r?.pane && r.pane.getId() !== 'candle_pane' && r.widget && r.widget === r.pane.getMainWidget()) {
+            const os = chart.getChartStore().getOverlayStore();
+            if (os.getProgressInstanceInfo() || os.getPressedInstanceInfo()?.instance) {
+              const cp = chart.getDrawPaneById('candle_pane'); if (cp) return { pane: cp, widget: cp.getMainWidget() };
+            }
+          }
+        } catch (_) {}
+        return r;
+      };
+    }
     if (patched) return;
     const ts = chart.getChartStore?.()?.getTimeScaleStore?.();
     const OvProto = Object.getPrototypeOf(window.klinecharts.getOverlayClass('scTrend')?.prototype || {});
@@ -776,6 +805,7 @@
     const last = S.data[S.data.length - 1];
     S.chart.setPriceVolumePrecision(precisionOf(last?.close), 2);
     S.chart.applyNewData(S.data, S.more);
+    const bs = S.store?.prefs?.bs; if (isNum(bs) && bs >= 1 && bs <= 50) S.chart.setBarSpace(bs);   // زومِ خودِ دانشجو
     msg('');
     restoreDrawings();
     paintHead();
@@ -910,6 +940,26 @@
     };
   }
   const lockOf = m => readOnly() || S.lockAll || !!m.k;
+  // آخرین ظاهرِ هر ابزار = پیش‌فرضِ شکلِ بعدی (مثلِ TradingView). متنِ هر شکل و مسیرِ قلم مالِ خودِ همان شکل‌اند.
+  const TD_X = new Set(['el', 'er', 'st', 'ax', 'f', 'mid', 'm', 'dev', 'lb', 'rv', 'lv', 'fs', 'b', 'bg']);
+  function styleFor(n) {
+    const td = S.store?.prefs?.td?.[n]; if (!td || typeof td !== 'object') return {};
+    const out = {};
+    if (/^#[0-9A-Fa-f]{6}$/.test(td.c || '')) out.c = td.c;
+    if ([2, 3, 4].includes(td.w)) out.w = td.w;
+    if ([1, 2].includes(td.s)) out.s = td.s;
+    if (td.x && typeof td.x === 'object') { const x = {}; for (const [k, v] of Object.entries(td.x)) if (TD_X.has(k)) x[k] = Array.isArray(v) ? v.slice() : v; if (Object.keys(x).length) out.x = x; }
+    return out;
+  }
+  function rememberStyle(id) {
+    const m = S.recs.get(id); if (!m || readOnly() || !S.store) return;
+    const def = T[m.n]; if (!def || def.transient) return;
+    const x = {}; for (const [k, v] of Object.entries(m.x || {})) if (TD_X.has(k)) x[k] = Array.isArray(v) ? v.slice() : v;
+    const td = { ...(m.c ? { c: m.c } : {}), ...(m.w > 1 ? { w: m.w } : {}), ...(m.s ? { s: m.s } : {}), ...(Object.keys(x).length ? { x } : {}) };
+    const all = { ...(S.store.prefs.td || {}) };
+    if (Object.keys(td).length) all[m.n] = td; else delete all[m.n];
+    S.store.prefs.td = all;
+  }
   function makeOverlay(rec, drawing) {
     const def = T[rec.n]; if (!def || def.special) return null;
     const m = metaOf(rec);
@@ -986,7 +1036,7 @@
     S.tool = id; if (def.g && def.g !== 'ruler') S.store.prefs.gl = { ...(S.store.prefs.gl || {}), [def.g]: id };
     deselect(); paintTools();
     if (def.pad) { pad(true); hint(id, 1); return; }
-    S.drawingId = makeOverlay({ id: newId(), n: id, p: [] }, true);
+    S.drawingId = makeOverlay({ id: newId(), n: id, p: [], ...styleFor(id) }, true);
     hint(id, 1);
   }
   function onDrawn(o) {
@@ -1061,6 +1111,7 @@
   }
   function toggleHidden() {
     S.hidden = !S.hidden;
+    if (S.store) { S.store.prefs.hid = S.hidden; scheduleSave(); }
     if (S.hidden) { cancelDrawing(); deselect(); }
     for (const id of S.recs.keys()) refresh(id);
     paintTools();
@@ -1097,7 +1148,7 @@
     el.addEventListener('pointerdown', e => {
       if (!T[S.tool]?.pad) return; e.preventDefault(); el.setPointerCapture?.(e.pointerId);
       S.stroke = [pos(e)];
-      const def = T[S.tool], col = S.store.prefs?.pc?.[S.tool] || def.color, ctx = g();
+      const def = T[S.tool], col = styleFor(S.tool).c || S.store.prefs?.pc?.[S.tool] || def.color, ctx = g();
       ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = def.id === 'scHighlighter' ? hexA(col, 0.38) : col; ctx.lineWidth = def.id === 'scHighlighter' ? 14 : 1.5;
     });
     el.addEventListener('pointermove', e => {
@@ -1116,8 +1167,8 @@
     const anchor = S.chart.convertToPixel({ dataIndex: first.dataIndex, value: first.value }, { paneId: 'candle_pane' });
     const bs = S.chart.getBarSpace() || 6, tf = tfMs();
     const d = path.map(p => { const v = S.chart.convertFromPixel([{ x: p.x, y: p.y }], { paneId: 'candle_pane' })?.[0]?.value; return [Math.round((p.x - anchor.x) / bs * tf), isNum(v) ? +(v - first.value).toPrecision(8) : 0]; });
-    const t0 = tsOfPoint(first), col = S.store.prefs?.pc?.[id] || null;
-    const nid = makeOverlay({ id: newId(), n: id, p: [[t0, first.value]], c: col, x: { d } }, false);
+    const t0 = tsOfPoint(first), st = styleFor(id), col = st.c || S.store.prefs?.pc?.[id] || null;
+    const nid = makeOverlay({ id: newId(), n: id, p: [[t0, first.value]], c: col, x: { ...(st.x || {}), d } }, false);
     commit();
     if (!S.stay) { pad(false); S.tool = 'cursor'; hint(null); paintTools(); if (nid) selectId(nid); }
   }
@@ -1276,10 +1327,10 @@
   function setColor(c) {
     const id = S.selected; if (!S.recs.has(id)) return;
     if (c && !/^#[0-9A-Fa-f]{6}$/.test(c)) return;
-    setMeta(id, { c: c || null }); closePop();
+    setMeta(id, { c: c || null }); rememberStyle(id); closePop();
   }
-  function setWidth(w) { if ([1, 2, 3, 4].includes(w)) setMeta(S.selected, { w }); closePop(); }
-  function setLineStyle(s) { if ([0, 1, 2].includes(s)) setMeta(S.selected, { s }); closePop(); }
+  function setWidth(w) { if ([1, 2, 3, 4].includes(w)) { setMeta(S.selected, { w }); rememberStyle(S.selected); } closePop(); }
+  function setLineStyle(s) { if ([0, 1, 2].includes(s)) { setMeta(S.selected, { s }); rememberStyle(S.selected); } closePop(); }
 
   // ── منوی راست‌کلیک ──
   function openCtx(id, e) {
@@ -1318,7 +1369,7 @@
     const coord = pts.length ? `<div class="fl">${tr('مختصات (قیمتِ هر نقطه)', 'Coordinates (price of each point)')}</div><div class="ch-coords">${pts.map((p, i) => `<label class="ch-row"><span>${esc(ptName(def, i, true))}</span><input class="fi" dir="ltr" inputmode="decimal" data-pt="${i}" value="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}" data-was="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}"></label>`).join('')}</div>` : '';
     box.innerHTML = `<div class="ch-mcard ch-set" role="dialog" aria-label="${esc(tr('تنظیماتِ ' + def.fa, def.en + ' settings'))}"><div class="ch-mh"><b>${esc(nm(def))}</b>${EN() ? '' : `<small dir="ltr">${esc(def.en)}</small>`}</div>
       ${f.length ? `<div class="ch-sec">${f.join('')}</div>` : ''}${coord}
-      <div class="ch-mrow"><button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
+      <div class="ch-mrow"><button type="button" class="btn btn-ghost ch-sdef" id="ch-sdef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button><button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
     box.hidden = false;
     const close = ok => {
       if (ok) {
@@ -1337,11 +1388,18 @@
         const np = o.points.map(p => ({ ...p })); let moved = false;
         box.querySelectorAll('[data-pt]').forEach(el => { const v = parseFloat(String(el.value).replace(/[٠-٩۰-۹]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d) >= 0 ? '٠١٢٣٤٥٦٧٨٩'.indexOf(d) : '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]).replace(/,/g, '')); const i = +el.dataset.pt; if (isNum(v) && v > 0 && np[i] && String(el.value).trim() !== el.dataset.was) { np[i].value = v; moved = true; } });
         if (moved) setPoints(id, np.map(p => ({ timestamp: tsOfPoint(p), value: p.value })));
-        m.x = nx; refresh(id); commit(); paintSel();
+        m.x = nx; rememberStyle(id); refresh(id); commit(); paintSel();
       }
       box.hidden = true; box.innerHTML = '';
     };
     $('ch-sok').onclick = () => close(true); $('ch-sno').onclick = () => close(false);
+    // ظاهرِ پیش‌فرضِ خودِ ابزار برای همین شکل و شکل‌های بعدی (متنِ شکل می‌ماند)
+    $('ch-sdef').onclick = () => {
+      const keep = m.x?.text ? { text: m.x.text } : {};
+      Object.assign(m, { c: null, w: 1, s: 0, x: keep });
+      const all = { ...(S.store.prefs.td || {}) }; delete all[m.n]; S.store.prefs.td = all;
+      box.hidden = true; box.innerHTML = ''; refresh(id); commit(); paintSel();
+    };
     box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
   }
   // متن: برگه‌ی کوچکِ خودِ نمودار (نه prompt مرورگر)
@@ -1393,6 +1451,7 @@
       <div class="ch-bar">
         <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TFS.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
         <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span id="ch-indl">${tr('اندیکاتور', 'Indicators')}</span></button>
+        <button type="button" class="ch-fullb" id="ch-full" onclick="SCCHART.max()" aria-pressed="false">${ICON.full}</button>
       </div>
       <div class="ch-main" dir="ltr">
         <div class="ch-tb" id="ch-tools" role="toolbar" aria-label="${tr('ابزارهای رسم', 'Drawing tools')}"></div>
@@ -1420,14 +1479,80 @@
     { id: 'EMA', t: 'میانگینِ نمایی (EMA)', en: 'Exponential Moving Average (EMA)', main: true }, { id: 'BOLL', t: 'باندِ بولینگر', en: 'Bollinger Bands (BOLL)', main: true },
     { id: 'RSI', t: 'RSI', en: 'Relative Strength Index (RSI)', main: false }, { id: 'MACD', t: 'MACD', en: 'MACD', main: false }
   ];
+  // دوره‌های پیش‌فرضِ KLineChart و برچسبِ هر عدد
+  const IND_DEF = { VOL: [5, 10, 20], MA: [5, 10, 30, 60], EMA: [6, 12, 20], BOLL: [20, 2], RSI: [6, 12, 24], MACD: [12, 26, 9] };
+  const indLabel = (name, i) => ({
+    VOL: () => tr('میانگینِ حجمِ ' + fa(i + 1), 'Volume MA ' + (i + 1)), MA: () => tr('دوره‌ی MA ' + fa(i + 1), 'MA length ' + (i + 1)),
+    EMA: () => tr('دوره‌ی EMA ' + fa(i + 1), 'EMA length ' + (i + 1)), RSI: () => tr('دوره‌ی RSI ' + fa(i + 1), 'RSI length ' + (i + 1)),
+    BOLL: () => [tr('دوره', 'Length'), tr('ضریبِ انحرافِ معیار', 'StdDev multiplier')][i], MACD: () => [tr('میانگینِ سریع', 'Fast length'), tr('میانگینِ کند', 'Slow length'), tr('خطِ سیگنال', 'Signal smoothing')][i]
+  }[name] || (() => String(i + 1)))();
+  const FIXED_N = new Set(['BOLL', 'MACD']);   // تعدادِ عددها ثابت؛ بقیه را می‌شود کم کرد (مثلاً فقط RSI ۱۴)
+  function indParams(name) {
+    const p = S.store?.prefs?.ip?.[name], d = IND_DEF[name];
+    if (!d || !Array.isArray(p) || !p.length || p.length > d.length || (FIXED_N.has(name) && p.length !== d.length)) return null;
+    return p.every((v, i) => isNum(v) && v > 0 && v <= 500 && (name === 'BOLL' && i === 1 ? v <= 10 : Number.isInteger(v))) ? p.slice() : null;
+  }
   function applyIndicators() {
     for (const [name, pane] of Object.entries(S.panes)) S.chart.removeIndicator(pane, name);
     S.panes = {};
+    const ph = S.store.prefs.ph || {};
     for (const name of S.store.prefs.ind || []) {
       const def = INDICATORS.find(x => x.id === name); if (!def) continue;
-      const pane = def.main ? S.chart.createIndicator(name, true, { id: 'candle_pane' }) : S.chart.createIndicator(name, false, { height: 90 });
+      const p = indParams(name), v = p ? { name, calcParams: p } : name;
+      const h = clamp(+ph[name] || 90, 50, 400);
+      const pane = def.main ? S.chart.createIndicator(v, true, { id: 'candle_pane' }) : S.chart.createIndicator(v, false, { height: h });
       S.panes[name] = def.main ? 'candle_pane' : pane;
     }
+  }
+  // کشیدنِ مرزِ پنل ⇒ ارتفاعِ هر پنلِ اندیکاتور ذخیره می‌شود
+  function savePaneHeights() {
+    if (!S.store || readOnly()) return;
+    const ph = { ...(S.store.prefs.ph || {}) };
+    for (const [name, pane] of Object.entries(S.panes)) { if (pane === 'candle_pane') continue; const h = S.chart.getSize(pane)?.height; if (isNum(h) && h > 20) ph[name] = Math.round(h); }
+    S.store.prefs.ph = ph; scheduleSave();
+  }
+  let zoomTimer = null;
+  function saveZoomSoon() {
+    if (!S.store || readOnly()) return;
+    clearTimeout(zoomTimer);
+    zoomTimer = setTimeout(() => { const bs = S.chart?.getBarSpace?.(); if (isNum(bs) && bs > 0) { S.store.prefs.bs = Math.round(bs * 100) / 100; scheduleSave(); } }, 700);
+  }
+  function openIndSettings(name) {
+    const box = $('ch-modal'), d = IND_DEF[name]; if (!box || !d || readOnly()) return;
+    $('ch-indm').hidden = true;
+    const cur = indParams(name) || d;
+    const n = d.length, rows = [];
+    for (let i = 0; i < n; i++) {
+      const v = cur[i], float = name === 'BOLL' && i === 1;
+      rows.push(`<label class="ch-row"><span>${esc(indLabel(name, i))}</span><input class="fi" dir="ltr" inputmode="${float ? 'decimal' : 'numeric'}" data-ip="${i}" value="${v ?? ''}" placeholder="${FIXED_N.has(name) ? d[i] : tr('خالی = بی این خط', 'empty = no line')}"></label>`);
+    }
+    const title = INDICATORS.find(x => x.id === name);
+    box.innerHTML = `<div class="ch-mcard ch-set" role="dialog" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + name)}"><div class="ch-mh"><b>${esc(tr(title.t, title.en))}</b></div>
+      <div class="ch-coords">${rows.join('')}</div><div class="ch-merr" id="ch-ierr" hidden></div>
+      <div class="ch-mrow"><button type="button" class="btn btn-ghost ch-sdef" id="ch-idef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button><button type="button" class="btn btn-ghost" id="ch-ino">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-iok">${tr('ثبت', 'Ok')}</button></div></div>`;
+    box.hidden = false;
+    const done = p => {
+      const all = { ...(S.store.prefs.ip || {}) };
+      if (!p || JSON.stringify(p) === JSON.stringify(d)) delete all[name]; else all[name] = p;
+      S.store.prefs.ip = all; box.hidden = true; box.innerHTML = ''; applyIndicators(); scheduleSave();
+    };
+    const toNum = s => parseFloat(String(s).replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)));
+    $('ch-iok').onclick = () => {
+      const vals = [...box.querySelectorAll('[data-ip]')].map(e => String(e.value).trim());
+      const out = [];
+      for (let i = 0; i < vals.length; i++) {
+        if (!vals[i]) { if (FIXED_N.has(name)) return bad(); continue; }
+        const v = toNum(vals[i]), float = name === 'BOLL' && i === 1;
+        if (!isNum(v) || v <= 0 || v > (float ? 10 : 500) || (!float && !Number.isInteger(v))) return bad();
+        out.push(v);
+      }
+      if (!out.length) return bad();
+      done(out);
+    };
+    function bad() { const e = $('ch-ierr'); e.textContent = tr('عددها باید مثبت باشند: دوره‌ها عددِ صحیح تا ۵۰۰' + (name === 'BOLL' ? '، ضریب تا ۱۰' : '') + '.', 'Values must be positive: whole-number lengths up to 500' + (name === 'BOLL' ? ', multiplier up to 10' : '') + '.'); e.hidden = false; }
+    $('ch-ino').onclick = () => { box.hidden = true; box.innerHTML = ''; };
+    $('ch-idef').onclick = () => done(null);
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); box.hidden = true; box.innerHTML = ''; } };
   }
   function toggleIndicator(name) {
     const set = new Set(S.store.prefs.ind || []);
@@ -1437,7 +1562,9 @@
   function paintInd() {
     const box = $('ch-indm'); if (!box || box.hidden) return;
     const on = new Set(S.store.prefs.ind || []);
-    box.innerHTML = INDICATORS.map(x => `<button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}</button>`).join('');
+    const ro = readOnly();
+    box.innerHTML = INDICATORS.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${(indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
+      + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
   }
 
   // ── انتخابگرِ نماد ──
@@ -1490,12 +1617,14 @@
     else if ((ev.ctrlKey || ev.metaKey) && (k === 'y' || (k === 'z' && ev.shiftKey))) { ev.preventDefault(); redo(); }
     else if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); undo(); }
     else if (ev.altKey && ev.shiftKey && ev.code === 'KeyR') { ev.preventDefault(); startTool('scRect'); }
+    else if (ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyF') { ev.preventDefault(); setMax(); }
     else if (ev.altKey && !ev.ctrlKey && !ev.metaKey && KEYS[ev.code?.replace('Key', '').toLowerCase()]) { ev.preventDefault(); startTool(KEYS[ev.code.replace('Key', '').toLowerCase()]); }
     else if (ev.key === 'Escape') {
       if (S.fly || S.pop || !$('ch-ctx')?.hidden) { closeFly(); closePop(); closeCtx(); }
       else if (S.drawingId || T[S.tool]?.pad || S.tool === 'eraser') startTool('cursor');
       else if (S.measureId) { dropMeasure(); paintTools(); }
       else if (S.selected) deselect();
+      else if (S.max) setMax(false);
     }
   }
   function onKeyUp(ev) { if (ev.key === 'Control') S.ctrl = false; }
@@ -1507,16 +1636,17 @@
     S.tol = S.touch ? 12 : 6; S.magTol = S.touch ? 28 : 16;
     registerOverlays();
     if (S.chart && S.root === el && el.querySelector('.ch-wrap')) { show(); return; }
-    S.root = el;
+    S.root = el; injectCss();
     await loadStore();
     const last = S.store.last || {}, pf = S.store.prefs;
     if (SOURCES.some(s => s.id === last.src)) S.src = last.src;
     if (/^[A-Z0-9]{1,15}$/.test(last.coin || '')) S.coin = last.coin;
     if (TFS.some(t => t.id === last.tf)) S.tf = last.tf;
     S.mag = [0, 1, 2].includes(pf.mag) ? pf.mag : 1; S.magLast = [1, 2].includes(pf.magLast) ? pf.magLast : 1;
-    S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa';
+    S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa'; S.hidden = !!pf.hid;
     el.innerHTML = shell();
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    paintMax();
     paintTools(); status(S.loadedStore ? 'saved' : 'local'); if (!S.loadedStore && !L.g(cacheKey())) $('ch-save').textContent = '';
     const phone = window.matchMedia('(max-width: 600px)').matches;
     S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: phone ? { ...STYLES, candle: { ...STYLES.candle, tooltip: { ...STYLES.candle.tooltip, showRule: 'follow_cross' } },
@@ -1525,6 +1655,8 @@
     S.chart.setLoadDataCallback(onLoadData);
     S.chart.setOffsetRightDistance(48);
     applyIndicators();
+    S.chart.subscribeAction('onZoom', saveZoomSoon);
+    S.chart.subscribeAction('onPaneDrag', () => setTimeout(savePaneHeights, 50));
     const cv = $('ch-canvas');
     if ('ResizeObserver' in window) new ResizeObserver(() => S.chart && S.chart.resize()).observe(cv);
     // جای آخرین اشاره (برای دوضربه‌ی سریع)، خط‌کش با Shift، و پاک شدنِ خط‌کش با کلیکِ بعدی
@@ -1546,9 +1678,43 @@
       if (!$('ch-ctx')?.hidden && !t.closest?.('#ch-ctx')) closeCtx();
       if (!$('ch-indm')?.hidden && !t.closest?.('#ch-indm, .ch-indb')) $('ch-indm').hidden = true;
     }, true);
+    // مرورگر خودش از تمام‌صفحه بیرون آمد (Esc / حرکتِ گوشی) ⇒ پوشش هم برداشته شود
+    document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && S.max) setMax(false); });
     document.addEventListener('visibilitychange', () => { if (!document.hidden && $('screen-chart')?.classList.contains('active')) startPoll(); });
     window.addEventListener('online', () => { if (S.store && !readOnly()) save(); });
     await loadSeries();
+  }
+  // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
+  // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}`;
+  function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
+  // ── تمام‌صفحه ──
+  function setMax(on) {
+    on = on === undefined ? !S.max : !!on;
+    if (on === S.max) return;
+    S.max = on;
+    const d = document, root = d.documentElement;
+    root.classList.toggle('ch-max', on);
+    closeFly(); closePop(); closeCtx(); paintMax();
+    if (on) {
+      // نوارهای مرورگر هم کنار بروند (دسکتاپ و اندروید)؛ آیفون این را ندارد و همان پوششِ CSS کافی است
+      if (!d.fullscreenElement && root.requestFullscreen) {
+        try {
+          root.requestFullscreen({ navigationUI: 'hide' }).then(() => {
+            if (!S.max) { if (d.fullscreenElement) d.exitFullscreen?.().catch(() => {}); return; }
+            try { screen.orientation?.lock?.('any')?.catch?.(() => {}); } catch (_) {}   // اپِ نصب‌شده عمودی قفل است؛ تمام‌صفحه = چرخشِ آزاد
+          }).catch(() => {});
+        } catch (_) {}
+      }
+    } else if (d.fullscreenElement && d.exitFullscreen) d.exitFullscreen().catch(() => {});
+    requestAnimationFrame(() => S.chart?.resize());
+  }
+  function paintMax() {
+    const b = $('ch-full'); if (!b) return;
+    const t = S.max ? tr('خروج از تمام‌صفحه', 'Exit fullscreen mode') : tr('تمام‌صفحه', 'Fullscreen mode');
+    const k = S.touch ? '' : ' (Shift+F)';
+    b.title = t + k; b.setAttribute('aria-label', t); b.setAttribute('aria-pressed', S.max);
+    b.classList.toggle('on', S.max); b.innerHTML = S.max ? ICON.unfull : ICON.full;
   }
   // تعویضِ زبان: همه‌ی متن‌ها و جهتِ پنل‌ها همان لحظه، بی بارگذاریِ دوباره‌ی نمودار
   function setLang(l) {
@@ -1566,12 +1732,12 @@
     al('ch-tools', tr('ابزارهای رسم', 'Drawing tools')); al('ch-lang', tr('زبانِ نمودار', 'Chart language'));
     const il = $('ch-indl'); if (il) il.textContent = tr('اندیکاتور', 'Indicators');
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintTools(); paintSel(); paintTree(); paintInd(); paintHead();
+    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax();
     if (S.saveState || readOnly()) status(S.saveState);
     if (S.hintArgs) hint(...S.hintArgs);
   }
   function show() { if (S.chart) { S.chart.resize(); if (S.data.length) startPoll(); else loadSeries(); } }
-  function hide() { stopPoll(); }
+  function hide() { stopPoll(); if (S.max) setMax(false); }
 
   window.SCCHART = {
     mount, show, hideScreen: hide,
@@ -1580,9 +1746,9 @@
     removeSelected: () => S.selected && removeId(S.selected), color: setColor, width: setWidth, lstyle: setLineStyle,
     colorMenu, widthMenu, styleMenu, settings: () => openSettings(), lock: () => toggleLock(), clone: () => cloneSel(), editText: () => editText(), ctx: ctxAction,
     pickObj: id => { selectId(id); paintTree(); }, objHide: id => { toggleHideOne(id); paintTree(); }, objLock: id => { toggleLock(id); paintTree(); }, objDel: id => { removeId(id); paintTree(); },
-    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang,
+    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
-    ind: toggleIndicator,
+    ind: toggleIndicator, indSet: openIndSettings,
     // برای تست
     _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
