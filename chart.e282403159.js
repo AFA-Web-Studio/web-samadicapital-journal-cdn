@@ -9,6 +9,8 @@
      ۱) آهنربای «ضعیفِ» کتابخانه زیرِ کفِ کندل هرگز نمی‌چسبید و درونِ کندل همیشه می‌چسبید ⇒ آهنربای خودمان؛
      ۲) راست‌کلیک روی شکل آن را بی‌پرسش پاک می‌کرد ⇒ منوی شکل؛
      ۳) دو کلیک/ضربه‌ی سریع وسطِ رسم، شکل را با نقطه‌های ناقص «تمام» می‌کرد ⇒ همان ضربه یک نقطه می‌گذارد.
+   v26.39 (درخواستِ مالک ۱۴۰۵/۰۹/۰۴: «انگلیسی هم مثلِ TradingView باشد و فارسی هم بشود انتخاب کرد»): زبانِ نمودار
+   فارسی (پیش‌فرض) یا English با همان نام‌های TradingView؛ دکمه‌ی «فا | EN» در سرِ نمودار، ذخیره در prefs.lang.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -34,7 +36,7 @@
     tool: 'cursor', recs: new Map(), selected: null, drawingId: null, hidden: false, mag: 1, magLast: 1, stay: false, lockAll: false,
     hist: [], redo: [], store: null, rev: null, loadedStore: false, saveTimer: null, saving: false, saveAgain: false, panes: {}, symbols: {}, gen: 0,
     quiet: false, ctrl: false, lastPtr: null, measureId: null, fly: null, pop: null, touch: false, tol: 6, magTol: 16, stroke: null,
-    debug: false, lastFigs: new Map(), figErr: []
+    debug: false, lastFigs: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null
   };
   const readOnly = () => !!SESSION?.isViewOnly;
   const storeKey = () => 'sc_chart_' + (SESSION?.uid || 'guest');
@@ -45,6 +47,12 @@
   const $ = id => document.getElementById(id);
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const fa = n => Number(n).toLocaleString('fa-IR');
+  // زبانِ نمودار: tr(فارسی، English) — متن‌های روی خودِ نمودار مثلِ TradingView همیشه انگلیسی‌اند
+  const EN = () => S.lang === 'en';
+  const tr = (f, e) => EN() ? e : f;
+  const num = n => EN() ? Number(n).toLocaleString('en-US') : fa(n);
+  const nm = d => EN() ? d.en : d.fa;
+  const dirOf = () => EN() ? 'ltr' : 'rtl';
   const hexA = (hex, a) => { const n = parseInt(String(hex).slice(1), 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
   const ink = hex => { const n = parseInt(String(hex).slice(1), 16); return ((n >> 16 & 255) * 0.299 + (n >> 8 & 255) * 0.587 + (n & 255) * 0.114) > 160 ? '#131722' : '#FFFFFF'; };
   function precisionOf(p) { p = Math.abs(+p) || 0; return p >= 1000 ? 1 : p >= 100 ? 2 : p >= 1 ? 3 : p >= 0.1 ? 4 : p >= 0.01 ? 5 : p >= 0.0001 ? 6 : 8; }
@@ -490,6 +498,21 @@
   const svg = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const dot = (x, y) => `<circle cx="${x}" cy="${y}" r="1.7" fill="currentColor" stroke="none"/>`;
   const P2 = ['نقطه‌ی اول', 'نقطه‌ی دوم'];
+  const PN_EN = { 'نقطه‌ی اول': 'Point 1', 'نقطه‌ی دوم': 'Point 2', 'قیمت': 'Price', 'شروع': 'Start', 'زمان': 'Time', 'نقطه': 'Point',
+    'شروعِ خط': 'Line start', 'پایانِ خط': 'Line end', 'پهنای کانال': 'Channel width', 'شروعِ بازه': 'Range start', 'پایانِ بازه': 'Range end',
+    'شروعِ خطِ روند': 'Trend line start', 'پایانِ خطِ روند': 'Trend line end', 'سطحِ افقی': 'Flat level', 'دسته': 'Handle',
+    'سقف/کفِ اول': 'First pivot', 'سقف/کفِ دوم': 'Second pivot', 'شروعِ موج (سطحِ ۱)': 'Swing start (level 1)', 'پایانِ موج (سطحِ ۰)': 'Swing end (level 0)',
+    'شروعِ موج (A)': 'Swing start (A)', 'پایانِ موج (B)': 'Swing end (B)', 'پایانِ اصلاح (C)': 'Retracement end (C)', 'پهنا': 'Width',
+    'یک واحدِ زمانی': 'One time unit', 'شانه‌ی چپ': 'Left shoulder', 'خطِ گردن ۱': 'Neckline 1', 'سر': 'Head', 'خطِ گردن ۲': 'Neckline 2',
+    'شانه‌ی راست': 'Right shoulder', 'پایان': 'End', 'قیمتِ ورود': 'Entry price', 'گوشه': 'Corner', 'گوشه‌ی مقابل': 'Opposite corner',
+    'مرکز': 'Center', 'لبه': 'Edge', 'رأسِ اول': 'Vertex 1', 'رأسِ دوم': 'Vertex 2', 'رأسِ سوم': 'Vertex 3', 'جای متن': 'Text position', 'نقطه‌ی اشاره': 'Pointer' };
+  const SEC_EN = { 'خطوط': 'Lines', 'کانال‌ها': 'Channels', 'چنگال': 'Pitchforks', 'الگوها': 'Chart patterns', 'امواجِ الیوت': 'Elliott waves',
+    'پیش‌بینی': 'Forecasting', 'اندازه‌گیری': 'Measurers', 'قلم‌ها': 'Brushes', 'اشکال': 'Shapes' };
+  // نامِ نقطه‌ی i ام (p2 = برای ابزارِ دو‌نقطه‌ای بی‌نام، «نقطه‌ی اول/دوم»)
+  function ptName(def, i, p2) {
+    const s = (def.pn || (p2 ? P2 : null))?.[i];
+    return s ? tr(s, PN_EN[s] ?? s) : tr('نقطه‌ی ' + fa(i + 1), 'Point ' + (i + 1));
+  }
   const T = {};
   const TOOL_LIST = [
     { id: 'cursor', g: 'cur', fa: 'نشانگرِ صلیبی', en: 'Cross', special: true, ic: svg('<path d="M12 3v18M3 12h18"/>') },
@@ -541,14 +564,17 @@
   // نسخه‌ی قدیم (v26.37) با همین نام‌ها ذخیره کرده بود — فقط برای بارگذاری
   T.scFib.legacy = T.scRect.legacy = T.scText.legacy = T.scLong.legacy = T.scShort.legacy = true;
   const GROUPS = [
-    { id: 'cur', fa: 'نشانگر' }, { id: 'lines', fa: 'خطوط و کانال‌ها' }, { id: 'fib', fa: 'فیبوناچی' }, { id: 'patterns', fa: 'الگوها و امواج' },
-    { id: 'measure', fa: 'پیش‌بینی و اندازه‌گیری' }, { id: 'shapes', fa: 'اشکالِ هندسی' }, { id: 'notes', fa: 'متن و یادداشت' }
+    { id: 'cur', fa: 'نشانگر', en: 'Cursors' }, { id: 'lines', fa: 'خطوط و کانال‌ها', en: 'Trend line tools' }, { id: 'fib', fa: 'فیبوناچی', en: 'Fibonacci tools' },
+    { id: 'patterns', fa: 'الگوها و امواج', en: 'Patterns' }, { id: 'measure', fa: 'پیش‌بینی و اندازه‌گیری', en: 'Prediction and measurement tools' },
+    { id: 'shapes', fa: 'اشکالِ هندسی', en: 'Geometric shapes' }, { id: 'notes', fa: 'متن و یادداشت', en: 'Annotation tools' }
   ].map(g => ({ ...g, tools: TOOL_LIST.filter(t => t.g === g.id).map(t => t.id) }));
   const OPT = {
-    el: ['bool', 'امتداد به چپ (آن‌سوی نقطه‌ی اول)'], er: ['bool', 'امتداد به راست (آن‌سوی نقطه‌ی دوم)'], st: ['bool', 'نمایشِ آمار: تغییرِ قیمت، درصد، تعدادِ کندل، زاویه'],
-    ax: ['boolOn', 'برچسبِ قیمت/زمان روی محور'], text: ['text', 'متن'], f: ['boolOn', 'پس‌زمینه'], mid: ['boolOn', 'خطِ میانی'], m: ['bool', 'خطِ میانی'],
-    dev: ['dev', 'انحرافِ معیار'], lb: ['boolOn', 'برچسبِ سطوح'], rv: ['bool', 'معکوس (سطحِ ۰ روی نقطه‌ی اول)'], lv: ['levels', 'سطوح'],
-    fs: ['fs', 'اندازه‌ی قلم'], b: ['bool', 'درشت (Bold)'], bg: ['bool', 'کادر و پس‌زمینه']
+    el: ['bool', 'امتداد به چپ (آن‌سوی نقطه‌ی اول)', 'Extend left'], er: ['bool', 'امتداد به راست (آن‌سوی نقطه‌ی دوم)', 'Extend right'],
+    st: ['bool', 'نمایشِ آمار: تغییرِ قیمت، درصد، تعدادِ کندل، زاویه', 'Stats: price change, percent, bars, angle'],
+    ax: ['boolOn', 'برچسبِ قیمت/زمان روی محور', 'Price/time label on axis'], text: ['text', 'متن', 'Text'], f: ['boolOn', 'پس‌زمینه', 'Background'],
+    mid: ['boolOn', 'خطِ میانی', 'Middle line'], m: ['bool', 'خطِ میانی', 'Middle line'], dev: ['dev', 'انحرافِ معیار', 'Deviation'],
+    lb: ['boolOn', 'برچسبِ سطوح', 'Labels'], rv: ['bool', 'معکوس (سطحِ ۰ روی نقطه‌ی اول)', 'Reverse (level 0 on point 1)'], lv: ['levels', 'سطوح', 'Levels'],
+    fs: ['fs', 'اندازه‌ی قلم', 'Font size'], b: ['bool', 'درشت (Bold)', 'Bold'], bg: ['bool', 'کادر و پس‌زمینه', 'Border and background']
   };
   const ICON = {
     tri: '<svg viewBox="0 0 6 6" aria-hidden="true"><path d="M6 0v6H0z" fill="currentColor"/></svg>',
@@ -735,13 +761,14 @@
   }
   async function loadSeries() {
     const gen = ++S.gen;
-    stopPoll(); msg('در حالِ بارگذاری…', 'load');
+    stopPoll(); msg(tr('در حالِ بارگذاری…', 'Loading…'), 'load');
     const res = await fetchCandles();
     if (gen !== S.gen) return;
     if (!res.ok) {
       S.data = []; cancelDrawing(); clearOverlays(); S.chart.clearData();
-      msg(res.status === 404 ? `${S.coin} در ${srcName()} پیدا نشد — منبعِ دیگری را امتحان کن.` : res.err === 'offline'
-        ? 'اینترنت در دسترس نیست. با اتصال دوباره، نمودار بارگذاری می‌شود.' : `${srcName()} الان پاسخ نمی‌دهد — منبعِ دیگری را امتحان کن.`, 'err');
+      msg(res.status === 404 ? tr(`${S.coin} در ${srcName()} پیدا نشد — منبعِ دیگری را امتحان کن.`, `${S.coin} was not found on ${srcName()} — try another source.`)
+        : res.err === 'offline' ? tr('اینترنت در دسترس نیست. با اتصال دوباره، نمودار بارگذاری می‌شود.', 'No internet connection. The chart will load when you are back online.')
+        : tr(`${srcName()} الان پاسخ نمی‌دهد — منبعِ دیگری را امتحان کن.`, `${srcName()} is not responding — try another source.`), 'err');
       paintHead(); return;
     }
     S.data = res.list; S.more = res.more;
@@ -848,10 +875,12 @@
     }
   }
   function status(k) {
+    S.saveState = k;
     const el = $('ch-save'); if (!el) return;
-    if (readOnly()) { el.textContent = 'فقط‌خواندنی (نمای ناظر)'; el.className = 'ch-save'; return; }
-    const m = { saving: ['در حالِ ذخیره…', ''], saved: ['✓ ذخیره شد', 'ok'], local: ['روی همین دستگاه ذخیره شد — با اتصال همگام می‌شود', 'warn'],
-      full: ['حجمِ تحلیل‌ها از سقف گذشت — چند شکلِ قدیمی را پاک کن', 'warn'] }[k] || ['', ''];
+    if (readOnly()) { el.textContent = tr('فقط‌خواندنی (نمای ناظر)', 'Read-only (mentor view)'); el.className = 'ch-save'; return; }
+    const m = { saving: [tr('در حالِ ذخیره…', 'Saving…'), ''], saved: [tr('✓ ذخیره شد', '✓ Saved'), 'ok'],
+      local: [tr('روی همین دستگاه ذخیره شد — با اتصال همگام می‌شود', 'Saved on this device — will sync when online'), 'warn'],
+      full: [tr('حجمِ تحلیل‌ها از سقف گذشت — چند شکلِ قدیمی را پاک کن', 'Drawing storage is full — remove some old drawings'), 'warn'] }[k] || ['', ''];
     el.textContent = m[0]; el.className = 'ch-save ' + m[1];
   }
 
@@ -952,7 +981,7 @@
     cancelDrawing();
     const def = T[id]; if (!def) return;
     if (def.special) { S.tool = id; paintTools(); if (id === 'eraser') { deselect(); hint('eraser'); } return; }
-    if (!def.transient && S.recs.size >= MAX_DRAWINGS) { showToast(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد — چند تا را پاک کن`); S.tool = 'cursor'; paintTools(); return; }
+    if (!def.transient && S.recs.size >= MAX_DRAWINGS) { showToast(tr(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد — چند تا را پاک کن`, `Up to ${MAX_DRAWINGS} drawings per symbol — remove a few first`)); S.tool = 'cursor'; paintTools(); return; }
     if (S.hidden) toggleHidden();
     S.tool = id; if (def.g && def.g !== 'ruler') S.store.prefs.gl = { ...(S.store.prefs.gl || {}), [def.g]: id };
     deselect(); paintTools();
@@ -996,7 +1025,7 @@
   const deselect = () => { if (S.selected) selectId(null); };
   function cloneSel(id = S.selected) {
     const m = S.recs.get(id), o = id && S.chart.getOverlayById(id); if (!m || !o || readOnly()) return;
-    if (S.recs.size >= MAX_DRAWINGS) { showToast(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد`); return; }
+    if (S.recs.size >= MAX_DRAWINGS) { showToast(tr(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد`, `Up to ${MAX_DRAWINGS} drawings per symbol`)); return; }
     const shift = 3 * tfMs();
     const rec = { id: newId(), n: m.n, p: o.points.map(pt => [tsOfPoint(pt) + shift, pt.value]), c: m.c, w: m.w, s: m.s, x: JSON.parse(JSON.stringify(m.x || {})) };
     const nid = makeOverlay(rec, false); commit(); closeCtx(); if (nid) selectId(nid);
@@ -1010,7 +1039,10 @@
   async function clearAll() {
     closePop();
     if (!S.recs.size) return;
-    if (!await uiConfirm(`همه‌ی ${fa(S.recs.size)} شکلِ ${S.coin} پاک شود؟\n\nبا «برگرداندن» (Ctrl+Z) می‌شود پس گرفت.`)) return;
+    // انگلیسی: هر خط داخلِ جداسازِ چپ‌به‌راست (U+2066…U+2069) تا علامت‌ها در پنجره‌ی راست‌چینِ اپ جابه‌جا نشوند
+    const q = EN() ? `\u2066Remove all ${S.recs.size} drawings on ${S.coin}?\u2069\n\n\u2066You can bring them back with Undo (Ctrl+Z).\u2069`
+      : `همه‌ی ${fa(S.recs.size)} شکلِ ${S.coin} پاک شود؟\n\nبا «برگرداندن» (Ctrl+Z) می‌شود پس گرفت.`;
+    if (!await uiConfirm(q, EN() ? { ok: 'Remove', cancel: 'Cancel' } : undefined)) return;
     cancelDrawing(); clearOverlays(); commit();
   }
   function undo() {
@@ -1037,18 +1069,20 @@
     S.lockAll = !S.lockAll; S.store.prefs.lock = S.lockAll;
     for (const id of S.recs.keys()) refresh(id);
     paintTools(); scheduleSave();
-    showToast(S.lockAll ? 'همه‌ی شکل‌ها قفل شدند — جابه‌جا نمی‌شوند' : 'قفلِ شکل‌ها باز شد');
+    showToast(S.lockAll ? tr('همه‌ی شکل‌ها قفل شدند — جابه‌جا نمی‌شوند', 'All drawings locked — they can no longer be moved') : tr('قفلِ شکل‌ها باز شد', 'All drawings unlocked'));
   }
   function toggleStay() {
     S.stay = !S.stay; S.store.prefs.stay = S.stay; paintTools(); scheduleSave();
-    showToast(S.stay ? 'ماندن در حالتِ رسم: ابزار بعد از هر شکل فعال می‌ماند' : 'بعد از هر شکل، به نشانگر برمی‌گردد');
+    showToast(S.stay ? tr('ماندن در حالتِ رسم: ابزار بعد از هر شکل فعال می‌ماند', 'Stay in drawing mode: the tool stays active after each drawing')
+      : tr('بعد از هر شکل، به نشانگر برمی‌گردد', 'Back to the cursor after each drawing'));
   }
   function setMagnet(mode) {
     mode = [0, 1, 2].includes(mode) ? mode : (S.mag ? 0 : (S.magLast || 1));
     S.mag = mode; if (mode) S.magLast = mode;
     S.store.prefs.mag = S.mag; S.store.prefs.magLast = S.magLast;
     closePop(); paintTools(); scheduleSave();
-    showToast(['آهنربا خاموش', 'آهنربای ضعیف: نزدیکِ سقف/کف/باز/بسته‌ی کندل که باشی، می‌چسبد', 'آهنربای قوی: همیشه به نزدیک‌ترین قیمتِ کندل می‌چسبد'][S.mag]);
+    showToast((EN() ? ['Magnet off', 'Weak magnet: snaps when you are near a candle\'s open, high, low or close', 'Strong magnet: always snaps to the nearest candle price']
+      : ['آهنربا خاموش', 'آهنربای ضعیف: نزدیکِ سقف/کف/باز/بسته‌ی کندل که باشی، می‌چسبد', 'آهنربای قوی: همیشه به نزدیک‌ترین قیمتِ کندل می‌چسبد'])[S.mag]);
   }
 
   // ── قلم و ماژیک: کشیدنِ آزاد روی لایه‌ی رویِ نمودار ──
@@ -1093,17 +1127,18 @@
   function msg(text, kind) { const el = $('ch-msg'); if (!el) return; el.textContent = text || ''; el.className = 'ch-msg' + (kind ? ' ' + kind : ''); el.hidden = !text; }
   function hint(id, step) {
     const el = $('ch-hint'); if (!el) return;
+    S.hintArgs = id ? [id, step] : null;
     if (!id) { el.hidden = true; el.textContent = ''; return; }
-    if (id === 'eraser') { el.textContent = 'پاک‌کن: روی هر شکل بزنی پاک می‌شود — Esc یا نشانگر برای خروج'; el.hidden = false; return; }
+    if (id === 'eraser') { el.textContent = tr('پاک‌کن: روی هر شکل بزنی پاک می‌شود — Esc یا نشانگر برای خروج', 'Eraser: tap a drawing to remove it — Esc or the cursor to exit'); el.hidden = false; return; }
     const def = T[id]; if (!def) return;
     let t;
-    if (def.pad) t = `${def.fa}: روی نمودار بکش`;
+    if (def.pad) t = `${nm(def)}: ${tr('روی نمودار بکش', 'draw on the chart')}`;
     else {
-      const n = def.steps || def.pts, i = clamp((step || 1) - 1, 0, n - 1), pn = def.pn || (n === 2 ? P2 : null);
-      t = `${def.fa}: ${pn ? pn[i] : 'نقطه‌ی ' + fa(i + 1)}` + (n > 1 ? ` (${fa(i + 1)} از ${fa(n)})` : '');
-      if (def.steps === 1 && def.pts > 1) t += ' — بعد هدف و حد ضرر را بکش';
+      const n = def.steps || def.pts, i = clamp((step || 1) - 1, 0, n - 1);
+      t = `${nm(def)}: ${ptName(def, i, n === 2)}` + (n > 1 ? tr(` (${fa(i + 1)} از ${fa(n)})`, ` (${i + 1} of ${n})`) : '');
+      if (def.steps === 1 && def.pts > 1) t += tr(' — بعد هدف و حد ضرر را بکش', ' — then drag the target and stop');
     }
-    el.textContent = t + (S.touch ? '' : ' · Esc لغو'); el.hidden = false;
+    el.textContent = t + (S.touch ? '' : tr(' · Esc لغو', ' · Esc to cancel')); el.hidden = false;
   }
   function paintHead() {
     const last = S.data[S.data.length - 1];
@@ -1121,7 +1156,7 @@
     document.querySelectorAll('#ch-srcs button').forEach(b => { const on = b.dataset.src === S.src; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     document.querySelectorAll('#ch-tfs button').forEach(b => { const on = b.dataset.tf === S.tf; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     const cs = $('ch-csrc'); if (cs) cs.textContent = srcName();
-    const info = $('ch-srcinfo'); if (info) info.textContent = `داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`;
+    const info = $('ch-srcinfo'); if (info) info.textContent = tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''} · Tehran time`);
   }
   const groupTool = g => { const last = S.store?.prefs?.gl?.[g.id]; return g.tools.includes(last) ? last : g.tools[0]; };
   const btn = (cls, title, onclick, inner, extra = '') => `<button type="button" class="ch-tool${cls}" title="${esc(title)}" aria-label="${esc(title)}" onclick="${onclick}"${extra}>${inner}</button>`;
@@ -1132,25 +1167,25 @@
     if (!ro) {
       for (const g of GROUPS) {
         const cur = g.tools.includes(S.tool) ? S.tool : groupTool(g), d = T[cur], on = g.tools.includes(S.tool);
-        h += `<div class="ch-gw">${btn(`${on ? ' on' : ''}${d.cls ? ' ' + d.cls : ''}`, `${d.fa} — ${d.en}${d.key ? ' (' + d.key + ')' : ''}`, `SCCHART.gclick('${g.id}',this)`, d.ic, ` data-g="${g.id}" aria-pressed="${on}"`)}`
-          + `<button type="button" class="ch-garr" aria-label="ابزارهای ${esc(g.fa)}" onclick="SCCHART.fly('${g.id}',this)">${ICON.tri}</button></div>`;
+        h += `<div class="ch-gw">${btn(`${on ? ' on' : ''}${d.cls ? ' ' + d.cls : ''}`, `${EN() ? d.en : d.fa + ' — ' + d.en}${d.key ? ' (' + d.key + ')' : ''}`, `SCCHART.gclick('${g.id}',this)`, d.ic, ` data-g="${g.id}" aria-pressed="${on}"`)}`
+          + `<button type="button" class="ch-garr" aria-label="${esc(tr('ابزارهای ' + g.fa, g.en))}" onclick="SCCHART.fly('${g.id}',this)">${ICON.tri}</button></div>`;
       }
       h += '<span class="ch-sep"></span>';
-      h += btn(S.tool === 'scMeasure' || S.measureId ? ' on' : '', 'خط‌کش — اندازه‌گیریِ موقت (Shift + کلیک)', "SCCHART.tool('scMeasure')", T.scMeasure.ic, ' data-t="ruler"');
+      h += btn(S.tool === 'scMeasure' || S.measureId ? ' on' : '', tr('خط‌کش — اندازه‌گیریِ موقت (Shift + کلیک)', 'Measure (Shift + Click)'), "SCCHART.tool('scMeasure')", T.scMeasure.ic, ' data-t="ruler"');
       h += '<span class="ch-sep"></span>';
-      h += `<div class="ch-gw">${btn(S.mag ? ' on' : '', S.mag === 2 ? 'آهنربای قوی' : S.mag ? 'آهنربای ضعیف' : 'آهنربا (خاموش)', 'SCCHART.magBtn(this)', S.mag === 2 ? ICON.magnetS : ICON.magnet, ` data-t="magnet" aria-pressed="${!!S.mag}"`)}`
-        + `<button type="button" class="ch-garr" aria-label="حالتِ آهنربا" onclick="SCCHART.magMenu(this)">${ICON.tri}</button></div>`;
-      h += btn(S.stay ? ' on' : '', 'ماندن در حالتِ رسم', 'SCCHART.stay()', ICON.stay, ` data-t="stay" aria-pressed="${S.stay}"`);
-      h += btn(S.lockAll ? ' on' : '', S.lockAll ? 'باز کردنِ قفلِ همه‌ی شکل‌ها' : 'قفلِ همه‌ی شکل‌ها', 'SCCHART.lockAll()', S.lockAll ? ICON.lock : ICON.unlock, ` data-t="lockall" aria-pressed="${S.lockAll}"`);
+      h += `<div class="ch-gw">${btn(S.mag ? ' on' : '', S.mag === 2 ? tr('آهنربای قوی', 'Strong magnet') : S.mag ? tr('آهنربای ضعیف', 'Weak magnet') : tr('آهنربا (خاموش)', 'Magnet mode (off)'), 'SCCHART.magBtn(this)', S.mag === 2 ? ICON.magnetS : ICON.magnet, ` data-t="magnet" aria-pressed="${!!S.mag}"`)}`
+        + `<button type="button" class="ch-garr" aria-label="${tr('حالتِ آهنربا', 'Magnet mode')}" onclick="SCCHART.magMenu(this)">${ICON.tri}</button></div>`;
+      h += btn(S.stay ? ' on' : '', tr('ماندن در حالتِ رسم', 'Stay in drawing mode'), 'SCCHART.stay()', ICON.stay, ` data-t="stay" aria-pressed="${S.stay}"`);
+      h += btn(S.lockAll ? ' on' : '', S.lockAll ? tr('باز کردنِ قفلِ همه‌ی شکل‌ها', 'Unlock all drawings') : tr('قفلِ همه‌ی شکل‌ها', 'Lock all drawings'), 'SCCHART.lockAll()', S.lockAll ? ICON.lock : ICON.unlock, ` data-t="lockall" aria-pressed="${S.lockAll}"`);
     }
-    h += btn(S.hidden ? ' on' : '', S.hidden ? 'نمایشِ شکل‌ها' : 'پنهان کردنِ همه‌ی شکل‌ها', 'SCCHART.hide()', S.hidden ? ICON.eyeOff : ICON.eye, ` data-t="hide" aria-pressed="${S.hidden}"`);
+    h += btn(S.hidden ? ' on' : '', S.hidden ? tr('نمایشِ شکل‌ها', 'Show all drawings') : tr('پنهان کردنِ همه‌ی شکل‌ها', 'Hide all drawings'), 'SCCHART.hide()', S.hidden ? ICON.eyeOff : ICON.eye, ` data-t="hide" aria-pressed="${S.hidden}"`);
     if (!ro) {
-      h += btn('', 'پاک کردنِ همه‌ی شکل‌های این نماد', 'SCCHART.clear()', ICON.trash, ` data-t="clear"${S.recs.size ? '' : ' disabled'}`);
+      h += btn('', tr('پاک کردنِ همه‌ی شکل‌های این نماد', 'Remove all drawings'), 'SCCHART.clear()', ICON.trash, ` data-t="clear"${S.recs.size ? '' : ' disabled'}`);
       h += '<span class="ch-sep"></span>';
-      h += btn('', 'برگرداندن (Ctrl+Z)', 'SCCHART.undo()', ICON.undo, ` data-t="undo"${S.hist.length ? '' : ' disabled'}`);
-      h += btn('', 'دوباره انجام دادن (Ctrl+Y)', 'SCCHART.redo()', ICON.redo, ` data-t="redo"${S.redo.length ? '' : ' disabled'}`);
+      h += btn('', tr('برگرداندن (Ctrl+Z)', 'Undo (Ctrl+Z)'), 'SCCHART.undo()', ICON.undo, ` data-t="undo"${S.hist.length ? '' : ' disabled'}`);
+      h += btn('', tr('دوباره انجام دادن (Ctrl+Y)', 'Redo (Ctrl+Y)'), 'SCCHART.redo()', ICON.redo, ` data-t="redo"${S.redo.length ? '' : ' disabled'}`);
     }
-    h += btn($('ch-tree') && !$('ch-tree').hidden ? ' on' : '', 'فهرستِ شکل‌ها', 'SCCHART.tree()', ICON.tree, ' data-t="tree"');
+    h += btn($('ch-tree') && !$('ch-tree').hidden ? ' on' : '', tr('فهرستِ شکل‌ها', 'Object tree'), 'SCCHART.tree()', ICON.tree, ' data-t="tree"');
     box.innerHTML = h;
   }
   // گروهِ ابزار: دسکتاپ = آخرین ابزارِ گروه فعال می‌شود، فلش = فهرست؛ گوشی = همیشه فهرست (مثلِ اپِ TradingView)
@@ -1165,11 +1200,11 @@
     const box = $('ch-fly'), g = GROUPS.find(x => x.id === gid); if (!box || !g) return;
     if (S.fly === gid && !box.hidden) { closeFly(); return; }
     closePop(); closeCtx();
-    let h = `<div class="ch-flyh">${esc(g.fa)}<button type="button" class="ch-x" aria-label="بستن" onclick="SCCHART.closeFly()">${ICON.close}</button></div>`, sec = null;
+    let h = `<div class="ch-flyh">${esc(tr(g.fa, g.en))}<button type="button" class="ch-x" aria-label="${tr('بستن', 'Close')}" onclick="SCCHART.closeFly()">${ICON.close}</button></div>`, sec = null;
     for (const id of g.tools) {
       const d = T[id];
-      if (d.sec && d.sec !== sec) { sec = d.sec; h += `<div class="ch-flys">${esc(sec)}</div>`; }
-      h += `<button type="button" class="ch-flyi${S.tool === id ? ' on' : ''}${d.cls ? ' ' + d.cls : ''}" data-tool="${id}" onclick="SCCHART.tool('${id}')">${d.ic}<span class="ch-flyt"><b>${esc(d.fa)}</b><small dir="ltr">${esc(d.en)}</small></span>${d.key && !S.touch ? `<kbd dir="ltr">${esc(d.key)}</kbd>` : ''}</button>`;
+      if (d.sec && d.sec !== sec) { sec = d.sec; h += `<div class="ch-flys">${esc(tr(sec, SEC_EN[sec]))}</div>`; }
+      h += `<button type="button" class="ch-flyi${S.tool === id ? ' on' : ''}${d.cls ? ' ' + d.cls : ''}" data-tool="${id}" onclick="SCCHART.tool('${id}')">${d.ic}<span class="ch-flyt"><b>${esc(nm(d))}</b>${EN() ? '' : `<small dir="ltr">${esc(d.en)}</small>`}</span>${d.key && !S.touch ? `<kbd dir="ltr">${esc(d.key)}</kbd>` : ''}</button>`;
     }
     box.innerHTML = h; box.hidden = false; S.fly = gid;
     place(box, el);
@@ -1196,11 +1231,11 @@
   function closePop() { const b = $('ch-pop'); if (b) { b.hidden = true; b.innerHTML = ''; } S.pop = null; }
   function magMenu(el) {
     const row = (m, t, d) => `<button type="button" class="ch-popi${S.mag === m ? ' on' : ''}" data-mag="${m}" onclick="SCCHART.setMag(${m})"><i></i><span><b>${t}</b>${d ? `<small>${d}</small>` : ''}</span></button>`;
-    openPop('mag', el, `<div class="ch-poph">آهنربا</div>`
-      + row(0, 'خاموش', 'نقطه دقیقاً همان‌جا که می‌زنی')
-      + row(1, 'آهنربای ضعیف', 'نزدیکِ سقف/کف/باز/بسته‌ی کندل که باشی، می‌چسبد')
-      + row(2, 'آهنربای قوی', 'همیشه به نزدیک‌ترین قیمتِ کندل می‌چسبد')
-      + (S.touch ? '' : '<div class="ch-popn">نگه‌داشتنِ Ctrl، آهنربا را موقتاً برعکس می‌کند</div>'));
+    openPop('mag', el, `<div class="ch-poph">${tr('آهنربا', 'Magnet mode')}</div>`
+      + row(0, tr('خاموش', 'Off'), tr('نقطه دقیقاً همان‌جا که می‌زنی', 'Points go exactly where you click'))
+      + row(1, tr('آهنربای ضعیف', 'Weak magnet'), tr('نزدیکِ سقف/کف/باز/بسته‌ی کندل که باشی، می‌چسبد', 'Snaps when you are near a candle\'s open, high, low or close'))
+      + row(2, tr('آهنربای قوی', 'Strong magnet'), tr('همیشه به نزدیک‌ترین قیمتِ کندل می‌چسبد', 'Always snaps to the nearest candle price'))
+      + (S.touch ? '' : `<div class="ch-popn">${tr('نگه‌داشتنِ Ctrl، آهنربا را موقتاً برعکس می‌کند', 'Hold Ctrl to temporarily invert the magnet')}</div>`));
   }
   function magBtn(el) { if (S.touch) magMenu(el); else setMagnet(); }
 
@@ -1210,23 +1245,24 @@
     const id = S.selected, m = id && S.recs.get(id);
     if (!m || readOnly() || S.drawingId) { bar.hidden = true; bar.innerHTML = ''; closePop(); return; }
     const def = T[m.n], col = m.c || def.color || C.blue;
-    bar.innerHTML = `<span class="ch-seln">${esc(def.fa)}</span>`
-      + `<button type="button" class="ch-selb" data-a="color" title="رنگ" aria-label="رنگ" onclick="SCCHART.colorMenu(this)"><i class="ch-sw" style="--c:${col}"></i></button>`
+    const b = (a, t, inner, extra = '', on = '') => `<button type="button" class="ch-selb${on}" data-a="${a}" title="${esc(t)}" aria-label="${esc(t)}"${extra}>${inner}</button>`;
+    bar.innerHTML = `<span class="ch-seln">${esc(nm(def))}</span>`
+      + b('color', tr('رنگ', 'Color'), `<i class="ch-sw" style="--c:${col}"></i>`, ' onclick="SCCHART.colorMenu(this)"')
       + (def.pad || ['scLong', 'scShort', 'scText', 'scPriceLabel'].includes(m.n) ? '' :
-        `<button type="button" class="ch-selb" data-a="width" title="ضخامتِ خط" aria-label="ضخامتِ خط" onclick="SCCHART.widthMenu(this)">${ICON.width}<em>${m.w}px</em></button>`
-        + `<button type="button" class="ch-selb" data-a="style" title="نوعِ خط" aria-label="نوعِ خط" onclick="SCCHART.styleMenu(this)">${ICON.style}</button>`)
-      + (def.text ? `<button type="button" class="ch-selb" data-a="text" title="ویرایشِ متن" aria-label="ویرایشِ متن" onclick="SCCHART.editText()">${ICON.textEdit}</button>` : '')
-      + `<button type="button" class="ch-selb" data-a="settings" title="تنظیمات" aria-label="تنظیمات" onclick="SCCHART.settings()">${ICON.gear}</button>`
-      + `<button type="button" class="ch-selb${m.k ? ' on' : ''}" data-a="lock" title="${m.k ? 'باز کردنِ قفل' : 'قفل'}" aria-label="قفل" aria-pressed="${m.k}" onclick="SCCHART.lock()">${m.k ? ICON.lock : ICON.unlock}</button>`
-      + `<button type="button" class="ch-selb" data-a="clone" title="کپی" aria-label="کپی" onclick="SCCHART.clone()">${ICON.clone}</button>`
-      + `<button type="button" class="ch-selb del" data-a="delete" title="حذف (Delete)" aria-label="حذف" onclick="SCCHART.removeSelected()">${ICON.trash}</button>`;
+        b('width', tr('ضخامتِ خط', 'Line width'), `${ICON.width}<em>${m.w}px</em>`, ' onclick="SCCHART.widthMenu(this)"')
+        + b('style', tr('نوعِ خط', 'Line style'), ICON.style, ' onclick="SCCHART.styleMenu(this)"'))
+      + (def.text ? b('text', tr('ویرایشِ متن', 'Edit text'), ICON.textEdit, ' onclick="SCCHART.editText()"') : '')
+      + b('settings', tr('تنظیمات', 'Settings'), ICON.gear, ' onclick="SCCHART.settings()"')
+      + b('lock', m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock'), m.k ? ICON.lock : ICON.unlock, ` aria-pressed="${m.k}" onclick="SCCHART.lock()"`, m.k ? ' on' : '')
+      + b('clone', tr('کپی', 'Clone'), ICON.clone, ' onclick="SCCHART.clone()"')
+      + b('delete', tr('حذف (Delete)', 'Remove (Delete)'), ICON.trash, ' onclick="SCCHART.removeSelected()"', ' del');
     bar.hidden = false;
   }
   function colorMenu(el) {
     const id = S.selected, m = S.recs.get(id); if (!m) return;
     const cur = m.c || T[m.n].color;
-    openPop('color', el, `<div class="ch-pal">${PALETTE.map(c => `<button type="button" class="ch-dot${c === cur ? ' on' : ''}" style="--c:${c}" data-c="${c}" aria-label="رنگ ${c}" onclick="SCCHART.color('${c}')"></button>`).join('')}</div>`
-      + `<button type="button" class="ch-popi" data-c="" onclick="SCCHART.color('')"><i></i><span><b>رنگِ پیش‌فرض</b></span></button>`);
+    openPop('color', el, `<div class="ch-pal">${PALETTE.map(c => `<button type="button" class="ch-dot${c === cur ? ' on' : ''}" style="--c:${c}" data-c="${c}" aria-label="${tr('رنگ', 'Color')} ${c}" onclick="SCCHART.color('${c}')"></button>`).join('')}</div>`
+      + `<button type="button" class="ch-popi" data-c="" onclick="SCCHART.color('')"><i></i><span><b>${tr('رنگِ پیش‌فرض', 'Default color')}</b></span></button>`);
   }
   function widthMenu(el) {
     const m = S.recs.get(S.selected); if (!m) return;
@@ -1234,7 +1270,7 @@
   }
   function styleMenu(el) {
     const m = S.recs.get(S.selected); if (!m) return;
-    const names = ['خطِ پیوسته', 'خط‌چین', 'نقطه‌چین'];
+    const names = EN() ? ['Solid', 'Dashed', 'Dotted'] : ['خطِ پیوسته', 'خط‌چین', 'نقطه‌چین'];
     openPop('style', el, [0, 1, 2].map(s => `<button type="button" class="ch-popi${m.s === s ? ' on' : ''}" data-s="${s}" onclick="SCCHART.lstyle(${s})"><i></i><span class="ch-sl s${s}"></span><small>${names[s]}</small></button>`).join(''));
   }
   function setColor(c) {
@@ -1250,8 +1286,9 @@
     const box = $('ch-ctx'), m = S.recs.get(id); if (!box || !m || readOnly()) return;
     closePop(); closeFly(); selectId(id);
     const it = (a, icon, t, k) => `<button type="button" class="ch-ctxi" data-a="${a}" onclick="SCCHART.ctx('${a}')">${icon}<span>${t}</span>${k ? `<kbd dir="ltr">${k}</kbd>` : ''}</button>`;
-    box.innerHTML = it('settings', ICON.gear, 'تنظیمات…') + it('clone', ICON.clone, 'کپی') + it('lock', m.k ? ICON.lock : ICON.unlock, m.k ? 'باز کردنِ قفل' : 'قفل')
-      + it('hide', ICON.eyeOff, 'پنهان کردن') + '<hr>' + it('delete', ICON.trash, 'حذف', 'Del');
+    box.innerHTML = it('settings', ICON.gear, tr('تنظیمات…', 'Settings…')) + it('clone', ICON.clone, tr('کپی', 'Clone'))
+      + it('lock', m.k ? ICON.lock : ICON.unlock, m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock'))
+      + it('hide', ICON.eyeOff, tr('پنهان کردن', 'Hide')) + '<hr>' + it('delete', ICON.trash, tr('حذف', 'Remove'), 'Del');
     box.hidden = false;
     const sr = box.parentElement.getBoundingClientRect();
     box.style.left = clamp((e?.x ?? 40), 4, sr.width - box.offsetWidth - 4) + 'px'; box.style.top = clamp((e?.y ?? 40), 4, sr.height - box.offsetHeight - 4) + 'px';
@@ -1270,18 +1307,18 @@
     const def = T[m.n], x = m.x || {}, opts = def.opts || [];
     const f = [];
     for (const key of opts) {
-      const [type, lab] = OPT[key];
+      const [type, labFa, labEn] = OPT[key], lab = tr(labFa, labEn);
       if (type === 'bool' || type === 'boolOn') { const on = type === 'boolOn' ? x[key] !== false : !!x[key]; f.push(`<label class="ch-ck"><input type="checkbox" data-o="${key}" data-t="${type}"${on ? ' checked' : ''}><span>${lab}</span></label>`); }
-      else if (type === 'text') f.push(`<label class="fl" for="ch-o-text">${lab}</label><textarea id="ch-o-text" class="fi" data-o="text" rows="2" maxlength="200" placeholder="${def.text ? 'متن' : 'اختیاری'}">${esc(x.text || '')}</textarea>`);
+      else if (type === 'text') f.push(`<label class="fl" for="ch-o-text">${lab}</label><textarea id="ch-o-text" class="fi" data-o="text" rows="2" maxlength="200" placeholder="${def.text ? tr('متن', 'Text') : tr('اختیاری', 'Optional')}">${esc(x.text || '')}</textarea>`);
       else if (type === 'fs') f.push(`<label class="ch-row"><span>${lab}</span><select class="fi" data-o="fs">${[10, 12, 14, 16, 20, 24, 28, 36].map(s => `<option value="${s}"${(+x.fs || 14) === s ? ' selected' : ''}>${s}</option>`).join('')}</select></label>`);
       else if (type === 'dev') f.push(`<label class="ch-row"><span>${lab}</span><select class="fi" data-o="dev">${[1, 1.5, 2, 2.5, 3].map(s => `<option value="${s}"${(isNum(x.dev) ? x.dev : 2) === s ? ' selected' : ''}>${s}</option>`).join('')}</select></label>`);
       else if (type === 'levels') { const on = Array.isArray(x.lv) ? x.lv : LV_ON; f.push(`<div class="fl">${lab}</div><div class="ch-lvs">${LV.map((l, i) => `<label class="ch-lv" style="--c:${LV_COL[i]}"><input type="checkbox" data-lv="${i}"${on.includes(i) ? ' checked' : ''}><span dir="ltr">${l}</span></label>`).join('')}</div>`); }
     }
     const pts = def.pad ? [] : o.points.slice(0, def.pts);
-    const coord = pts.length ? `<div class="fl">مختصات (قیمتِ هر نقطه)</div><div class="ch-coords">${pts.map((p, i) => `<label class="ch-row"><span>${esc((def.pn || P2)[i] || 'نقطه‌ی ' + fa(i + 1))}</span><input class="fi" dir="ltr" inputmode="decimal" data-pt="${i}" value="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}" data-was="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}"></label>`).join('')}</div>` : '';
-    box.innerHTML = `<div class="ch-mcard ch-set" role="dialog" aria-label="تنظیماتِ ${esc(def.fa)}"><div class="ch-mh"><b>${esc(def.fa)}</b><small dir="ltr">${esc(def.en)}</small></div>
+    const coord = pts.length ? `<div class="fl">${tr('مختصات (قیمتِ هر نقطه)', 'Coordinates (price of each point)')}</div><div class="ch-coords">${pts.map((p, i) => `<label class="ch-row"><span>${esc(ptName(def, i, true))}</span><input class="fi" dir="ltr" inputmode="decimal" data-pt="${i}" value="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}" data-was="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}"></label>`).join('')}</div>` : '';
+    box.innerHTML = `<div class="ch-mcard ch-set" role="dialog" aria-label="${esc(tr('تنظیماتِ ' + def.fa, def.en + ' settings'))}"><div class="ch-mh"><b>${esc(nm(def))}</b>${EN() ? '' : `<small dir="ltr">${esc(def.en)}</small>`}</div>
       ${f.length ? `<div class="ch-sec">${f.join('')}</div>` : ''}${coord}
-      <div class="ch-mrow"><button type="button" class="btn btn-ghost" id="ch-sno">انصراف</button><button type="button" class="btn btn-primary" id="ch-sok">ثبت</button></div></div>`;
+      <div class="ch-mrow"><button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
     box.hidden = false;
     const close = ok => {
       if (ok) {
@@ -1311,9 +1348,10 @@
   function editText(id, fresh) {
     id = id || S.selected; const m = S.recs.get(id); if (!m || readOnly()) return;
     const box = $('ch-modal'); if (!box) return;
-    box.innerHTML = `<div class="ch-mcard" role="dialog" aria-label="متن روی نمودار"><label class="fl" for="ch-txt">متن روی نمودار</label>
-      <textarea id="ch-txt" class="fi" rows="3" maxlength="200" placeholder="مثلاً: شکستِ مقاومت با حجم">${esc(m.x?.text || '')}</textarea>
-      <div class="ch-mrow"><button type="button" class="btn btn-ghost" id="ch-tno">انصراف</button><button type="button" class="btn btn-primary" id="ch-tok">ثبت</button></div></div>`;
+    const lab = tr('متن روی نمودار', 'Text on the chart');
+    box.innerHTML = `<div class="ch-mcard" role="dialog" aria-label="${lab}"><label class="fl" for="ch-txt">${lab}</label>
+      <textarea id="ch-txt" class="fi" rows="3" maxlength="200" dir="auto" placeholder="${tr('مثلاً: شکستِ مقاومت با حجم', 'e.g. Breakout above resistance on volume')}">${esc(m.x?.text || '')}</textarea>
+      <div class="ch-mrow"><button type="button" class="btn btn-ghost" id="ch-tno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-tok">${tr('ثبت', 'Ok')}</button></div></div>`;
     box.hidden = false;
     const ta = $('ch-txt'); setTimeout(() => ta?.focus(), 30);
     const close = ok => {
@@ -1335,39 +1373,41 @@
     for (const [id, m] of S.recs) {
       if (id === S.drawingId || T[m.n]?.transient) continue;
       const def = T[m.n], o = S.chart.getOverlayById(id), v = o?.points?.[0]?.value;
-      rows.push(`<div class="ch-tri${S.selected === id ? ' on' : ''}${m.h ? ' off' : ''}" data-id="${id}"><button type="button" class="ch-trn" onclick="SCCHART.pickObj('${id}')"><span class="ch-tric" style="color:${m.c || def.color || C.blue}">${def.ic}</span><span><b>${esc(def.fa)}</b><small dir="ltr">${def.pad ? '' : esc(fmt(v))}${m.x?.text ? ' · ' + esc(String(m.x.text).slice(0, 24)) : ''}</small></span></button>`
-        + `<button type="button" class="ch-trb" title="${m.h ? 'نمایش' : 'پنهان'}" aria-label="پنهان/نمایش" onclick="SCCHART.objHide('${id}')">${m.h ? ICON.eyeOff : ICON.eye}</button>`
-        + (ro ? '' : `<button type="button" class="ch-trb" title="${m.k ? 'باز کردنِ قفل' : 'قفل'}" aria-label="قفل" onclick="SCCHART.objLock('${id}')">${m.k ? ICON.lock : ICON.unlock}</button><button type="button" class="ch-trb del" title="حذف" aria-label="حذف" onclick="SCCHART.objDel('${id}')">${ICON.trash}</button>`) + '</div>');
+      rows.push(`<div class="ch-tri${S.selected === id ? ' on' : ''}${m.h ? ' off' : ''}" data-id="${id}"><button type="button" class="ch-trn" onclick="SCCHART.pickObj('${id}')"><span class="ch-tric" style="color:${m.c || def.color || C.blue}">${def.ic}</span><span><b>${esc(nm(def))}</b><small dir="ltr">${def.pad ? '' : esc(fmt(v))}${m.x?.text ? ` · <span class="ch-utext" dir="auto">${esc(String(m.x.text).slice(0, 24))}</span>` : ''}</small></span></button>`
+        + `<button type="button" class="ch-trb" title="${m.h ? tr('نمایش', 'Show') : tr('پنهان', 'Hide')}" aria-label="${tr('پنهان/نمایش', 'Hide/show')}" onclick="SCCHART.objHide('${id}')">${m.h ? ICON.eyeOff : ICON.eye}</button>`
+        + (ro ? '' : `<button type="button" class="ch-trb" title="${m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock')}" aria-label="${tr('قفل', 'Lock')}" onclick="SCCHART.objLock('${id}')">${m.k ? ICON.lock : ICON.unlock}</button><button type="button" class="ch-trb del" title="${tr('حذف', 'Remove')}" aria-label="${tr('حذف', 'Remove')}" onclick="SCCHART.objDel('${id}')">${ICON.trash}</button>`) + '</div>');
     }
-    t.innerHTML = `<div class="ch-flyh">شکل‌های ${esc(S.coin)} <small>(${fa(rows.length)})</small><button type="button" class="ch-x" aria-label="بستن" onclick="SCCHART.tree()">${ICON.close}</button></div>`
-      + (rows.length ? rows.reverse().join('') : '<div class="ch-pempty">هنوز شکلی رسم نشده.</div>');
+    t.innerHTML = `<div class="ch-flyh">${tr('شکل‌های ' + esc(S.coin), 'Object tree · ' + esc(S.coin))} <small>(${num(rows.length)})</small><button type="button" class="ch-x" aria-label="${tr('بستن', 'Close')}" onclick="SCCHART.tree()">${ICON.close}</button></div>`
+      + (rows.length ? rows.reverse().join('') : `<div class="ch-pempty">${tr('هنوز شکلی رسم نشده.', 'No drawings yet.')}</div>`);
   }
 
   function shell() {
-    return `<div class="ch-wrap">
+    const d = dirOf();
+    return `<div class="ch-wrap" dir="${d}">
       <div class="ch-head">
-        <button type="button" class="ch-coin" onclick="SCCHART.pick()" aria-label="انتخابِ نماد و منبع"><span id="ch-logo">${typeof coinLogo === 'function' ? coinLogo(S.coin) : ''}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
+        <button type="button" class="ch-coin" id="ch-coinb" onclick="SCCHART.pick()" aria-label="${tr('انتخابِ نماد و منبع', 'Symbol search')}"><span id="ch-logo">${typeof coinLogo === 'function' ? coinLogo(S.coin) : ''}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
         <div class="ch-px" dir="ltr"><b id="ch-last">—</b><span id="ch-chg" class="ch-chg"></span></div>
-        <div class="ch-srcs" id="ch-srcs" role="group" aria-label="منبعِ داده">${SOURCES.map(s => `<button type="button" data-src="${s.id}" onclick="SCCHART.src('${s.id}')">${s.name}</button>`).join('')}</div>
+        <div class="ch-srcs" id="ch-srcs" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" data-src="${s.id}" onclick="SCCHART.src('${s.id}')">${s.name}</button>`).join('')}</div>
+        <div class="ch-lang" id="ch-lang" role="group" aria-label="${tr('زبانِ نمودار', 'Chart language')}"><button type="button" data-l="fa" lang="fa" onclick="SCCHART.lang('fa')">فا</button><button type="button" data-l="en" lang="en" onclick="SCCHART.lang('en')">EN</button></div>
       </div>
       <div class="ch-bar">
-        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="تایم‌فریم" dir="ltr">${TFS.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
-        <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span>اندیکاتور</span></button>
+        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TFS.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
+        <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span id="ch-indl">${tr('اندیکاتور', 'Indicators')}</span></button>
       </div>
       <div class="ch-main" dir="ltr">
-        <div class="ch-tb" id="ch-tools" role="toolbar" aria-label="ابزارهای رسم"></div>
+        <div class="ch-tb" id="ch-tools" role="toolbar" aria-label="${tr('ابزارهای رسم', 'Drawing tools')}"></div>
         <div class="ch-stage" id="ch-stage">
           <div class="ch-canvas" id="ch-canvas"></div>
           <div class="ch-pad" id="ch-pad" hidden><canvas></canvas></div>
           <div class="ch-msg" id="ch-msg" hidden></div>
-          <div class="ch-hint" id="ch-hint" dir="rtl" hidden></div>
-          <div class="ch-sel" id="ch-sel" dir="rtl" hidden></div>
-          <div class="ch-fly" id="ch-fly" dir="rtl" hidden></div>
-          <div class="ch-pop" id="ch-pop" dir="rtl" hidden></div>
-          <div class="ch-ctx" id="ch-ctx" dir="rtl" hidden></div>
-          <div class="ch-tree" id="ch-tree" dir="rtl" hidden></div>
-          <div class="ch-indm" id="ch-indm" dir="rtl" hidden></div>
-          <div class="ch-modal" id="ch-modal" dir="rtl" hidden></div>
+          <div class="ch-hint" id="ch-hint" dir="${d}" hidden></div>
+          <div class="ch-sel" id="ch-sel" dir="${d}" hidden></div>
+          <div class="ch-fly" id="ch-fly" dir="${d}" hidden></div>
+          <div class="ch-pop" id="ch-pop" dir="${d}" hidden></div>
+          <div class="ch-ctx" id="ch-ctx" dir="${d}" hidden></div>
+          <div class="ch-tree" id="ch-tree" dir="${d}" hidden></div>
+          <div class="ch-indm" id="ch-indm" dir="${d}" hidden></div>
+          <div class="ch-modal" id="ch-modal" dir="${d}" hidden></div>
         </div>
       </div>
       <div class="ch-foot"><span id="ch-save" class="ch-save"></span><span id="ch-srcinfo"></span></div>
@@ -1376,8 +1416,9 @@
 
   // ── اندیکاتورها ──
   const INDICATORS = [
-    { id: 'VOL', t: 'حجم', main: false }, { id: 'MA', t: 'میانگینِ متحرک (MA)', main: true }, { id: 'EMA', t: 'میانگینِ نمایی (EMA)', main: true },
-    { id: 'BOLL', t: 'باندِ بولینگر', main: true }, { id: 'RSI', t: 'RSI', main: false }, { id: 'MACD', t: 'MACD', main: false }
+    { id: 'VOL', t: 'حجم', en: 'Volume', main: false }, { id: 'MA', t: 'میانگینِ متحرک (MA)', en: 'Moving Average (MA)', main: true },
+    { id: 'EMA', t: 'میانگینِ نمایی (EMA)', en: 'Exponential Moving Average (EMA)', main: true }, { id: 'BOLL', t: 'باندِ بولینگر', en: 'Bollinger Bands (BOLL)', main: true },
+    { id: 'RSI', t: 'RSI', en: 'Relative Strength Index (RSI)', main: false }, { id: 'MACD', t: 'MACD', en: 'MACD', main: false }
   ];
   function applyIndicators() {
     for (const [name, pane] of Object.entries(S.panes)) S.chart.removeIndicator(pane, name);
@@ -1396,7 +1437,7 @@
   function paintInd() {
     const box = $('ch-indm'); if (!box || box.hidden) return;
     const on = new Set(S.store.prefs.ind || []);
-    box.innerHTML = INDICATORS.map(x => `<button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(x.t)}</button>`).join('');
+    box.innerHTML = INDICATORS.map(x => `<button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}</button>`).join('');
   }
 
   // ── انتخابگرِ نماد ──
@@ -1409,19 +1450,19 @@
   async function pick() {
     const recent = (S.store?.recent || []).filter(c => c !== S.coin).slice(0, 8);
     const chip = c => `<button type="button" class="ch-pchip" onclick="SCCHART.coin('${jsArg(c)}')">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<span dir="ltr">${esc(c)}</span></button>`;
-    $('det-content').innerHTML = `<div class="ch-pick"><h3>انتخابِ نماد و منبع</h3>
-      <div class="ch-psrc" role="group" aria-label="منبعِ داده">${SOURCES.map(s => `<button type="button" class="${s.id === S.src ? 'on' : ''}" aria-pressed="${s.id === S.src}" onclick="SCCHART.src('${s.id}');SCCHART.pick()">${s.name}</button>`).join('')}</div>
-      <input id="ch-psearch" class="fi" dir="ltr" placeholder="جست‌وجو: BTC، ETH، SOL…" autocomplete="off" autocapitalize="characters">
-      ${recent.length ? `<div class="ch-plab">اخیر</div><div class="ch-pchips">${recent.map(chip).join('')}</div>` : ''}
-      <div class="ch-plab">پرطرفدار</div><div class="ch-pchips">${POPULAR.map(chip).join('')}</div>
-      <div class="ch-plab" id="ch-plabel">همه‌ی نمادها</div><div class="ch-plist" id="ch-plist"><div class="ch-pempty">در حالِ بارگذاری…</div></div></div>`;
+    $('det-content').innerHTML = `<div class="ch-pick" dir="${dirOf()}"><h3>${tr('انتخابِ نماد و منبع', 'Symbol search')}</h3>
+      <div class="ch-psrc" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" class="${s.id === S.src ? 'on' : ''}" aria-pressed="${s.id === S.src}" onclick="SCCHART.src('${s.id}');SCCHART.pick()">${s.name}</button>`).join('')}</div>
+      <input id="ch-psearch" class="fi" dir="ltr" placeholder="${tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      ${recent.length ? `<div class="ch-plab">${tr('اخیر', 'Recent')}</div><div class="ch-pchips">${recent.map(chip).join('')}</div>` : ''}
+      <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips">${POPULAR.map(chip).join('')}</div>
+      <div class="ch-plab" id="ch-plabel">${tr('همه‌ی نمادها', 'All symbols')}</div><div class="ch-plist" id="ch-plist"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div></div>`;
     document.getElementById('det-sheet').classList.add('open');
     const all = await symbolsOf(S.src), list = $('ch-plist'), input = $('ch-psearch');
     const draw = () => {
       const q = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       let items = all.filter(s => !q || s.includes(q)).slice(0, 120);
       if (q && !items.includes(q) && /^[A-Z0-9]{1,15}$/.test(q)) items = [q, ...items];
-      list.innerHTML = items.length ? items.map(chip).join('') : `<div class="ch-pempty">نمادی پیدا نشد</div>`;
+      list.innerHTML = items.length ? items.map(chip).join('') : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
     };
     input.oninput = draw; draw();
     input.onkeydown = ev => { if (ev.key === 'Enter') { const q = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (q) setCoin(q); } };
@@ -1473,8 +1514,9 @@
     if (/^[A-Z0-9]{1,15}$/.test(last.coin || '')) S.coin = last.coin;
     if (TFS.some(t => t.id === last.tf)) S.tf = last.tf;
     S.mag = [0, 1, 2].includes(pf.mag) ? pf.mag : 1; S.magLast = [1, 2].includes(pf.magLast) ? pf.magLast : 1;
-    S.stay = !!pf.stay; S.lockAll = !!pf.lock;
+    S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa';
     el.innerHTML = shell();
+    document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     paintTools(); status(S.loadedStore ? 'saved' : 'local'); if (!S.loadedStore && !L.g(cacheKey())) $('ch-save').textContent = '';
     const phone = window.matchMedia('(max-width: 600px)').matches;
     S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: phone ? { ...STYLES, candle: { ...STYLES.candle, tooltip: { ...STYLES.candle.tooltip, showRule: 'follow_cross' } },
@@ -1508,6 +1550,26 @@
     window.addEventListener('online', () => { if (S.store && !readOnly()) save(); });
     await loadSeries();
   }
+  // تعویضِ زبان: همه‌ی متن‌ها و جهتِ پنل‌ها همان لحظه، بی بارگذاریِ دوباره‌ی نمودار
+  function setLang(l) {
+    l = l === 'en' ? 'en' : 'fa'; if (l === S.lang && S.store?.prefs?.lang === l) { paintLang(); return; }
+    S.lang = l;
+    if (S.store) { S.store.prefs.lang = l; if (!readOnly()) scheduleSave(); }
+    closeFly(); closePop(); closeCtx();
+    paintLang();
+  }
+  function paintLang() {
+    const d = dirOf(), w = S.root?.querySelector('.ch-wrap'); if (w) w.setAttribute('dir', d);
+    for (const id of ['ch-hint', 'ch-sel', 'ch-fly', 'ch-pop', 'ch-ctx', 'ch-tree', 'ch-indm', 'ch-modal']) $(id)?.setAttribute('dir', d);
+    const al = (id, v) => $(id)?.setAttribute('aria-label', v);
+    al('ch-coinb', tr('انتخابِ نماد و منبع', 'Symbol search')); al('ch-srcs', tr('منبعِ داده', 'Data source')); al('ch-tfs', tr('تایم‌فریم', 'Time interval'));
+    al('ch-tools', tr('ابزارهای رسم', 'Drawing tools')); al('ch-lang', tr('زبانِ نمودار', 'Chart language'));
+    const il = $('ch-indl'); if (il) il.textContent = tr('اندیکاتور', 'Indicators');
+    document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    paintTools(); paintSel(); paintTree(); paintInd(); paintHead();
+    if (S.saveState || readOnly()) status(S.saveState);
+    if (S.hintArgs) hint(...S.hintArgs);
+  }
   function show() { if (S.chart) { S.chart.resize(); if (S.data.length) startPoll(); else loadSeries(); } }
   function hide() { stopPoll(); }
 
@@ -1518,7 +1580,7 @@
     removeSelected: () => S.selected && removeId(S.selected), color: setColor, width: setWidth, lstyle: setLineStyle,
     colorMenu, widthMenu, styleMenu, settings: () => openSettings(), lock: () => toggleLock(), clone: () => cloneSel(), editText: () => editText(), ctx: ctxAction,
     pickObj: id => { selectId(id); paintTree(); }, objHide: id => { toggleHideOne(id); paintTree(); }, objLock: id => { toggleLock(id); paintTree(); }, objDel: id => { removeId(id); paintTree(); },
-    src: setSrc, tf: setTf, coin: setCoin, pick,
+    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator,
     // برای تست
@@ -1533,6 +1595,7 @@
       const e = f.find(g => g.type === 'scEll'); if (e) return { x: e.attrs.x + e.attrs.rx * (e.attrs.area ? 0.5 : 1), y: e.attrs.y };   // مرکزِ دایره دسته‌ی خودش است
       return null;
     },
-    _validTools: () => TOOL_LIST.filter(t => !t.special && !t.transient).map(t => t.id), _legacyTools: () => Object.keys(LEGACY)
+    _validTools: () => TOOL_LIST.filter(t => !t.special && !t.transient).map(t => t.id), _legacyTools: () => Object.keys(LEGACY),
+    _i18n: () => ({ PN_EN, SEC_EN, GROUPS: GROUPS.map(g => ({ id: g.id, fa: g.fa, en: g.en })), OPT, INDICATORS })
   };
 })();
