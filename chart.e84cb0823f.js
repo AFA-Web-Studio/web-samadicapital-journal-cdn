@@ -19,6 +19,10 @@
    (رنگ/ضخامت/نوعِ خط/گزینه‌ها مثلِ سطوحِ فیبو) پیش‌فرضِ شکلِ بعدیِ همان ابزار می‌شود (prefs.td، با «بازگشت به پیش‌فرض»)؛
    زوم (prefs.bs)، ارتفاعِ پنلِ اندیکاتور (prefs.ph)، دوره‌های اندیکاتور (prefs.ip، پنجره‌ی تنظیمات) و «پنهانِ همه» (prefs.hid)
    هم ذخیره می‌شوند — همه در sc_chart_<uid>، روی همه‌ی دستگاه‌ها.
+   v26.41 (همان روز: «مثلِ TradingView، راحت‌تر؛ تنظیماتِ فیبو یک‌جا؛ برچسبِ فیبو سمتِ راست؛ حجم پاک نمی‌شود؛ تمِ تیره/روشن»):
+   پنجره‌ی تنظیماتِ چهار زبانه‌ای (ظاهر/متن/مختصات/نمایش) با پیش‌نمایشِ زنده، جدولِ ۲۴ سطحِ فیبو با مقدار و رنگ (x.lvl)،
+   جای برچسب (چپ/راست، بالا/وسط/پایین)، نمایش روی تایم‌فریم‌های انتخابی (x.vis)، دکمه‌های ⚙ و ✕ کنارِ نامِ هر اندیکاتور،
+   و تمِ روشن به سبکِ TradingView (prefs.theme).
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -151,18 +155,31 @@
   const LV = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.618, 2.618, 3.618, 4.236];
   const LV_COL = ['#787B86', '#F23645', '#FF9800', '#4CAF50', '#089981', '#00BCD4', '#787B86', '#2962FF', '#F23645', '#9C27B0', '#E91E63'];
   const LV_ON = [0, 1, 2, 3, 4, 5, 6, 7];
-  function levels(k) {
-    const on = Array.isArray(k.x.lv) ? k.x.lv : LV_ON;
-    return LV.map((l, i) => ({ l, i, col: k.m.c ? k.col : LV_COL[i] })).filter(o => on.includes(o.i)).sort((a, b) => a.l - b.l);
+  // v26.41: همان ۲۴ سطحِ پنجره‌ی Fib در TradingView (۱۱ سطحِ اول همان سطوحِ قبلی‌اند)؛ هر سطر = [مقدار، روشن، رنگ]
+  const LV_TV = LV.map((l, i) => [l, LV_COL[i]]).concat([[1.272, '#FF9800'], [1.414, '#F23645'], [2, '#089981'], [2.272, '#FF9800'], [2.414, '#4CAF50'],
+    [3, '#00BCD4'], [3.272, '#787B86'], [3.414, '#2962FF'], [4, '#F23645'], [4.272, '#9C27B0'], [4.414, '#E91E63'], [4.618, '#FF9800'], [4.764, '#089981']]);
+  function levelRows(x) {
+    if (Array.isArray(x?.lvl) && x.lvl.length) return x.lvl.map(r => [+r[0], r[1] ? 1 : 0, /^#[0-9A-Fa-f]{6}$/.test(r[2] || '') ? r[2] : C.gray]);
+    const on = Array.isArray(x?.lv) ? x.lv : LV_ON;   // داده‌ی پیش از v26.41: شماره‌ی سطوحِ روشن از ۱۱ سطحِ اول
+    return LV_TV.map(([l, c], i) => [l, i < LV.length && on.includes(i) ? 1 : 0, c]);
   }
+  function levels(k) {
+    const one = !!k.x.oc || (!Array.isArray(k.x.lvl) && !!k.m.c);   // «یک رنگ برای همه»؛ داده‌ی قدیم: رنگِ شکل = همه‌ی سطوح
+    return levelRows(k.x).filter(r => r[1] && isNum(r[0])).map(([l, , c]) => ({ l, col: one ? k.col : c })).sort((a, b) => a.l - b.l);
+  }
+  // شفافیتِ پس‌زمینه (x.fo = درصد، از پنجره‌ی تنظیمات)؛ پیش‌فرضِ هر ابزار همان قبلی
+  const fillA = (k, d) => isNum(k.x.fo) ? clamp(k.x.fo, 0, 100) / 100 : d;
   function levelFigs(k, out, yAt, valAt, x0, x1, opt = {}) {
     const lv = levels(k);
-    if (k.x.f !== false) for (let i = 0; i + 1 < lv.length; i++) out.push(F.poly(rectPts(x0, yAt(lv[i].l), x1, yAt(lv[i + 1].l)), hexA(lv[i + 1].col, 0.12)));
-    const outside = x0 > 104;
+    if (k.x.f !== false) for (let i = 0; i + 1 < lv.length; i++) out.push(F.poly(rectPts(x0, yAt(lv[i].l), x1, yAt(lv[i + 1].l)), hexA(lv[i + 1].col, fillA(k, 0.12))));
+    const right = k.x.lpos === 1, outside = right ? x1 + 130 < k.W : x0 > 104;
+    const vp = [0, 1, 2].includes(k.x.lvp) ? k.x.lvp : (outside ? 1 : 0), dy = [-2, 0, 2][vp], base = ['bottom', 'middle', 'top'][vp];
     for (const o of lv) {
-      const y = yAt(o.l);
+      const y = yAt(o.l), t = opt.noPrice || k.x.lp === false ? String(o.l) : `${o.l} (${fmt(valAt(o.l))})`;
       out.push(F.line([{ x: x0, y }, { x: x1, y }], o.col, k.w, k.s), F.hit([{ x: x0, y }, { x: x1, y }]));
-      if (k.x.lb !== false) out.push(F.txt(outside ? x0 - 6 : x0 + 4, outside ? y : y - 2, opt.noPrice ? String(o.l) : `${o.l} (${fmt(valAt(o.l))})`, { color: o.col, align: outside ? 'right' : 'left', base: outside ? 'middle' : 'bottom', size: 11 }));
+      if (k.x.lb === false) continue;
+      if (right) out.push(F.txt(outside ? x1 + 6 : x1 - 4, y + dy, t, { color: o.col, align: outside ? 'left' : 'right', base, size: 11 }));
+      else out.push(F.txt(outside ? x0 - 6 : x0 + 4, y + dy, t, { color: o.col, align: outside ? 'right' : 'left', base, size: 11 }));
     }
     if (k.x.f !== false && lv.length > 1) out.push(F.hit(rectPts(x0, yAt(lv[0].l), x1, yAt(lv[lv.length - 1].l)), true));
     return out;
@@ -208,7 +225,11 @@
     const a = k.c[0]; if (!a) return [];
     const p = { x: ray ? a.x : 0, y: a.y }, q = { x: k.W, y: a.y };
     const out = [F.line([p, q], k.col, k.w, k.s), F.hit([p, q])];
-    if (k.x.text) out.push(F.txt(k.W - 10, a.y - 4, k.x.text, { color: k.col, align: 'right', base: 'bottom', size: 12, family: SANS, weight: 600 }));
+    if (k.x.text) {
+      const left = k.x.lpos === 0, vp = [0, 1, 2].includes(k.x.lvp) ? k.x.lvp : 0;
+      out.push(F.txt(left ? (ray ? a.x + 8 : 10) : k.W - 10, a.y + [-4, 0, 4][vp], k.x.text, { color: k.col, align: left ? 'left' : 'right', base: ['bottom', 'middle', 'top'][vp], size: 12, family: SANS, weight: 600,
+        ...(vp === 1 ? { bg: TH().bg, pad: 3 } : {}) }));
+    }
     return out;
   }
   function vlineFigs(k) { const a = k.c[0]; if (!a) return []; const p = { x: a.x, y: 0 }, q = { x: a.x, y: k.H }; return [F.line([p, q], k.col, k.w, k.s), F.hit([p, q])]; }
@@ -222,7 +243,7 @@
     const [p, q] = ext(a, b, k.W, k.H, k.x.el, k.x.er), out = [];
     if (c) {
       const dy = c.y - yOnLine(a, b, c.x), p2 = { x: p.x, y: p.y + dy }, q2 = { x: q.x, y: q.y + dy };
-      if (k.x.f !== false) out.push(F.poly([p, q, q2, p2], hexA(k.col, 0.15)), F.hit([p, q, q2, p2], true));
+      if (k.x.f !== false) out.push(F.poly([p, q, q2, p2], hexA(k.col, fillA(k, 0.15))), F.hit([p, q, q2, p2], true));
       if (k.x.mid !== false) out.push(F.line([{ x: p.x, y: p.y + dy / 2 }, { x: q.x, y: q.y + dy / 2 }], k.col, 1, 1));
       out.push(F.line([p2, q2], k.col, k.w, k.s), F.hit([p2, q2]));
     }
@@ -234,7 +255,7 @@
     const [p, q] = ext(a, b, k.W, k.H, k.x.el, k.x.er), out = [];
     if (c) {
       const h0 = { x: p.x, y: c.y }, h1 = { x: q.x, y: c.y };
-      if (k.x.f !== false) out.push(F.poly([p, q, h1, h0], hexA(k.col, 0.15)), F.hit([p, q, h1, h0], true));
+      if (k.x.f !== false) out.push(F.poly([p, q, h1, h0], hexA(k.col, fillA(k, 0.15))), F.hit([p, q, h1, h0], true));
       out.push(F.line([h0, h1], k.col, k.w, k.s), F.hit([h0, h1]));
     }
     out.push(F.line([p, q], k.col, k.w, k.s), F.hit([p, q]));
@@ -248,8 +269,9 @@
     const ray = from => ext(from, { x: from.x + d.x, y: from.y + d.y }, k.W, k.H, false, true);
     const med = ext(a, m, k.W, k.H, false, true), up = ray(b), dn = ray(c), h1 = ray(midPt(b, m)), h2 = ray(midPt(c, m));
     const out = [];
-    if (k.x.f !== false) out.push(F.poly([up[0], up[1], h1[1], h1[0]], hexA(k.col, 0.1)), F.poly([h1[0], h1[1], h2[1], h2[0]], hexA(k.col, 0.16)),
-      F.poly([h2[0], h2[1], dn[1], dn[0]], hexA(k.col, 0.1)), F.hit([up[0], up[1], dn[1], dn[0]], true));
+    const fp = fillA(k, 0.1);
+    if (k.x.f !== false) out.push(F.poly([up[0], up[1], h1[1], h1[0]], hexA(k.col, fp)), F.poly([h1[0], h1[1], h2[1], h2[0]], hexA(k.col, Math.min(1, fp * 1.6))),
+      F.poly([h2[0], h2[1], dn[1], dn[0]], hexA(k.col, fp)), F.hit([up[0], up[1], dn[1], dn[0]], true));
     out.push(F.line(h1, k.col, 1, 1), F.line(h2, k.col, 1, 1));
     for (const L of [med, up, dn]) out.push(F.line(L, k.col, k.w, k.s), F.hit(L));
     out.push(F.line([b, c], k.col, k.w, k.s), F.hit([b, c]), F.line([a, m], k.col, 1, 1));
@@ -284,7 +306,7 @@
     const P = (i, off) => ({ x: X(i), y: Y(R.icpt + R.slope * (i - R.i0) + off) });
     const up = [P(R.i0, dev * R.sd), P(iE, dev * R.sd)], mid = [P(R.i0, 0), P(iE, 0)], dn = [P(R.i0, -dev * R.sd), P(iE, -dev * R.sd)];
     const out = [];
-    if (k.x.f !== false) out.push(F.poly([up[0], up[1], mid[1], mid[0]], hexA(k.col, 0.12)), F.poly([mid[0], mid[1], dn[1], dn[0]], hexA(C.red, 0.1)));
+    if (k.x.f !== false) out.push(F.poly([up[0], up[1], mid[1], mid[0]], hexA(k.col, fillA(k, 0.12))), F.poly([mid[0], mid[1], dn[1], dn[0]], hexA(C.red, fillA(k, 0.12) * 0.85)));
     out.push(F.line(up, k.col, k.w, k.s), F.line(dn, k.col, k.w, k.s), F.line(mid, C.red, k.w, 1), F.hit([up[0], up[1], dn[1], dn[0]], true));
     out.push(F.txt(dn[0].x, dn[0].y + 6, `Pearson's R ${R.r.toFixed(3)}`, { color: k.col, align: 'left', base: 'top', size: 11 }));
     return out;
@@ -300,13 +322,13 @@
     const [a, b] = k.c; if (!b) return [];
     const rv = !!k.x.rv, A = rv ? b : a, B = rv ? a : b, vA = rv ? k.v[1] : k.v[0], vB = rv ? k.v[0] : k.v[1];
     let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x); if (k.x.el) x0 = 0; if (k.x.er) x1 = k.W;
-    const out = [F.line([a, b], C.gray, 1, 1)];
+    const out = k.x.tl === false ? [] : [F.line([a, b], C.gray, 1, 1)];
     return levelFigs(k, out, L => B.y + (A.y - B.y) * L, L => vB + (vA - vB) * L, x0, x1);
   }
   function fibExtFigs(k) {
     const [a, b, c] = k.c; if (!b) return [];
-    const out = [F.line([a, b], C.gray, 1, 1), F.hit([a, b])]; if (!c) return out;
-    out.push(F.line([b, c], C.gray, 1, 1), F.hit([b, c]));
+    const tl = k.x.tl !== false, out = [...(tl ? [F.line([a, b], C.gray, 1, 1)] : []), F.hit([a, b])]; if (!c) return out;
+    out.push(...(tl ? [F.line([b, c], C.gray, 1, 1)] : []), F.hit([b, c]));
     let x0 = c.x, x1 = c.x + Math.max(60, Math.abs(b.x - a.x)); if (k.x.el) x0 = 0; if (k.x.er) x1 = k.W;
     return levelFigs(k, out, L => c.y + (b.y - a.y) * L, L => k.v[2] + (k.v[1] - k.v[0]) * L, x0, x1);
   }
@@ -315,11 +337,13 @@
     if (!c) return [F.line([a, b], k.col, k.w, k.s), F.hit([a, b])];
     const dy = c.y - yOnLine(a, b, c.x), [p, q] = ext(a, b, k.W, k.H, k.x.el, k.x.er), lv = levels(k), out = [];
     const at = (pt, L) => ({ x: pt.x, y: pt.y + dy * L });
-    if (k.x.f !== false) for (let i = 0; i + 1 < lv.length; i++) out.push(F.poly([at(p, lv[i].l), at(q, lv[i].l), at(q, lv[i + 1].l), at(p, lv[i + 1].l)], hexA(lv[i + 1].col, 0.12)));
+    if (k.x.f !== false) for (let i = 0; i + 1 < lv.length; i++) out.push(F.poly([at(p, lv[i].l), at(q, lv[i].l), at(q, lv[i + 1].l), at(p, lv[i + 1].l)], hexA(lv[i + 1].col, fillA(k, 0.12))));
     for (const o of lv) {
       const L = [at(p, o.l), at(q, o.l)];
       out.push(F.line(L, o.col, k.w, k.s), F.hit(L));
-      if (k.x.lb !== false) out.push(F.txt(L[0].x - 4, L[0].y, String(o.l), { color: o.col, align: 'right', base: 'middle', size: 11 }));
+      if (k.x.lb !== false) out.push(k.x.lpos === 1
+        ? F.txt(L[1].x + (L[1].x + 40 < k.W ? 4 : -4), L[1].y, String(o.l), { color: o.col, align: L[1].x + 40 < k.W ? 'left' : 'right', base: 'middle', size: 11 })
+        : F.txt(L[0].x - 4, L[0].y, String(o.l), { color: o.col, align: 'right', base: 'middle', size: 11 }));
     }
     return out;
   }
@@ -446,23 +470,23 @@
   function rectFigs(k) {
     const [a, b] = k.c; if (!b) return [];
     let x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x); if (k.x.el) x0 = 0; if (k.x.er) x1 = k.W;
-    const box = rectPts(x0, a.y, x1, b.y), out = [F.shape(box, k.x.f !== false ? hexA(k.col, 0.2) : null, k.col, k.w, k.s), F.hit(box, k.x.f !== false)];
+    const box = rectPts(x0, a.y, x1, b.y), out = [F.shape(box, k.x.f !== false ? hexA(k.col, fillA(k, 0.2)) : null, k.col, k.w, k.s), F.hit(box, k.x.f !== false)];
     if (k.x.m) out.push(F.line([{ x: x0, y: (a.y + b.y) / 2 }, { x: x1, y: (a.y + b.y) / 2 }], k.col, 1, 1));
     return out;
   }
   function circleFigs(k) {
     const [a, b] = k.c; if (!b) return [];
     const r = Math.hypot(b.x - a.x, b.y - a.y);
-    return [F.ell(a.x, a.y, r, r, k.x.f !== false ? hexA(k.col, 0.2) : null, k.col, k.w, k.s, k.x.f !== false)];
+    return [F.ell(a.x, a.y, r, r, k.x.f !== false ? hexA(k.col, fillA(k, 0.2)) : null, k.col, k.w, k.s, k.x.f !== false)];
   }
   function ellipseFigs(k) {
     const [a, b] = k.c; if (!b) return [];
-    return [F.ell((a.x + b.x) / 2, (a.y + b.y) / 2, (b.x - a.x) / 2, (b.y - a.y) / 2, k.x.f !== false ? hexA(k.col, 0.2) : null, k.col, k.w, k.s, k.x.f !== false)];
+    return [F.ell((a.x + b.x) / 2, (a.y + b.y) / 2, (b.x - a.x) / 2, (b.y - a.y) / 2, k.x.f !== false ? hexA(k.col, fillA(k, 0.2)) : null, k.col, k.w, k.s, k.x.f !== false)];
   }
   function triangleFigs(k) {
     const c = k.c; if (c.length < 2) return [];
     if (c.length < 3) return [F.line(c, k.col, k.w, k.s)];
-    return [F.shape(c.slice(0, 3), k.x.f !== false ? hexA(k.col, 0.2) : null, k.col, k.w, k.s), F.hit(c.slice(0, 3), k.x.f !== false)];
+    return [F.shape(c.slice(0, 3), k.x.f !== false ? hexA(k.col, fillA(k, 0.2)) : null, k.col, k.w, k.s), F.hit(c.slice(0, 3), k.x.f !== false)];
   }
   // قلم: نقطه‌ی ۱ لنگر است؛ مسیر = [فاصله‌ی زمانی (ms)، فاصله‌ی قیمت] از لنگر ⇒ با جابه‌جایی و تایم‌فریمِ دیگر درست می‌ماند
   function brushFigs(k, hl) {
@@ -530,17 +554,17 @@
     { id: 'scInfo', g: 'lines', sec: 'خطوط', fa: 'خطِ اطلاعات', en: 'Info Line', pts: 2, color: C.blue, opts: ['el', 'er'], ic: svg(`<path d="M4 20L13 11"/>${dot(4, 20)}${dot(13, 11)}<rect x="14" y="3" width="7" height="6" rx="1"/>`), figs: k => trendFigs(k, false, false, true) },
     { id: 'scExtended', g: 'lines', sec: 'خطوط', fa: 'خطِ ممتد', en: 'Extended Line', pts: 2, color: C.blue, opts: ['st'], ic: svg(`<path d="M2 22L22 2"/>${dot(8, 16)}${dot(16, 8)}`), figs: k => trendFigs(k, true, true) },
     { id: 'scAngle', g: 'lines', sec: 'خطوط', fa: 'زاویه‌ی روند', en: 'Trend Angle', pts: 2, color: C.blue, ic: svg(`<path d="M4 19h16" stroke-dasharray="2 2"/><path d="M4 19L18 6"/><path d="M11 19a7 7 0 0 0-2-5"/>${dot(4, 19)}`), figs: angleFigs },
-    { id: 'scHLine', g: 'lines', sec: 'خطوط', fa: 'خطِ افقی', en: 'Horizontal Line', key: 'Alt+H', pts: 1, color: C.blue, opts: ['ax', 'text'], pn: ['قیمت'], ic: svg(`<path d="M2 12h20"/>${dot(12, 12)}`), figs: k => hlineFigs(k), y: k => axisY(k) },
-    { id: 'scHRay', g: 'lines', sec: 'خطوط', fa: 'ریِ افقی', en: 'Horizontal Ray', key: 'Alt+J', pts: 1, color: C.blue, opts: ['ax', 'text'], pn: ['شروع'], ic: svg(`<path d="M7 12h15"/>${dot(6, 12)}`), figs: k => hlineFigs(k, true), y: k => axisY(k) },
+    { id: 'scHLine', g: 'lines', sec: 'خطوط', fa: 'خطِ افقی', en: 'Horizontal Line', key: 'Alt+H', pts: 1, color: C.blue, opts: ['ax', 'text', 'lpos', 'lvp'], pn: ['قیمت'], ic: svg(`<path d="M2 12h20"/>${dot(12, 12)}`), figs: k => hlineFigs(k), y: k => axisY(k) },
+    { id: 'scHRay', g: 'lines', sec: 'خطوط', fa: 'ریِ افقی', en: 'Horizontal Ray', key: 'Alt+J', pts: 1, color: C.blue, opts: ['ax', 'text', 'lpos', 'lvp'], pn: ['شروع'], ic: svg(`<path d="M7 12h15"/>${dot(6, 12)}`), figs: k => hlineFigs(k, true), y: k => axisY(k) },
     { id: 'scVLine', g: 'lines', sec: 'خطوط', fa: 'خطِ عمودی', en: 'Vertical Line', key: 'Alt+V', pts: 1, color: C.blue, opts: ['ax'], pn: ['زمان'], ic: svg(`<path d="M12 2v20"/>${dot(12, 12)}`), figs: vlineFigs, x: k => axisX(k) },
     { id: 'scCross', g: 'lines', sec: 'خطوط', fa: 'خطِ متقاطع', en: 'Cross Line', key: 'Alt+C', pts: 1, color: C.blue, opts: ['ax'], pn: ['نقطه'], ic: svg(`<path d="M12 2v20M2 12h20"/>${dot(12, 12)}`), figs: crossFigs, y: k => axisY(k), x: k => axisX(k) },
     { id: 'scChannel', g: 'lines', sec: 'کانال‌ها', fa: 'کانالِ موازی', en: 'Parallel Channel', pts: 3, color: C.blue, opts: ['f', 'mid', 'el', 'er'], pn: ['شروعِ خط', 'پایانِ خط', 'پهنای کانال'], ic: svg('<path d="M3 15L15 3M9 21L21 9"/><path d="M6 18L18 6" stroke-dasharray="2 2.5"/>'), figs: channelFigs },
     { id: 'scRegression', g: 'lines', sec: 'کانال‌ها', fa: 'روندِ رگرسیون', en: 'Regression Trend', pts: 2, color: C.blue, opts: ['f', 'dev', 'er'], pn: ['شروعِ بازه', 'پایانِ بازه'], noMag: true, ic: svg('<path d="M3 16L21 8" stroke-dasharray="2 2.5"/><path d="M3 12L21 4M3 20L21 12"/>'), figs: regressionFigs, move: regressionMove },
     { id: 'scFlat', g: 'lines', sec: 'کانال‌ها', fa: 'سقف/کفِ صاف', en: 'Flat Top/Bottom', pts: 3, color: C.blue, opts: ['f', 'el', 'er'], pn: ['شروعِ خطِ روند', 'پایانِ خطِ روند', 'سطحِ افقی'], ic: svg('<path d="M3 19L21 11"/><path d="M3 6h18"/>'), figs: flatFigs },
     { id: 'scPitchfork', g: 'lines', sec: 'چنگال', fa: 'چنگالِ اندروز', en: 'Pitchfork', pts: 3, color: C.orange, opts: ['f'], pn: ['دسته', 'سقف/کفِ اول', 'سقف/کفِ دوم'], ic: svg(`<path d="M3 12h18M9 5h12M9 19h12M9 5v14"/>${dot(3, 12)}`), figs: pitchforkFigs },
-    { id: 'scFib', g: 'fib', fa: 'فیبوناچیِ اصلاحی', en: 'Fib Retracement', key: 'Alt+F', pts: 2, color: C.gray, opts: ['lv', 'f', 'lb', 'rv', 'el', 'er'], pn: ['شروعِ موج (سطحِ ۱)', 'پایانِ موج (سطحِ ۰)'], ic: svg('<path d="M3 4h18M3 9h18M3 14h18M3 20h18"/><path d="M5 20L19 4" stroke-dasharray="2 2.5"/>'), figs: fibFigs },
-    { id: 'scFibExt', g: 'fib', fa: 'فیبوناچیِ گسترشی', en: 'Trend-Based Fib Extension', pts: 3, color: C.gray, opts: ['lv', 'f', 'lb', 'el', 'er'], pn: ['شروعِ موج (A)', 'پایانِ موج (B)', 'پایانِ اصلاح (C)'], ic: svg('<path d="M3 20L8 9l4 6" stroke-dasharray="2 2"/><path d="M13 4h8M13 9h8M13 14h8M13 19h8"/>'), figs: fibExtFigs },
-    { id: 'scFibChannel', g: 'fib', fa: 'کانالِ فیبوناچی', en: 'Fib Channel', pts: 3, color: C.gray, opts: ['lv', 'f', 'lb', 'el', 'er'], pn: ['شروعِ خط', 'پایانِ خط', 'پهنا'], ic: svg('<path d="M3 13L13 3M5 17L17 5M8 21L21 8"/>'), figs: fibChannelFigs },
+    { id: 'scFib', g: 'fib', fa: 'فیبوناچیِ اصلاحی', en: 'Fib Retracement', key: 'Alt+F', pts: 2, color: C.gray, opts: ['lv', 'tl', 'f', 'lb', 'lp', 'lpos', 'lvp', 'rv', 'el', 'er'], pn: ['شروعِ موج (سطحِ ۱)', 'پایانِ موج (سطحِ ۰)'], ic: svg('<path d="M3 4h18M3 9h18M3 14h18M3 20h18"/><path d="M5 20L19 4" stroke-dasharray="2 2.5"/>'), figs: fibFigs },
+    { id: 'scFibExt', g: 'fib', fa: 'فیبوناچیِ گسترشی', en: 'Trend-Based Fib Extension', pts: 3, color: C.gray, opts: ['lv', 'tl', 'f', 'lb', 'lp', 'lpos', 'lvp', 'el', 'er'], pn: ['شروعِ موج (A)', 'پایانِ موج (B)', 'پایانِ اصلاح (C)'], ic: svg('<path d="M3 20L8 9l4 6" stroke-dasharray="2 2"/><path d="M13 4h8M13 9h8M13 14h8M13 19h8"/>'), figs: fibExtFigs },
+    { id: 'scFibChannel', g: 'fib', fa: 'کانالِ فیبوناچی', en: 'Fib Channel', pts: 3, color: C.gray, opts: ['lv', 'f', 'lb', 'lpos', 'el', 'er'], pn: ['شروعِ خط', 'پایانِ خط', 'پهنا'], ic: svg('<path d="M3 13L13 3M5 17L17 5M8 21L21 8"/>'), figs: fibChannelFigs },
     { id: 'scFibTime', g: 'fib', fa: 'منطقه‌ی زمانیِ فیبوناچی', en: 'Fib Time Zone', pts: 2, color: C.gray, opts: ['lb'], pn: ['شروع', 'یک واحدِ زمانی'], noMag: true, ic: svg('<path d="M3 3v18M6 3v18M9 3v18M14 3v18M21 3v18"/>'), figs: fibTimeFigs },
     { id: 'scXABCD', g: 'patterns', sec: 'الگوها', fa: 'الگوی XABCD', en: 'XABCD Pattern', pts: 5, color: C.blue, opts: ['f', 'lb'], pn: ['X', 'A', 'B', 'C', 'D'], ic: svg('<path d="M2 17L7 6l4 8 5-10 6 14"/>'), figs: xabcdFigs },
     { id: 'scABCD', g: 'patterns', sec: 'الگوها', fa: 'الگوی ABCD', en: 'ABCD Pattern', pts: 4, color: C.green, opts: ['lb'], pn: ['A', 'B', 'C', 'D'], ic: svg('<path d="M3 18L9 6l5 8 7-10"/>'), figs: abcdFigs },
@@ -582,7 +606,9 @@
     ax: ['boolOn', 'برچسبِ قیمت/زمان روی محور', 'Price/time label on axis'], text: ['text', 'متن', 'Text'], f: ['boolOn', 'پس‌زمینه', 'Background'],
     mid: ['boolOn', 'خطِ میانی', 'Middle line'], m: ['bool', 'خطِ میانی', 'Middle line'], dev: ['dev', 'انحرافِ معیار', 'Deviation'],
     lb: ['boolOn', 'برچسبِ سطوح', 'Labels'], rv: ['bool', 'معکوس (سطحِ ۰ روی نقطه‌ی اول)', 'Reverse (level 0 on point 1)'], lv: ['levels', 'سطوح', 'Levels'],
-    fs: ['fs', 'اندازه‌ی قلم', 'Font size'], b: ['bool', 'درشت (Bold)', 'Bold'], bg: ['bool', 'کادر و پس‌زمینه', 'Border and background']
+    fs: ['fs', 'اندازه‌ی قلم', 'Font size'], b: ['bool', 'درشت (Bold)', 'Bold'], bg: ['bool', 'کادر و پس‌زمینه', 'Border and background'],
+    tl: ['boolOn', 'خطِ روند', 'Trend line'], lp: ['boolOn', 'قیمت در برچسب‌ها', 'Prices in labels'],
+    lpos: ['lpos', 'جای برچسب‌ها (افقی)', 'Labels position'], lvp: ['lvp', 'جای برچسب‌ها (عمودی)', 'Labels vertical position']
   };
   const ICON = {
     tri: '<svg viewBox="0 0 6 6" aria-hidden="true"><path d="M6 0v6H0z" fill="currentColor"/></svg>',
@@ -606,6 +632,8 @@
     chev: svg('<path d="M6 9l6 6 6-6"/>'),
     close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
     full: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+    sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+    moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
     unfull: svg('<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>')
   };
 
@@ -713,6 +741,45 @@
         return r;
       };
     }
+    // v26.41: نمودار از وسط بالا/پایین هم می‌رود (مثلِ TradingView): کشیدنِ عمودی روی نمودارِ اصلی مقیاسِ خودکارِ قیمت را
+    // خاموش می‌کند تا کتابخانه همان کشیدن را جابه‌جاییِ عمودی کند؛ دکمه‌ی «A» گوشه‌ی محورِ قیمت آن را برمی‌گرداند.
+    if (ce && typeof ce.pressedMouseMoveEvent === 'function' && !ce.__scPan) {
+      const pm = ce.pressedMouseMoveEvent.bind(ce); ce.__scPan = true;
+      ce.pressedMouseMoveEvent = e => {
+        try {
+          const w = ce._mouseDownWidget, st = ce._startScrollCoordinate, os = chart.getChartStore().getOverlayStore();
+          if (w && st && w.getName() === 'main' && w.getPane().getId() === 'candle_pane' && !os.getPressedInstanceInfo()?.instance && !os.getProgressInstanceInfo() && !T[S.tool]?.pad) {
+            const ax = w.getPane().getAxisComponent(), b = w.getBounding(), dy = e.y - b.top - st.y, dx = e.x - b.left - st.x;
+            if (ax.getAutoCalcTickFlag() && Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx) * 0.5) { ax.setAutoCalcTickFlag(false); setTimeout(paintAuto, 0); }
+          }
+        } catch (_) {}
+        return pm(e);
+      };
+    }
+    // لمس: کتابخانه کشیدنِ انگشت را فقط افقی می‌کند؛ همان جابه‌جاییِ عمودیِ موس این‌جا برای انگشت هم ساخته شده
+    if (ce && typeof ce.touchMoveEvent === 'function' && typeof ce.touchStartEvent === 'function' && !ce.__scTouchPan) {
+      const tsE = ce.touchStartEvent.bind(ce), tmE = ce.touchMoveEvent.bind(ce); ce.__scTouchPan = true;
+      ce.touchStartEvent = e => { ce.__scRange = null; ce.__scY = null; return tsE(e); };
+      ce.touchMoveEvent = e => {
+        try {
+          const st = ce._startScrollCoordinate, os = chart.getChartStore().getOverlayStore(), f = ce._findWidgetByEvent(e), w = f.widget, pane = f.pane;
+          if (st && ce._touchCoordinate == null && w && pane && w.getName() === 'main' && pane.getId() === 'candle_pane' && !os.getPressedInstanceInfo()?.instance && !os.getProgressInstanceInfo() && !T[S.tool]?.pad) {
+            const ax = pane.getAxisComponent(), b = w.getBounding(), x = e.x - b.left, y = e.y - b.top;
+            let go = !ax.getAutoCalcTickFlag();
+            if (!go && Math.abs(y - st.y) > 10 && Math.abs(y - st.y) >= Math.abs(x - st.x) * 0.5) { ax.setAutoCalcTickFlag(false); go = true; setTimeout(paintAuto, 0); }
+            if (go) {
+              if (!ce.__scRange) { ce.__scRange = { ...ax.getRange() }; ce.__scY = y; }
+              const { from, range } = ce.__scRange, dist = ax.isReverse() ? ce.__scY - y : y - ce.__scY, nf = from + range * dist / b.height, nt = nf + range;
+              const rf = ax.convertToRealValue(nf), rt = ax.convertToRealValue(nt);
+              ax.setRange({ from: nf, to: nt, range, realFrom: rf, realTo: rt, realRange: rt - rf });
+              chart.getChartStore().getTimeScaleStore().scroll(x - st.x);   // بازرسمِ همه + حرکتِ افقیِ هم‌زمان (مثلِ موس)
+              return true;
+            }
+          }
+        } catch (_) {}
+        return tmE(e);
+      };
+    }
     if (patched) return;
     const ts = chart.getChartStore?.()?.getTimeScaleStore?.();
     const OvProto = Object.getPrototypeOf(window.klinecharts.getOverlayClass('scTrend')?.prototype || {});
@@ -751,29 +818,39 @@
     OvProto.nextStep = function () { ns.call(this); if (T[this.name] && this.id === S.drawingId) setTimeout(() => { if (this.isDrawing() && this.id === S.drawingId) hint(this.name, this.currentStep); }, 0); };
   }
 
-  // ── ظاهر ──
-  const TXT = '#8a8274', LINE = '#2a2621';
-  const STYLES = {
-    grid: { horizontal: { color: 'rgba(255,255,255,.035)' }, vertical: { color: 'rgba(255,255,255,.035)' } },
-    candle: {
-      bar: { upColor: UP, downColor: DOWN, noChangeColor: TXT, upBorderColor: UP, downBorderColor: DOWN, noChangeBorderColor: TXT, upWickColor: UP, downWickColor: DOWN, noChangeWickColor: TXT },
-      priceMark: { high: { color: TXT, textFamily: MONO, textSize: 11 }, low: { color: TXT, textFamily: MONO, textSize: 11 },
-        last: { upColor: UP, downColor: DOWN, text: { family: MONO, size: 11, weight: 600 } } },
-      tooltip: { showRule: 'always', showType: 'standard', text: { color: '#aea89e', size: 11, family: MONO, marginLeft: 6, marginRight: 6 } }
-    },
-    indicator: { tooltip: { text: { color: '#aea89e', size: 11, family: MONO } } },
-    xAxis: { axisLine: { color: LINE }, tickLine: { color: LINE }, tickText: { color: TXT, size: 11, family: MONO } },
-    yAxis: { axisLine: { color: LINE }, tickLine: { color: LINE }, tickText: { color: TXT, size: 11, family: MONO } },
-    separator: { color: LINE },
-    crosshair: {
-      horizontal: { line: { color: 'rgba(200,168,75,.45)' }, text: { backgroundColor: '#3a332a', borderColor: '#3a332a', family: MONO, size: 11, color: '#EFEAE3' } },
-      vertical: { line: { color: 'rgba(200,168,75,.45)' }, text: { backgroundColor: '#3a332a', borderColor: '#3a332a', family: MONO, size: 11, color: '#EFEAE3' } }
-    },
-    overlay: { text: { family: MONO, size: 11 }, rect: { color: 'rgba(41,98,255,.12)' } }
+  // ── ظاهر: تمِ تیره (رنگ‌های خودِ اپ) و روشن (همان رنگ‌های TradingView) ──
+  const THEME = {
+    dark: { bg: '#0b0a09', txt: '#8a8274', line: '#2a2621', grid: 'rgba(255,255,255,.035)', up: UP, down: DOWN, tip: '#aea89e', cross: 'rgba(200,168,75,.45)', crossBg: '#3a332a', crossTxt: '#EFEAE3', icon: '#8a8274', iconOn: '#EFEAE3', iconBg: 'rgba(255,255,255,.12)' },
+    light: { bg: '#FFFFFF', txt: '#131722', line: '#E0E3EB', grid: '#F0F3FA', up: '#089981', down: '#F23645', tip: '#131722', cross: '#9598A1', crossBg: '#131722', crossTxt: '#FFFFFF', icon: '#787B86', iconOn: '#131722', iconBg: 'rgba(19,23,34,.08)' }
   };
+  const TH = () => THEME[S.theme] || THEME.dark;
+  const ICON_FONT = "'Segoe UI Symbol','Apple Symbols','Noto Sans Symbols 2','Noto Sans Symbols',sans-serif";
+  function stylesFor() {
+    const t = TH(), rule = S.phone ? 'follow_cross' : 'always';
+    // ⚙ و ✕ کنارِ نامِ هر اندیکاتور (مثلِ TradingView): تنظیمات و حذف
+    const ic = (id, icon, ml) => ({ id, position: 'middle', marginLeft: ml, marginTop: 0, marginRight: 0, marginBottom: 0, paddingLeft: 3, paddingTop: 1, paddingRight: 3, paddingBottom: 1,
+      size: 12, color: t.icon, activeColor: t.iconOn, backgroundColor: 'rgba(0,0,0,0)', activeBackgroundColor: t.iconBg, fontFamily: ICON_FONT, icon });
+    const tick = { color: t.txt, size: 11, family: MONO };
+    const crossText = { backgroundColor: t.crossBg, borderColor: t.crossBg, family: MONO, size: 11, color: t.crossTxt };
+    return {
+      grid: { horizontal: { color: t.grid }, vertical: { color: t.grid } },
+      candle: {
+        bar: { upColor: t.up, downColor: t.down, noChangeColor: t.txt, upBorderColor: t.up, downBorderColor: t.down, noChangeBorderColor: t.txt, upWickColor: t.up, downWickColor: t.down, noChangeWickColor: t.txt },
+        priceMark: { high: { color: t.txt, textFamily: MONO, textSize: 11 }, low: { color: t.txt, textFamily: MONO, textSize: 11 },
+          last: { upColor: t.up, downColor: t.down, text: { family: MONO, size: 11, weight: 600 } } },
+        tooltip: { showRule: rule, showType: 'standard', text: { color: t.tip, size: 11, family: MONO, marginLeft: 6, marginRight: 6 } }
+      },
+      indicator: { tooltip: { showRule: rule, text: { color: t.tip, size: 11, family: MONO }, icons: readOnly() ? [] : [ic('set', '⚙', 8), ic('del', '✕', 2)] } },
+      xAxis: { axisLine: { color: t.line }, tickLine: { color: t.line }, tickText: tick },
+      yAxis: { axisLine: { color: t.line }, tickLine: { color: t.line }, tickText: tick },
+      separator: { color: t.line },
+      crosshair: { horizontal: { line: { color: t.cross }, text: crossText }, vertical: { line: { color: t.cross }, text: crossText } },
+      overlay: { text: { family: MONO, size: 11 }, rect: { color: 'rgba(41,98,255,.12)' } }
+    };
+  }
   // دسته‌ها مثلِ TradingView: حلقه‌ی توخالی به رنگِ شکل؛ زیرِ انگشت بزرگ‌تر
   const ovStyles = col => ({
-    point: { color: '#0b0a09', borderColor: col, borderSize: 1.6, radius: S.touch ? 6.5 : 4.5, activeColor: col, activeBorderColor: hexA(col, 0.3), activeBorderSize: 4, activeRadius: S.touch ? 7.5 : 5.5 },
+    point: { color: TH().bg, borderColor: col, borderSize: 1.6, radius: S.touch ? 6.5 : 4.5, activeColor: col, activeBorderColor: hexA(col, 0.3), activeBorderSize: 4, activeRadius: S.touch ? 7.5 : 5.5 },
     text: { color: ink(col), backgroundColor: col, borderColor: col, family: MONO, size: 11 },
     rect: { color: hexA(col, 0.12) }
   });
@@ -804,7 +881,9 @@
     if (S.store) S.store.recent = [S.coin, ...(S.store.recent || []).filter(x => x !== S.coin)].slice(0, 10);
     const last = S.data[S.data.length - 1];
     S.chart.setPriceVolumePrecision(precisionOf(last?.close), 2);
+    { const a = candleAxis(); if (a && !a.getAutoCalcTickFlag()) a.setAutoCalcTickFlag(true); }   // نماد/تایم‌فریمِ تازه = مقیاسِ خودکار
     S.chart.applyNewData(S.data, S.more);
+    setTimeout(paintAuto, 0);
     const bs = S.store?.prefs?.bs; if (isNum(bs) && bs >= 1 && bs <= 50) S.chart.setBarSpace(bs);   // زومِ خودِ دانشجو
     msg('');
     restoreDrawings();
@@ -940,8 +1019,10 @@
     };
   }
   const lockOf = m => readOnly() || S.lockAll || !!m.k;
+  // x.vis = تایم‌فریم‌هایی که شکل روی‌شان دیده می‌شود (بیتِ i = TFS[i])؛ نبودنش = همه
+  const visOn = m => !isNum(m.x?.vis) || !!(m.x.vis & (1 << Math.max(0, TFS.findIndex(t => t.id === S.tf))));
   // آخرین ظاهرِ هر ابزار = پیش‌فرضِ شکلِ بعدی (مثلِ TradingView). متنِ هر شکل و مسیرِ قلم مالِ خودِ همان شکل‌اند.
-  const TD_X = new Set(['el', 'er', 'st', 'ax', 'f', 'mid', 'm', 'dev', 'lb', 'rv', 'lv', 'fs', 'b', 'bg']);
+  const TD_X = new Set(['el', 'er', 'st', 'ax', 'f', 'mid', 'm', 'dev', 'lb', 'rv', 'lv', 'fs', 'b', 'bg', 'fo', 'tl', 'lp', 'lpos', 'lvp', 'oc', 'lvl']);
   function styleFor(n) {
     const td = S.store?.prefs?.td?.[n]; if (!td || typeof td !== 'object') return {};
     const out = {};
@@ -950,6 +1031,13 @@
     if ([1, 2].includes(td.s)) out.s = td.s;
     if (td.x && typeof td.x === 'object') { const x = {}; for (const [k, v] of Object.entries(td.x)) if (TD_X.has(k)) x[k] = Array.isArray(v) ? v.slice() : v; if (Object.keys(x).length) out.x = x; }
     return out;
+  }
+  // ابزارِ سطح‌دارِ تازه (فیبوی اصلاحی/گسترشی/کانال) با همان سطوحِ پیش‌فرضِ TradingView: ۱۱ سطح تا ۴٫۲۳۶ (پیش‌تر فقط تا ۱٫۶۱۸)؛
+  // شکل‌های ذخیره‌شده‌ی قبلی دست نمی‌خورند. اگر دانشجو سطوحِ خودش را ساخته باشد (td)، همان می‌آید.
+  function newStyle(id) {
+    const st = styleFor(id);
+    if (T[id]?.opts?.includes('lv') && !st.x?.lvl && !st.x?.lv) st.x = { ...(st.x || {}), lvl: LV_TV.map(([l, c], i) => [l, i < LV.length ? 1 : 0, c]) };
+    return st;
   }
   function rememberStyle(id) {
     const m = S.recs.get(id); if (!m || readOnly() || !S.store) return;
@@ -963,7 +1051,7 @@
   function makeOverlay(rec, drawing) {
     const def = T[rec.n]; if (!def || def.special) return null;
     const m = metaOf(rec);
-    const o = { id: rec.id, name: rec.n, mode: 'normal', visible: !S.hidden && !m.h, lock: lockOf(m), extendData: { ...m }, styles: ovStyles(m.c || def.color || C.blue), ...callbacks() };
+    const o = { id: rec.id, name: rec.n, mode: 'normal', visible: !S.hidden && !m.h && visOn(m), lock: lockOf(m), extendData: { ...m }, styles: ovStyles(m.c || def.color || C.blue), ...callbacks() };
     if (!drawing) o.points = rec.p.map(([t, v]) => ({ timestamp: t, value: v }));
     S.quiet = !drawing; let id = null;
     try { id = S.chart.createOverlay(o); } finally { S.quiet = false; }
@@ -973,7 +1061,7 @@
   function refresh(id) {
     const m = S.recs.get(id); if (!m) return;
     S.quiet = true;
-    try { S.chart.overrideOverlay({ id, extendData: { ...m }, styles: ovStyles(m.c || T[m.n].color || C.blue), lock: lockOf(m), visible: !S.hidden && !m.h }); }
+    try { S.chart.overrideOverlay({ id, extendData: { ...m }, styles: ovStyles(m.c || T[m.n].color || C.blue), lock: lockOf(m), visible: !S.hidden && !m.h && visOn(m) }); }
     finally { S.quiet = false; }
   }
   function setPoints(id, points) { S.quiet = true; try { S.chart.overrideOverlay({ id, points }); } finally { S.quiet = false; } }
@@ -1036,7 +1124,7 @@
     S.tool = id; if (def.g && def.g !== 'ruler') S.store.prefs.gl = { ...(S.store.prefs.gl || {}), [def.g]: id };
     deselect(); paintTools();
     if (def.pad) { pad(true); hint(id, 1); return; }
-    S.drawingId = makeOverlay({ id: newId(), n: id, p: [], ...styleFor(id) }, true);
+    S.drawingId = makeOverlay({ id: newId(), n: id, p: [], ...newStyle(id) }, true);
     hint(id, 1);
   }
   function onDrawn(o) {
@@ -1327,6 +1415,8 @@
   function setColor(c) {
     const id = S.selected; if (!S.recs.has(id)) return;
     if (c && !/^#[0-9A-Fa-f]{6}$/.test(c)) return;
+    const m = S.recs.get(id);
+    if (T[m.n]?.opts?.includes('lv')) { m.x = { ...(m.x || {}) }; if (c) m.x.oc = true; else delete m.x.oc; }
     setMeta(id, { c: c || null }); rememberStyle(id); closePop();
   }
   function setWidth(w) { if ([1, 2, 3, 4].includes(w)) { setMeta(S.selected, { w }); rememberStyle(S.selected); } closePop(); }
@@ -1352,55 +1442,176 @@
   }
 
   // ── تنظیماتِ هر شکل (مثلِ پنجره‌ی Settings در TradingView) ──
-  function openSettings(id = S.selected) {
+  // ── پنجره‌ی تنظیماتِ شکل، مثلِ TradingView: «ظاهر / متن / مختصات / نمایش»؛ هر تغییر همان لحظه روی نمودار دیده می‌شود
+  //    (پیش‌نمایشِ زنده) و «انصراف» / Esc همه را برمی‌گرداند. رنگ، ضخامت و نوعِ خط هم این‌جاست، نه فقط در نوارِ شکل.
+  const NO_LINE = new Set(['scLong', 'scShort', 'scText', 'scPriceLabel']);
+  const NO_COLOR = new Set(['scLong', 'scShort']);
+  const TEXT_KEYS = new Set(['text', 'fs', 'b', 'bg']);
+  const FO_DEF = { scFib: 12, scFibExt: 12, scFibChannel: 12, scChannel: 15, scFlat: 15, scPitchfork: 10, scRegression: 12, scRect: 20, scCircle: 20, scEllipse: 20, scTriangle: 20 };
+  const numIn = s => parseFloat(String(s).replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c)).replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c)).replace(/,/g, ''));
+  const WIDTH_IC = w => `<i class="chs-wl" style="--w:${w}px"></i>`;
+  const STYLE_IC = s => `<i class="chs-sl s${s}"></i>`;
+  function openSettings(id = S.selected, tab) {
     const m = S.recs.get(id), o = id && S.chart.getOverlayById(id), box = $('ch-modal'); if (!m || !o || !box || readOnly()) return;
     closePop(); closeCtx();
-    const def = T[m.n], x = m.x || {}, opts = def.opts || [];
-    const f = [];
-    for (const key of opts) {
-      const [type, labFa, labEn] = OPT[key], lab = tr(labFa, labEn);
-      if (type === 'bool' || type === 'boolOn') { const on = type === 'boolOn' ? x[key] !== false : !!x[key]; f.push(`<label class="ch-ck"><input type="checkbox" data-o="${key}" data-t="${type}"${on ? ' checked' : ''}><span>${lab}</span></label>`); }
-      else if (type === 'text') f.push(`<label class="fl" for="ch-o-text">${lab}</label><textarea id="ch-o-text" class="fi" data-o="text" rows="2" maxlength="200" placeholder="${def.text ? tr('متن', 'Text') : tr('اختیاری', 'Optional')}">${esc(x.text || '')}</textarea>`);
-      else if (type === 'fs') f.push(`<label class="ch-row"><span>${lab}</span><select class="fi" data-o="fs">${[10, 12, 14, 16, 20, 24, 28, 36].map(s => `<option value="${s}"${(+x.fs || 14) === s ? ' selected' : ''}>${s}</option>`).join('')}</select></label>`);
-      else if (type === 'dev') f.push(`<label class="ch-row"><span>${lab}</span><select class="fi" data-o="dev">${[1, 1.5, 2, 2.5, 3].map(s => `<option value="${s}"${(isNum(x.dev) ? x.dev : 2) === s ? ' selected' : ''}>${s}</option>`).join('')}</select></label>`);
-      else if (type === 'levels') { const on = Array.isArray(x.lv) ? x.lv : LV_ON; f.push(`<div class="fl">${lab}</div><div class="ch-lvs">${LV.map((l, i) => `<label class="ch-lv" style="--c:${LV_COL[i]}"><input type="checkbox" data-lv="${i}"${on.includes(i) ? ' checked' : ''}><span dir="ltr">${l}</span></label>`).join('')}</div>`); }
-    }
-    const pts = def.pad ? [] : o.points.slice(0, def.pts);
-    const coord = pts.length ? `<div class="fl">${tr('مختصات (قیمتِ هر نقطه)', 'Coordinates (price of each point)')}</div><div class="ch-coords">${pts.map((p, i) => `<label class="ch-row"><span>${esc(ptName(def, i, true))}</span><input class="fi" dir="ltr" inputmode="decimal" data-pt="${i}" value="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}" data-was="${isNum(p.value) ? (+p.value).toFixed(prec()) : ''}"></label>`).join('')}</div>` : '';
-    box.innerHTML = `<div class="ch-mcard ch-set" role="dialog" aria-label="${esc(tr('تنظیماتِ ' + def.fa, def.en + ' settings'))}"><div class="ch-mh"><b>${esc(nm(def))}</b>${EN() ? '' : `<small dir="ltr">${esc(def.en)}</small>`}</div>
-      ${f.length ? `<div class="ch-sec">${f.join('')}</div>` : ''}${coord}
-      <div class="ch-mrow"><button type="button" class="btn btn-ghost ch-sdef" id="ch-sdef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button><button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
-    box.hidden = false;
-    const close = ok => {
-      if (ok) {
-        const nx = { ...x };
-        box.querySelectorAll('[data-o]').forEach(el => {
-          const k = el.dataset.o;
-          if (el.type === 'checkbox') { if (el.dataset.t === 'boolOn') { if (el.checked) delete nx[k]; else nx[k] = false; } else { if (el.checked) nx[k] = true; else delete nx[k]; } }
-          else if (k === 'text') { const v = String(el.value || '').trim().slice(0, 200); if (v) nx.text = v; else delete nx.text; }
-          else if (k === 'fs') { const v = +el.value; if (v === 14) delete nx.fs; else nx.fs = v; }
-          else if (k === 'dev') { const v = +el.value; if (v === 2) delete nx.dev; else nx.dev = v; }
-        });
-        if (box.querySelector('[data-lv]')) {
-          const lv = [...box.querySelectorAll('[data-lv]')].filter(e => e.checked).map(e => +e.dataset.lv);
-          if (JSON.stringify(lv) === JSON.stringify(LV_ON)) delete nx.lv; else nx.lv = lv;
-        }
-        const np = o.points.map(p => ({ ...p })); let moved = false;
-        box.querySelectorAll('[data-pt]').forEach(el => { const v = parseFloat(String(el.value).replace(/[٠-٩۰-۹]/g, d => '0123456789'['٠١٢٣٤٥٦٧٨٩'.indexOf(d) >= 0 ? '٠١٢٣٤٥٦٧٨٩'.indexOf(d) : '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)]).replace(/,/g, '')); const i = +el.dataset.pt; if (isNum(v) && v > 0 && np[i] && String(el.value).trim() !== el.dataset.was) { np[i].value = v; moved = true; } });
-        if (moved) setPoints(id, np.map(p => ({ timestamp: tsOfPoint(p), value: p.value })));
-        m.x = nx; rememberStyle(id); refresh(id); commit(); paintSel();
+    const def = T[m.n], opts = def.opts || [];
+    m.x = m.x || {};
+    const snap = JSON.parse(JSON.stringify(m)), pts0 = o.points.slice(0, def.pts).map(p => ({ timestamp: tsOfPoint(p), value: p.value }));
+    const lineOk = !def.pad && !NO_LINE.has(m.n), colorOk = !NO_COLOR.has(m.n), hasLv = opts.includes('lv');
+    // جای برچسب برای ابزارِ متن‌دار (خطِ افقی) در زبانه‌ی «متن» است، برای فیبو در «ظاهر»
+    const inText = k => TEXT_KEYS.has(k) || ((k === 'lpos' || k === 'lvp') && opts.includes('text'));
+    const textOpts = opts.filter(inText), styleOpts = opts.filter(k => !inText(k) && k !== 'lv');
+    const lposDef = ['scHLine', 'scHRay'].includes(m.n) ? 1 : 0;
+    const posRow = (key, lab) => key === 'lpos'
+      ? `<div class="chs-r"><span class="chs-l">${lab}</span>${seg('lpos', [[0, tr('چپ', 'Left'), tr('چپ', 'Left')], [1, tr('راست', 'Right'), tr('راست', 'Right')]], m.x.lpos === 0 || m.x.lpos === 1 ? m.x.lpos : lposDef)}</div>`
+      : `<div class="chs-r"><span class="chs-l">${lab}</span>${seg('lvp', [[-1, tr('خودکار', 'Auto'), tr('خودکار', 'Auto')], [0, tr('بالا', 'Top'), tr('بالا', 'Top')], [1, tr('وسط', 'Middle'), tr('وسط', 'Middle')], [2, tr('پایین', 'Bottom'), tr('پایین', 'Bottom')]], [0, 1, 2].includes(m.x.lvp) ? m.x.lvp : -1)}</div>`;
+    const tabs = [['style', tr('ظاهر', 'Style')]];
+    if (textOpts.length) tabs.push(['text', tr('متن', 'Text')]);
+    if (!def.pad) tabs.push(['coords', tr('مختصات', 'Coordinates')]);
+    tabs.push(['vis', tr('نمایش', 'Visibility')]);
+    let cur = tabs.some(t => t[0] === tab) ? tab : 'style', rows = hasLv ? levelRows(m.x) : null, lvTouched = false, palFor = null, moved = false;
+    const colOf = () => m.c || def.color || C.blue;
+    const live = () => { if (hasLv && lvTouched) { m.x.lvl = rows.map(r => r.slice()); delete m.x.lv; } refresh(id); paintSel(); };
+    const sw = (key, col, cls = '') => `<button type="button" class="chs-sw${cls}" data-sw="${key}" style="--c:${col}" title="${tr('رنگ', 'Color')}" aria-label="${tr('رنگ', 'Color')}"></button>`;
+    const seg = (key, vals, now) => `<div class="chs-seg" role="group" data-seg="${key}">${vals.map(([v, inner, t]) => `<button type="button" data-v="${v}" class="${v === now ? 'on' : ''}" title="${esc(t)}" aria-label="${esc(t)}" aria-pressed="${v === now}">${inner}</button>`).join('')}</div>`;
+    const ck = (key, on, lab, extra = '') => `<div class="chs-r chs-rc"><label class="chs-ck"><input type="checkbox" data-o="${key}"${on ? ' checked' : ''}><span>${lab}</span></label>${extra}</div>`;
+    const optOn = key => OPT[key][0] === 'boolOn' ? m.x[key] !== false : !!m.x[key];
+    function stylePanel() {
+      const h = [];
+      if (colorOk) h.push(`<div class="chs-r"><span class="chs-l">${lineOk ? tr('خط', 'Line') : tr('رنگ', 'Color')}</span><div class="chs-c">${sw('c', colOf())}`
+        + (lineOk ? seg('w', [1, 2, 3, 4].map(w => [w, WIDTH_IC(w), w + 'px']), m.w || 1) + seg('s', [[0, STYLE_IC(0), tr('پیوسته', 'Solid')], [1, STYLE_IC(1), tr('خط‌چین', 'Dashed')], [2, STYLE_IC(2), tr('نقطه‌چین', 'Dotted')]], m.s || 0) : '') + '</div></div>');
+      for (const key of styleOpts) {
+        const [type, lf, le] = OPT[key], lab = tr(lf, le);
+        if (type === 'bool' || type === 'boolOn') {
+          const fo = key === 'f' && FO_DEF[m.n] != null ? (isNum(m.x.fo) ? m.x.fo : FO_DEF[m.n]) : null;
+          h.push(ck(key, optOn(key), lab, fo == null ? '' : `<div class="chs-c chs-op"><input type="range" dir="ltr" min="0" max="100" step="1" value="${fo}" data-fo aria-label="${tr('شفافیتِ پس‌زمینه', 'Background opacity')}"><b dir="ltr" data-fov>${fo}%</b></div>`));
+        } else if (type === 'dev') h.push(`<div class="chs-r"><span class="chs-l">${lab}</span><select class="fi chs-in" data-o="dev">${[1, 1.5, 2, 2.5, 3].map(v => `<option value="${v}"${(isNum(m.x.dev) ? m.x.dev : 2) === v ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`);
+        else if (type === 'lpos' || type === 'lvp') h.push(posRow(key, lab));
       }
-      box.hidden = true; box.innerHTML = '';
+      if (hasLv) {
+        h.push(`<div class="chs-h">${tr('سطوح', 'Levels')}</div><div class="chs-lvs">${rows.map((r, i) => `<div class="chs-lv"><input type="checkbox" data-lvon="${i}"${r[1] ? ' checked' : ''} aria-label="${tr('سطحِ ', 'Level ') + r[0]}">`
+          + `<input class="chs-lvv" dir="ltr" inputmode="decimal" data-lvv="${i}" value="${r[0]}" aria-label="${tr('مقدارِ سطح', 'Level value')}">${sw('lv' + i, r[2], ' sm')}</div>`).join('')}</div>`);
+        h.push(ck('oc', !!m.x.oc, tr('یک رنگ برای همه‌ی سطوح (رنگِ خط)', 'Use one color (line color)')));
+      }
+      return h.join('');
+    }
+    function textPanel() {
+      const h = [];
+      for (const key of textOpts) {
+        const [type, lf, le] = OPT[key], lab = tr(lf, le);
+        if (type === 'text') h.push(`<label class="chs-h" for="chs-text">${lab}</label><textarea id="chs-text" class="fi chs-ta" data-o="text" rows="3" maxlength="200" dir="auto" placeholder="${def.text ? tr('متن', 'Text') : tr('اختیاری', 'Optional')}">${esc(m.x.text || '')}</textarea>`);
+        else if (type === 'lpos' || type === 'lvp') h.push(posRow(key, lab));
+        else if (type === 'fs') h.push(`<div class="chs-r"><span class="chs-l">${lab}</span><select class="fi chs-in" data-o="fs">${[10, 12, 14, 16, 20, 24, 28, 36].map(v => `<option value="${v}"${(+m.x.fs || 14) === v ? ' selected' : ''}>${v}</option>`).join('')}</select></div>`);
+        else h.push(ck(key, optOn(key), lab));
+      }
+      return h.join('');
+    }
+    function coordsPanel() {
+      const pts = o.points.slice(0, def.pts);
+      return `<div class="chs-hint">${tr('قیمتِ هر نقطه را دقیق بنویس؛ زمان را با کشیدنِ نقطه روی نمودار عوض کن.', 'Type the exact price of each point; move a point on the chart to change its time.')}</div>`
+        + pts.map((p, i) => { const v = isNum(p.value) ? (+p.value).toFixed(prec()) : ''; return `<div class="chs-r"><span class="chs-l">${esc(ptName(def, i, true))}<small dir="ltr">${esc(fmtDate(tsOfPoint(p)))}</small></span>`
+          + `<input class="fi chs-in" dir="ltr" inputmode="decimal" data-pt="${i}" value="${v}" aria-label="${tr('قیمت', 'Price')}"></div>`; }).join('');
+    }
+    function visPanel() {
+      const mask = isNum(m.x.vis) ? m.x.vis : 63;
+      return `<div class="chs-hint">${tr('این شکل روی کدام تایم‌فریم‌ها دیده شود؟', 'Show this drawing on which time intervals?')}</div><div class="chs-vis">`
+        + TFS.map((t, i) => `<label class="chs-ck"><input type="checkbox" data-vis="${i}"${mask & (1 << i) ? ' checked' : ''}><span dir="ltr">${t.l}</span></label>`).join('') + '</div>';
+    }
+    function render() {
+      const panels = { style: stylePanel, text: textPanel, coords: coordsPanel, vis: visPanel };
+      box.innerHTML = `<div class="ch-mcard ch-set chs" role="dialog" aria-label="${esc(tr('تنظیماتِ ' + def.fa, def.en + ' settings'))}">`
+        + `<div class="chs-top"><b>${esc(nm(def))}</b><button type="button" class="chs-x" id="chs-x" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+        + `<div class="chs-tabs" role="tablist">${tabs.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === cur ? 'on' : ''}" aria-selected="${k === cur}">${t}</button>`).join('')}</div>`
+        + `<div class="chs-body">${tabs.map(([k]) => `<div class="chs-p" data-p="${k}"${k === cur ? '' : ' hidden'}>${panels[k]()}</div>`).join('')}`
+        + `<div class="chs-pal" id="chs-pal" hidden></div></div>`
+        + `<div class="chs-foot"><div class="chs-tpl"><button type="button" class="btn btn-ghost chs-tb" id="chs-tpl" aria-haspopup="true">${tr('قالب', 'Template')} ▾</button>`
+        + `<div class="chs-tm" id="chs-tm" hidden><button type="button" id="chs-save">${tr('ذخیره به‌عنوانِ پیش‌فرض', 'Save as default')}</button><button type="button" id="ch-sdef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button></div></div>`
+        + `<button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
+      box.hidden = false;
+    }
+    function openPal(key, el) {
+      const pal = $('chs-pal'), body = box.querySelector('.chs-body'); if (!pal || !body) return;
+      if (palFor === key && !pal.hidden) { pal.hidden = true; palFor = null; return; }
+      palFor = key;
+      const now = key === 'c' ? colOf() : rows[+key.slice(2)][2];
+      pal.innerHTML = `<div class="ch-pal">${PALETTE.map(c => `<button type="button" class="ch-dot${c.toLowerCase() === String(now).toLowerCase() ? ' on' : ''}" style="--c:${c}" data-pc="${c}" aria-label="${tr('رنگ', 'Color')} ${c}"></button>`).join('')}</div>`
+        + (key === 'c' ? `<button type="button" class="ch-popi" data-pc=""><i></i><span><b>${tr('رنگِ پیش‌فرض', 'Default color')}</b></span></button>` : '');
+      pal.hidden = false;
+      const br = body.getBoundingClientRect(), er = el.getBoundingClientRect();
+      pal.style.top = (er.bottom - br.top + body.scrollTop + 4) + 'px';
+      pal.style.left = clamp(er.left - br.left, 4, Math.max(4, br.width - pal.offsetWidth - 4)) + 'px';
+    }
+    const close = ok => {
+      if (ok) { rememberStyle(id); commit(); paintSel(); }
+      else {
+        for (const k of Object.keys(m)) delete m[k];
+        Object.assign(m, JSON.parse(JSON.stringify(snap)));
+        if (moved) setPoints(id, pts0);
+        refresh(id); paintSel();
+      }
+      box.hidden = true; box.innerHTML = ''; box.onclick = box.oninput = box.onchange = box.onkeydown = null;
     };
-    $('ch-sok').onclick = () => close(true); $('ch-sno').onclick = () => close(false);
-    // ظاهرِ پیش‌فرضِ خودِ ابزار برای همین شکل و شکل‌های بعدی (متنِ شکل می‌ماند)
-    $('ch-sdef').onclick = () => {
-      const keep = m.x?.text ? { text: m.x.text } : {};
-      Object.assign(m, { c: null, w: 1, s: 0, x: keep });
-      const all = { ...(S.store.prefs.td || {}) }; delete all[m.n]; S.store.prefs.td = all;
-      box.hidden = true; box.innerHTML = ''; refresh(id); commit(); paintSel();
+    render();
+    box.onclick = ev => {
+      const t = ev.target;
+      if (t === box) { close(false); return; }   // کلیک روی پس‌زمینه‌ی تیره = انصراف
+      const tabB = t.closest('[data-tab]'); if (tabB) { cur = tabB.dataset.tab; box.querySelectorAll('[data-tab]').forEach(b => { const on = b === tabB; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); }); box.querySelectorAll('[data-p]').forEach(p => { p.hidden = p.dataset.p !== cur; }); $('chs-pal').hidden = true; return; }
+      const swB = t.closest('[data-sw]'); if (swB) { openPal(swB.dataset.sw, swB); return; }
+      const pc = t.closest('[data-pc]');
+      if (pc) {
+        const c = pc.dataset.pc;
+        if (palFor === 'c') { m.c = c || null; if (hasLv) { if (c) m.x.oc = true; else delete m.x.oc; const oc = box.querySelector('[data-o="oc"]'); if (oc) oc.checked = !!m.x.oc; } box.querySelector('[data-sw="c"]')?.style.setProperty('--c', colOf()); }
+        else if (palFor && palFor.startsWith('lv')) { const i = +palFor.slice(2); rows[i][2] = c; lvTouched = true; box.querySelector(`[data-sw="lv${i}"]`)?.style.setProperty('--c', c); }
+        $('chs-pal').hidden = true; palFor = null; live(); return;
+      }
+      if (!t.closest('#chs-pal') && !t.closest('[data-sw]')) { const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; }
+      const sg = t.closest('.chs-seg button');
+      if (sg) {
+        const key = sg.parentElement.dataset.seg, v = +sg.dataset.v;
+        sg.parentElement.querySelectorAll('button').forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+        if (key === 'w') m.w = v; else if (key === 's') m.s = v; else if (key === 'lpos') m.x.lpos = v; else if (key === 'lvp') { if (v < 0) delete m.x.lvp; else m.x.lvp = v; }
+        live(); return;
+      }
+      if (t.id === 'chs-tpl') { const tm = $('chs-tm'); tm.hidden = !tm.hidden; return; }
+      if (t.id === 'chs-save') { rememberStyle(id); scheduleSave(); $('chs-tm').hidden = true; showToast(tr('ظاهرِ این شکل پیش‌فرضِ ' + def.fa + ' شد', 'Saved as the default for ' + def.en)); return; }
+      if (t.id === 'ch-sdef') {
+        const keep = {}; if (m.x.text) keep.text = m.x.text; if (isNum(m.x.vis)) keep.vis = m.x.vis;
+        m.c = null; m.w = 1; m.s = 0; m.x = keep; if (hasLv) { rows = levelRows({}); lvTouched = false; }
+        const all = { ...(S.store.prefs.td || {}) }; delete all[m.n]; S.store.prefs.td = all; scheduleSave();
+        render(); live(); return;
+      }
+      if (t.id === 'ch-sok') { close(true); return; }
+      if (t.id === 'ch-sno' || t.closest('#chs-x')) { close(false); return; }
+      const tm = $('chs-tm'); if (tm && !t.closest('.chs-tpl')) tm.hidden = true;
     };
-    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
+    box.onchange = ev => {
+      const t = ev.target, key = t.dataset.o;
+      if (t.type === 'checkbox' && key) {
+        if (key === 'oc') { if (t.checked) m.x.oc = true; else delete m.x.oc; }
+        else if (OPT[key]?.[0] === 'boolOn') { if (t.checked) delete m.x[key]; else m.x[key] = false; }
+        else { if (t.checked) m.x[key] = true; else delete m.x[key]; }
+        live(); return;
+      }
+      if (t.dataset.lvon != null) { rows[+t.dataset.lvon][1] = t.checked ? 1 : 0; lvTouched = true; live(); return; }
+      if (t.dataset.vis != null) {
+        let mask = 0; box.querySelectorAll('[data-vis]').forEach(e => { if (e.checked) mask |= 1 << +e.dataset.vis; });
+        if (mask === 63) delete m.x.vis; else m.x.vis = mask;
+        live(); return;
+      }
+      if (key === 'dev') { const v = +t.value; if (v === 2) delete m.x.dev; else m.x.dev = v; live(); return; }
+      if (key === 'fs') { const v = +t.value; if (v === 14) delete m.x.fs; else m.x.fs = v; live(); return; }
+    };
+    box.oninput = ev => {
+      const t = ev.target;
+      if (t.dataset.fo != null) { const v = +t.value; if (v === FO_DEF[m.n]) delete m.x.fo; else m.x.fo = v; const b = box.querySelector('[data-fov]'); if (b) b.textContent = v + '%'; live(); return; }
+      if (t.dataset.o === 'text') { const v = String(t.value || '').slice(0, 200); if (v.trim()) m.x.text = v.trim(); else delete m.x.text; live(); return; }
+      if (t.dataset.lvv != null) { const v = numIn(t.value), okv = isNum(v) && Math.abs(v) <= 100; t.classList.toggle('bad', !okv); if (okv) { rows[+t.dataset.lvv][0] = v; lvTouched = true; live(); } return; }
+      if (t.dataset.pt != null) {
+        const v = numIn(t.value), i = +t.dataset.pt, okv = isNum(v) && v > 0; t.classList.toggle('bad', !okv);
+        if (okv) { const np = o.points.slice(0, def.pts).map(p => ({ timestamp: tsOfPoint(p), value: p.value })); np[i].value = v; setPoints(id, np); moved = true; refresh(id); }
+      }
+    };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } else if (ev.key === 'Enter' && ev.target.tagName !== 'TEXTAREA' && !ev.target.closest('button')) { ev.preventDefault(); close(true); } };
   }
   // متن: برگه‌ی کوچکِ خودِ نمودار (نه prompt مرورگر)
   function editText(id, fresh) {
@@ -1431,7 +1642,7 @@
     for (const [id, m] of S.recs) {
       if (id === S.drawingId || T[m.n]?.transient) continue;
       const def = T[m.n], o = S.chart.getOverlayById(id), v = o?.points?.[0]?.value;
-      rows.push(`<div class="ch-tri${S.selected === id ? ' on' : ''}${m.h ? ' off' : ''}" data-id="${id}"><button type="button" class="ch-trn" onclick="SCCHART.pickObj('${id}')"><span class="ch-tric" style="color:${m.c || def.color || C.blue}">${def.ic}</span><span><b>${esc(nm(def))}</b><small dir="ltr">${def.pad ? '' : esc(fmt(v))}${m.x?.text ? ` · <span class="ch-utext" dir="auto">${esc(String(m.x.text).slice(0, 24))}</span>` : ''}</small></span></button>`
+      rows.push(`<div class="ch-tri${S.selected === id ? ' on' : ''}${m.h || !visOn(m) ? ' off' : ''}" data-id="${id}"><button type="button" class="ch-trn" onclick="SCCHART.pickObj('${id}')"><span class="ch-tric" style="color:${m.c || def.color || C.blue}">${def.ic}</span><span><b>${esc(nm(def))}</b><small dir="ltr">${def.pad ? '' : esc(fmt(v))}${m.x?.text ? ` · <span class="ch-utext" dir="auto">${esc(String(m.x.text).slice(0, 24))}</span>` : ''}</small></span></button>`
         + `<button type="button" class="ch-trb" title="${m.h ? tr('نمایش', 'Show') : tr('پنهان', 'Hide')}" aria-label="${tr('پنهان/نمایش', 'Hide/show')}" onclick="SCCHART.objHide('${id}')">${m.h ? ICON.eyeOff : ICON.eye}</button>`
         + (ro ? '' : `<button type="button" class="ch-trb" title="${m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock')}" aria-label="${tr('قفل', 'Lock')}" onclick="SCCHART.objLock('${id}')">${m.k ? ICON.lock : ICON.unlock}</button><button type="button" class="ch-trb del" title="${tr('حذف', 'Remove')}" aria-label="${tr('حذف', 'Remove')}" onclick="SCCHART.objDel('${id}')">${ICON.trash}</button>`) + '</div>');
     }
@@ -1441,12 +1652,13 @@
 
   function shell() {
     const d = dirOf();
-    return `<div class="ch-wrap" dir="${d}">
+    return `<div class="ch-wrap" dir="${d}" data-theme="${S.theme === 'light' ? 'light' : 'dark'}">
       <div class="ch-head">
         <button type="button" class="ch-coin" id="ch-coinb" onclick="SCCHART.pick()" aria-label="${tr('انتخابِ نماد و منبع', 'Symbol search')}"><span id="ch-logo">${typeof coinLogo === 'function' ? coinLogo(S.coin) : ''}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
         <div class="ch-px" dir="ltr"><b id="ch-last">—</b><span id="ch-chg" class="ch-chg"></span></div>
         <div class="ch-srcs" id="ch-srcs" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" data-src="${s.id}" onclick="SCCHART.src('${s.id}')">${s.name}</button>`).join('')}</div>
         <div class="ch-lang" id="ch-lang" role="group" aria-label="${tr('زبانِ نمودار', 'Chart language')}"><button type="button" data-l="fa" lang="fa" onclick="SCCHART.lang('fa')">فا</button><button type="button" data-l="en" lang="en" onclick="SCCHART.lang('en')">EN</button></div>
+        <button type="button" class="ch-thm" id="ch-thm" onclick="SCCHART.theme()" aria-pressed="false"></button>
       </div>
       <div class="ch-bar">
         <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TFS.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
@@ -1457,6 +1669,7 @@
         <div class="ch-tb" id="ch-tools" role="toolbar" aria-label="${tr('ابزارهای رسم', 'Drawing tools')}"></div>
         <div class="ch-stage" id="ch-stage">
           <div class="ch-canvas" id="ch-canvas"></div>
+          <button type="button" class="ch-auto on" id="ch-auto" onclick="SCCHART.auto()" aria-pressed="true">A</button>
           <div class="ch-pad" id="ch-pad" hidden><canvas></canvas></div>
           <div class="ch-msg" id="ch-msg" hidden></div>
           <div class="ch-hint" id="ch-hint" dir="${d}" hidden></div>
@@ -1643,20 +1856,25 @@
     if (/^[A-Z0-9]{1,15}$/.test(last.coin || '')) S.coin = last.coin;
     if (TFS.some(t => t.id === last.tf)) S.tf = last.tf;
     S.mag = [0, 1, 2].includes(pf.mag) ? pf.mag : 1; S.magLast = [1, 2].includes(pf.magLast) ? pf.magLast : 1;
-    S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa'; S.hidden = !!pf.hid;
+    S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa'; S.hidden = !!pf.hid; S.theme = pf.theme === 'light' ? 'light' : 'dark';
     el.innerHTML = shell();
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintMax();
+    paintMax(); paintTheme(); paintAuto();
     paintTools(); status(S.loadedStore ? 'saved' : 'local'); if (!S.loadedStore && !L.g(cacheKey())) $('ch-save').textContent = '';
     const phone = window.matchMedia('(max-width: 600px)').matches;
-    S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: phone ? { ...STYLES, candle: { ...STYLES.candle, tooltip: { ...STYLES.candle.tooltip, showRule: 'follow_cross' } },
-      indicator: { tooltip: { ...STYLES.indicator.tooltip, showRule: 'follow_cross' } } } : STYLES });
+    S.phone = phone;
+    S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: stylesFor() });
     patchEngine(S.chart);
     S.chart.setLoadDataCallback(onLoadData);
     S.chart.setOffsetRightDistance(48);
     applyIndicators();
     S.chart.subscribeAction('onZoom', saveZoomSoon);
     S.chart.subscribeAction('onPaneDrag', () => setTimeout(savePaneHeights, 50));
+    S.chart.subscribeAction('onTooltipIconClick', d => {
+      if (!d?.indicatorName || readOnly()) return;
+      if (d.iconId === 'set') openIndSettings(d.indicatorName);
+      else if (d.iconId === 'del' && (S.store.prefs.ind || []).includes(d.indicatorName)) toggleIndicator(d.indicatorName);
+    });
     const cv = $('ch-canvas');
     if ('ResizeObserver' in window) new ResizeObserver(() => S.chart && S.chart.resize()).observe(cv);
     // جای آخرین اشاره (برای دوضربه‌ی سریع)، خط‌کش با Shift، و پاک شدنِ خط‌کش با کلیکِ بعدی
@@ -1666,6 +1884,8 @@
       if (e.shiftKey && S.tool === 'cursor' && !readOnly()) startTool('scMeasure');
     }, true);
     cv.addEventListener('contextmenu', e => e.preventDefault());
+    // کشیدن یا دوبار-کلیکِ محورِ قیمت هم حالتِ خودکار را عوض می‌کند ⇒ دکمه‌ی A همگام بماند
+    for (const t of ['pointerup', 'dblclick']) cv.addEventListener(t, () => setTimeout(paintAuto, 0));
     padEvents($('ch-pad'));
     document.addEventListener('keydown', onKey);
     document.addEventListener('keyup', onKeyUp);
@@ -1686,8 +1906,39 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
+  // ── مقیاسِ خودکارِ قیمت (A) ──
+  const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
+  const isAuto = () => { const a = candleAxis(); return !a || !!a.getAutoCalcTickFlag(); };
+  function setAuto() {
+    const a = candleAxis(); if (!a) return;
+    a.setAutoCalcTickFlag(true);
+    try { S.chart.adjustPaneViewport(false, true, true, true); } catch (_) {}
+    paintAuto();
+  }
+  function paintAuto() {
+    const b = $('ch-auto'); if (!b) return;
+    const on = isAuto(), t = tr('مقیاسِ خودکارِ قیمت', 'Auto (fits data to screen)');
+    b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.title = t; b.setAttribute('aria-label', t);
+  }
+  // ── تمِ تیره/روشن ──
+  function setTheme(t) {
+    t = t === undefined ? (S.theme === 'light' ? 'dark' : 'light') : (t === 'light' ? 'light' : 'dark');
+    if (t === S.theme) { paintTheme(); return; }
+    S.theme = t;
+    if (S.store) { S.store.prefs.theme = t; if (!readOnly()) scheduleSave(); }
+    const w = S.root?.querySelector('.ch-wrap'); if (w) w.dataset.theme = t;
+    closePop(); closeCtx();
+    S.chart?.setStyles(stylesFor());
+    for (const id of S.recs.keys()) refresh(id);
+    paintTheme();
+  }
+  function paintTheme() {
+    const b = $('ch-thm'); if (!b) return;
+    const light = S.theme === 'light', t = light ? tr('تمِ تیره', 'Dark theme') : tr('تمِ روشن', 'Light theme');
+    b.title = t; b.setAttribute('aria-label', t); b.setAttribute('aria-pressed', light); b.innerHTML = light ? ICON.moon : ICON.sun;
+  }
   // ── تمام‌صفحه ──
   function setMax(on) {
     on = on === undefined ? !S.max : !!on;
@@ -1732,7 +1983,7 @@
     al('ch-tools', tr('ابزارهای رسم', 'Drawing tools')); al('ch-lang', tr('زبانِ نمودار', 'Chart language'));
     const il = $('ch-indl'); if (il) il.textContent = tr('اندیکاتور', 'Indicators');
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax();
+    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax(); paintTheme(); paintAuto();
     if (S.saveState || readOnly()) status(S.saveState);
     if (S.hintArgs) hint(...S.hintArgs);
   }
@@ -1746,7 +1997,7 @@
     removeSelected: () => S.selected && removeId(S.selected), color: setColor, width: setWidth, lstyle: setLineStyle,
     colorMenu, widthMenu, styleMenu, settings: () => openSettings(), lock: () => toggleLock(), clone: () => cloneSel(), editText: () => editText(), ctx: ctxAction,
     pickObj: id => { selectId(id); paintTree(); }, objHide: id => { toggleHideOne(id); paintTree(); }, objLock: id => { toggleLock(id); paintTree(); }, objDel: id => { removeId(id); paintTree(); },
-    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
+    src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator, indSet: openIndSettings,
     // برای تست
