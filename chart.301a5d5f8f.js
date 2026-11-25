@@ -23,6 +23,10 @@
    پنجره‌ی تنظیماتِ چهار زبانه‌ای (ظاهر/متن/مختصات/نمایش) با پیش‌نمایشِ زنده، جدولِ ۲۴ سطحِ فیبو با مقدار و رنگ (x.lvl)،
    جای برچسب (چپ/راست، بالا/وسط/پایین)، نمایش روی تایم‌فریم‌های انتخابی (x.vis)، دکمه‌های ⚙ و ✕ کنارِ نامِ هر اندیکاتور،
    و تمِ روشن به سبکِ TradingView (prefs.theme).
+   v26.42 (مالک: «از همه لحاظ با سخت‌گیریِ خیلی بیشتر مثلِ TradingView؛ کاربرپسندتر؛ خودت منتشر کن»): تایم‌فریمِ ۳۰m و 1W
+   (گوشی: فهرستِ کشویی مثلِ اپِ TradingView)، نوعِ نمودار (شمعی/توخالی/میله‌ای/خطی/ناحیه‌ای/هیکن‌آشی)، مقیاسِ لگاریتمی و درصدی،
+   دکمه‌ی «بازگشت به آخرین کندل» و Alt+R، عکسِ نمودار، تنظیماتِ نمودار (رنگِ شمع‌ها، خطِ وضعیت، خطِ قیمت، سقف/کف، شبکه)،
+   هفت اندیکاتورِ تازه با جست‌وجو، کپی/چسباندنِ شکل (Ctrl+C/V) و نامِ نقطه‌های ابزارِ پوزیشن.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -30,8 +34,13 @@
   const SOURCES = [{ id: 'hl', name: 'Hyperliquid' }, { id: 'sodex', name: 'SoDEX' }, { id: 'bybit', name: 'Bybit' }];
   const TFS = [
     { id: '1m', l: '1m', ms: 6e4, poll: 4000 }, { id: '5m', l: '5m', ms: 3e5, poll: 5000 }, { id: '15m', l: '15m', ms: 9e5, poll: 8000 },
-    { id: '1h', l: '1H', ms: 36e5, poll: 10000 }, { id: '4h', l: '4H', ms: 144e5, poll: 15000 }, { id: '1d', l: '1D', ms: 864e5, poll: 30000 }
+    { id: '1h', l: '1H', ms: 36e5, poll: 10000 }, { id: '4h', l: '4H', ms: 144e5, poll: 15000 }, { id: '1d', l: '1D', ms: 864e5, poll: 30000 },
+    { id: '30m', l: '30m', ms: 18e5, poll: 9000 }, { id: '1w', l: '1W', ms: 6048e5, poll: 60000 }
   ];
+  const TF_VIEW = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].map(id => TFS.find(t => t.id === id));
+  const ALL_TF = (1 << TFS.length) - 1;
+  const tfName = t => ({ '1m': tr('۱ دقیقه', '1 minute'), '5m': tr('۵ دقیقه', '5 minutes'), '15m': tr('۱۵ دقیقه', '15 minutes'), '30m': tr('۳۰ دقیقه', '30 minutes'),
+    '1h': tr('۱ ساعت', '1 hour'), '4h': tr('۴ ساعت', '4 hours'), '1d': tr('۱ روز', '1 day'), '1w': tr('۱ هفته', '1 week') }[t.id] || t.l);
   const GOLD = '#C8A84B', UP = '#22C97A', DOWN = '#E8505B';
   // رنگ‌های پیش‌فرضِ TradingView
   const C = { blue: '#2962FF', red: '#F23645', green: '#089981', orange: '#FF9800', purple: '#9C27B0', gray: '#787B86', cyan: '#00BCD4',
@@ -536,7 +545,7 @@
     'سقف/کفِ اول': 'First pivot', 'سقف/کفِ دوم': 'Second pivot', 'شروعِ موج (سطحِ ۱)': 'Swing start (level 1)', 'پایانِ موج (سطحِ ۰)': 'Swing end (level 0)',
     'شروعِ موج (A)': 'Swing start (A)', 'پایانِ موج (B)': 'Swing end (B)', 'پایانِ اصلاح (C)': 'Retracement end (C)', 'پهنا': 'Width',
     'یک واحدِ زمانی': 'One time unit', 'شانه‌ی چپ': 'Left shoulder', 'خطِ گردن ۱': 'Neckline 1', 'سر': 'Head', 'خطِ گردن ۲': 'Neckline 2',
-    'شانه‌ی راست': 'Right shoulder', 'پایان': 'End', 'قیمتِ ورود': 'Entry price', 'گوشه': 'Corner', 'گوشه‌ی مقابل': 'Opposite corner',
+    'شانه‌ی راست': 'Right shoulder', 'پایان': 'End', 'قیمتِ ورود': 'Entry price', 'حدِ سود': 'Target', 'حدِ ضرر': 'Stop', 'گوشه': 'Corner', 'گوشه‌ی مقابل': 'Opposite corner',
     'مرکز': 'Center', 'لبه': 'Edge', 'رأسِ اول': 'Vertex 1', 'رأسِ دوم': 'Vertex 2', 'رأسِ سوم': 'Vertex 3', 'جای متن': 'Text position', 'نقطه‌ی اشاره': 'Pointer' };
   const SEC_EN = { 'خطوط': 'Lines', 'کانال‌ها': 'Channels', 'چنگال': 'Pitchforks', 'الگوها': 'Chart patterns', 'امواجِ الیوت': 'Elliott waves',
     'پیش‌بینی': 'Forecasting', 'اندازه‌گیری': 'Measurers', 'قلم‌ها': 'Brushes', 'اشکال': 'Shapes' };
@@ -573,8 +582,8 @@
     { id: 'scEWCorrection', g: 'patterns', sec: 'امواجِ الیوت', fa: 'موجِ اصلاحیِ الیوت', en: 'Elliott Correction Wave (ABC)', pts: 4, color: C.blue, pn: ['شروع', '(A)', '(B)', '(C)'], ic: svg('<path d="M3 5l6 11 4-6 8 10"/>'), figs: waveFigs(['', '(A)', '(B)', '(C)']) },
     { id: 'scEWTriangle', g: 'patterns', sec: 'امواجِ الیوت', fa: 'موجِ مثلثیِ الیوت', en: 'Elliott Triangle Wave (ABCDE)', pts: 6, color: C.orange, pn: ['شروع', '(A)', '(B)', '(C)', '(D)', '(E)'], ic: svg('<path d="M2 5l4 14 4-10 4 7 4-5 4 3"/>'), figs: waveFigs(['', '(A)', '(B)', '(C)', '(D)', '(E)']) },
     { id: 'scEWCombo', g: 'patterns', sec: 'امواجِ الیوت', fa: 'ترکیبیِ دوگانه‌ی الیوت', en: 'Elliott Double Combo Wave (WXY)', pts: 4, color: C.green, pn: ['شروع', '(W)', '(X)', '(Y)'], ic: svg('<path d="M3 6l6 12 5-7 7 9"/>'), figs: waveFigs(['', '(W)', '(X)', '(Y)']) },
-    { id: 'scLong', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ خرید', en: 'Long Position', pts: 3, steps: 1, cls: 'up', pn: ['قیمتِ ورود'], ic: svg('<path d="M4 13h16"/><rect x="4" y="4" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="13" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, true), move: posMove, done: o => posDone(o, true) },
-    { id: 'scShort', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ فروش', en: 'Short Position', pts: 3, steps: 1, cls: 'down', pn: ['قیمتِ ورود'], ic: svg('<path d="M4 11h16"/><rect x="4" y="11" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="5" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, false), move: posMove, done: o => posDone(o, false) },
+    { id: 'scLong', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ خرید', en: 'Long Position', pts: 3, steps: 1, cls: 'up', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 13h16"/><rect x="4" y="4" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="13" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, true), move: posMove, done: o => posDone(o, true) },
+    { id: 'scShort', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ فروش', en: 'Short Position', pts: 3, steps: 1, cls: 'down', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 11h16"/><rect x="4" y="11" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="5" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, false), move: posMove, done: o => posDone(o, false) },
     { id: 'scPriceRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی قیمت', en: 'Price Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], ic: svg('<path d="M5 4h14M5 20h14M12 7v11"/><path d="M9 10l3-3 3 3"/>'), figs: k => rangeFigs(k, 'p') },
     { id: 'scDateRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی زمان', en: 'Date Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], noMag: true, ic: svg('<path d="M4 5v14M20 5v14M7 12h11"/><path d="M15 9l3 3-3 3"/>'), figs: k => rangeFigs(k, 'd') },
     { id: 'scDPRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی زمان و قیمت', en: 'Date and Price Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], ic: svg('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M12 8v8M8 12h8"/>'), figs: k => rangeFigs(k, 'dp') },
@@ -632,6 +641,8 @@
     chev: svg('<path d="M6 9l6 6 6-6"/>'),
     close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
     full: svg('<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>'),
+    camera: svg('<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>'),
+    rt: svg('<path d="M6 7l5 5-5 5M13 7l5 5-5 5"/>'),
     sun: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
     moon: svg('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
     unfull: svg('<path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"/>')
@@ -831,18 +842,23 @@
     const ic = (id, icon, ml) => ({ id, position: 'middle', marginLeft: ml, marginTop: 0, marginRight: 0, marginBottom: 0, paddingLeft: 3, paddingTop: 1, paddingRight: 3, paddingBottom: 1,
       size: 12, color: t.icon, activeColor: t.iconOn, backgroundColor: 'rgba(0,0,0,0)', activeBackgroundColor: t.iconBg, fontFamily: ICON_FONT, icon });
     const tick = { color: t.txt, size: 11, family: MONO };
+    const cs = S.cs || {}, up = /^#[0-9A-Fa-f]{6}$/.test(cs.up || '') ? cs.up : t.up, down = /^#[0-9A-Fa-f]{6}$/.test(cs.down || '') ? cs.down : t.down;
+    const ctype = { hollow: 'candle_up_stroke', bars: 'ohlc', line: 'area', area: 'area' }[S.ct] || 'candle_solid';
+    const fill = S.ct === 'line' ? ['rgba(41,98,255,0)', 'rgba(41,98,255,0)'] : ['rgba(41,98,255,0.01)', 'rgba(41,98,255,0.24)'];
     const crossText = { backgroundColor: t.crossBg, borderColor: t.crossBg, family: MONO, size: 11, color: t.crossTxt };
     return {
-      grid: { horizontal: { color: t.grid }, vertical: { color: t.grid } },
+      grid: { show: cs.grid !== false, horizontal: { color: t.grid }, vertical: { color: t.grid } },
       candle: {
-        bar: { upColor: t.up, downColor: t.down, noChangeColor: t.txt, upBorderColor: t.up, downBorderColor: t.down, noChangeBorderColor: t.txt, upWickColor: t.up, downWickColor: t.down, noChangeWickColor: t.txt },
-        priceMark: { high: { color: t.txt, textFamily: MONO, textSize: 11 }, low: { color: t.txt, textFamily: MONO, textSize: 11 },
-          last: { upColor: t.up, downColor: t.down, text: { family: MONO, size: 11, weight: 600 } } },
-        tooltip: { showRule: rule, showType: 'standard', text: { color: t.tip, size: 11, family: MONO, marginLeft: 6, marginRight: 6 } }
+        type: ctype,
+        bar: { upColor: up, downColor: down, noChangeColor: t.txt, upBorderColor: up, downBorderColor: down, noChangeBorderColor: t.txt, upWickColor: up, downWickColor: down, noChangeWickColor: t.txt },
+        area: { lineSize: 2, lineColor: '#2962FF', smooth: false, value: 'close', backgroundColor: [{ offset: 0, color: fill[0] }, { offset: 1, color: fill[1] }], point: { show: false } },
+        priceMark: { show: true, high: { show: cs.hl !== false, color: t.txt, textFamily: MONO, textSize: 11 }, low: { show: cs.hl !== false, color: t.txt, textFamily: MONO, textSize: 11 },
+          last: { show: cs.last !== false, upColor: up, downColor: down, text: { family: MONO, size: 11, weight: 600 } } },
+        tooltip: { showRule: cs.legend === false ? 'none' : rule, showType: 'standard', text: { color: t.tip, size: 11, family: MONO, marginLeft: 6, marginRight: 6 } }
       },
-      indicator: { tooltip: { showRule: rule, text: { color: t.tip, size: 11, family: MONO }, icons: readOnly() ? [] : [ic('set', '⚙', 8), ic('del', '✕', 2)] } },
+      indicator: { tooltip: { showRule: cs.legend === false ? 'none' : rule, text: { color: t.tip, size: 11, family: MONO }, icons: readOnly() ? [] : [ic('set', '⚙', 8), ic('del', '✕', 2)] } },
       xAxis: { axisLine: { color: t.line }, tickLine: { color: t.line }, tickText: tick },
-      yAxis: { axisLine: { color: t.line }, tickLine: { color: t.line }, tickText: tick },
+      yAxis: { type: S.ys === 'log' ? 'log' : S.ys === 'pct' ? 'percentage' : 'normal', axisLine: { color: t.line }, tickLine: { color: t.line }, tickText: tick },
       separator: { color: t.line },
       crosshair: { horizontal: { line: { color: t.cross }, text: crossText }, vertical: { line: { color: t.cross }, text: crossText } },
       overlay: { text: { family: MONO, size: 11 }, rect: { color: 'rgba(41,98,255,.12)' } }
@@ -857,6 +873,16 @@
 
   // ── داده ──
   const toK = c => ({ timestamp: c.t, open: c.o, high: c.h, low: c.l, close: c.c, volume: c.v });
+  // هیکن‌آشی (مثلِ TradingView): از کلِ تاریخچه‌ی بارشده ساخته می‌شود؛ داده‌ی خام (S.data) دست نمی‌خورد
+  function toHA(list) {
+    const out = []; let po = null, pc = null;
+    for (const k of list) {
+      const c = (k.open + k.high + k.low + k.close) / 4, o = po == null ? (k.open + k.close) / 2 : (po + pc) / 2;
+      out.push({ ...k, open: o, close: c, high: Math.max(k.high, o, c), low: Math.min(k.low, o, c) }); po = o; pc = c;
+    }
+    return out;
+  }
+  const viewData = list => S.ct === 'ha' ? toHA(list) : list;
   async function fetchCandles({ before = 0, limit = BARS } = {}) {
     const q = `src=${S.src}&coin=${encodeURIComponent(S.coin)}&tf=${S.tf}&limit=${limit}` + (before ? `&before=${before}` : '');
     const r = await apiFetch('/api/chart/candles?' + q, {}, { retries: 1 });
@@ -882,8 +908,8 @@
     const last = S.data[S.data.length - 1];
     S.chart.setPriceVolumePrecision(precisionOf(last?.close), 2);
     { const a = candleAxis(); if (a && !a.getAutoCalcTickFlag()) a.setAutoCalcTickFlag(true); }   // نماد/تایم‌فریمِ تازه = مقیاسِ خودکار
-    S.chart.applyNewData(S.data, S.more);
-    setTimeout(paintAuto, 0);
+    S.chart.applyNewData(viewData(S.data), S.more);
+    setTimeout(() => { paintAuto(); updRT(); }, 0);
     const bs = S.store?.prefs?.bs; if (isNum(bs) && bs >= 1 && bs <= 50) S.chart.setBarSpace(bs);   // زومِ خودِ دانشجو
     msg('');
     restoreDrawings();
@@ -896,7 +922,7 @@
     fetchCandles({ before: data.timestamp }).then(res => {
       if (gen !== S.gen) { callback([], false); return; }
       if (!res.ok) { callback([], true); return; }
-      S.data = res.list.concat(S.data); callback(res.list, res.more && res.list.length > 0);
+      S.data = res.list.concat(S.data); callback(S.ct === 'ha' ? toHA(S.data).slice(0, res.list.length) : res.list, res.more && res.list.length > 0);
     });
   }
   function startPoll() {
@@ -911,9 +937,9 @@
         for (const k of res.list) {
           if (k.timestamp < lastT) continue;
           if (k.timestamp === S.data[S.data.length - 1].timestamp) S.data[S.data.length - 1] = k; else S.data.push(k);
-          S.chart.updateData(k);
+          S.chart.updateData(S.ct === 'ha' ? toHA(S.data.slice(-300)).pop() : k);
         }
-        paintHead();
+        paintHead(); updRT();
       } finally { S.pollBusy = false; }
     }, tfOf(S.tf).poll);
   }
@@ -1294,6 +1320,7 @@
     }
     document.querySelectorAll('#ch-srcs button').forEach(b => { const on = b.dataset.src === S.src; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     document.querySelectorAll('#ch-tfs button').forEach(b => { const on = b.dataset.tf === S.tf; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    const tl = $('ch-tfl'); if (tl) tl.textContent = tfOf(S.tf).l;
     const cs = $('ch-csrc'); if (cs) cs.textContent = srcName();
     const info = $('ch-srcinfo'); if (info) info.textContent = tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''} · Tehran time`);
   }
@@ -1427,7 +1454,7 @@
     const box = $('ch-ctx'), m = S.recs.get(id); if (!box || !m || readOnly()) return;
     closePop(); closeFly(); selectId(id);
     const it = (a, icon, t, k) => `<button type="button" class="ch-ctxi" data-a="${a}" onclick="SCCHART.ctx('${a}')">${icon}<span>${t}</span>${k ? `<kbd dir="ltr">${k}</kbd>` : ''}</button>`;
-    box.innerHTML = it('settings', ICON.gear, tr('تنظیمات…', 'Settings…')) + it('clone', ICON.clone, tr('کپی', 'Clone'))
+    box.innerHTML = it('settings', ICON.gear, tr('تنظیمات…', 'Settings…')) + it('clone', ICON.clone, tr('نسخه‌ی دوم (Clone)', 'Clone')) + it('copy', ICON.clone, tr('کپی', 'Copy'), 'Ctrl+C')
       + it('lock', m.k ? ICON.lock : ICON.unlock, m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock'))
       + it('hide', ICON.eyeOff, tr('پنهان کردن', 'Hide')) + '<hr>' + it('delete', ICON.trash, tr('حذف', 'Remove'), 'Del');
     box.hidden = false;
@@ -1437,7 +1464,7 @@
   function closeCtx() { const b = $('ch-ctx'); if (b) { b.hidden = true; b.innerHTML = ''; } }
   function ctxAction(a) {
     const id = S.selected; closeCtx();
-    if (a === 'settings') openSettings(id); else if (a === 'clone') cloneSel(id); else if (a === 'lock') toggleLock(id);
+    if (a === 'settings') openSettings(id); else if (a === 'clone') cloneSel(id); else if (a === 'copy') { S.selected = id; copySel(); } else if (a === 'lock') toggleLock(id);
     else if (a === 'hide') toggleHideOne(id); else if (a === 'delete') removeId(id);
   }
 
@@ -1513,9 +1540,9 @@
           + `<input class="fi chs-in" dir="ltr" inputmode="decimal" data-pt="${i}" value="${v}" aria-label="${tr('قیمت', 'Price')}"></div>`; }).join('');
     }
     function visPanel() {
-      const mask = isNum(m.x.vis) ? m.x.vis : 63;
+      const mask = isNum(m.x.vis) ? m.x.vis : ALL_TF;
       return `<div class="chs-hint">${tr('این شکل روی کدام تایم‌فریم‌ها دیده شود؟', 'Show this drawing on which time intervals?')}</div><div class="chs-vis">`
-        + TFS.map((t, i) => `<label class="chs-ck"><input type="checkbox" data-vis="${i}"${mask & (1 << i) ? ' checked' : ''}><span dir="ltr">${t.l}</span></label>`).join('') + '</div>';
+        + TF_VIEW.map(t => { const i = TFS.indexOf(t); return `<label class="chs-ck"><input type="checkbox" data-vis="${i}"${mask & (1 << i) ? ' checked' : ''}><span dir="ltr">${t.l}</span></label>`; }).join('') + '</div>';
     }
     function render() {
       const panels = { style: stylePanel, text: textPanel, coords: coordsPanel, vis: visPanel };
@@ -1595,7 +1622,7 @@
       if (t.dataset.lvon != null) { rows[+t.dataset.lvon][1] = t.checked ? 1 : 0; lvTouched = true; live(); return; }
       if (t.dataset.vis != null) {
         let mask = 0; box.querySelectorAll('[data-vis]').forEach(e => { if (e.checked) mask |= 1 << +e.dataset.vis; });
-        if (mask === 63) delete m.x.vis; else m.x.vis = mask;
+        if (mask === ALL_TF) delete m.x.vis; else m.x.vis = mask;
         live(); return;
       }
       if (key === 'dev') { const v = +t.value; if (v === 2) delete m.x.dev; else m.x.dev = v; live(); return; }
@@ -1661,8 +1688,12 @@
         <button type="button" class="ch-thm" id="ch-thm" onclick="SCCHART.theme()" aria-pressed="false"></button>
       </div>
       <div class="ch-bar">
-        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TFS.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
+        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TF_VIEW.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
+        <button type="button" class="ch-tfb" id="ch-tfb" onclick="SCCHART.tfMenu(this)" aria-haspopup="true"><b id="ch-tfl" dir="ltr">${tfOf(S.tf).l}</b>${ICON.chev}</button>
+        <button type="button" class="ch-fullb ch-bb" id="ch-ctb" onclick="SCCHART.ctMenu(this)" aria-haspopup="true">${CT_IC[S.ct] || CT_IC.candle}</button>
         <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span id="ch-indl">${tr('اندیکاتور', 'Indicators')}</span></button>
+        <button type="button" class="ch-fullb ch-bb" id="ch-cset" onclick="SCCHART.chartSettings()">${ICON.gear}</button>
+        <button type="button" class="ch-fullb ch-bb" id="ch-shot" onclick="SCCHART.snapshot()">${ICON.camera}</button>
         <button type="button" class="ch-fullb" id="ch-full" onclick="SCCHART.max()" aria-pressed="false">${ICON.full}</button>
       </div>
       <div class="ch-main" dir="ltr">
@@ -1670,6 +1701,9 @@
         <div class="ch-stage" id="ch-stage">
           <div class="ch-canvas" id="ch-canvas"></div>
           <button type="button" class="ch-auto on" id="ch-auto" onclick="SCCHART.auto()" aria-pressed="true">A</button>
+          <button type="button" class="ch-auto ch-scl" id="ch-log" data-ys="log" onclick="SCCHART.scale('log')" aria-pressed="false">L</button>
+          <button type="button" class="ch-auto ch-scl" id="ch-pct" data-ys="pct" onclick="SCCHART.scale('pct')" aria-pressed="false">%</button>
+          <button type="button" class="ch-rt" id="ch-rt" onclick="SCCHART.realtime()" hidden>${ICON.rt}</button>
           <div class="ch-pad" id="ch-pad" hidden><canvas></canvas></div>
           <div class="ch-msg" id="ch-msg" hidden></div>
           <div class="ch-hint" id="ch-hint" dir="${d}" hidden></div>
@@ -1690,16 +1724,25 @@
   const INDICATORS = [
     { id: 'VOL', t: 'حجم', en: 'Volume', main: false }, { id: 'MA', t: 'میانگینِ متحرک (MA)', en: 'Moving Average (MA)', main: true },
     { id: 'EMA', t: 'میانگینِ نمایی (EMA)', en: 'Exponential Moving Average (EMA)', main: true }, { id: 'BOLL', t: 'باندِ بولینگر', en: 'Bollinger Bands (BOLL)', main: true },
-    { id: 'RSI', t: 'RSI', en: 'Relative Strength Index (RSI)', main: false }, { id: 'MACD', t: 'MACD', en: 'MACD', main: false }
+    { id: 'RSI', t: 'RSI', en: 'Relative Strength Index (RSI)', main: false }, { id: 'MACD', t: 'MACD', en: 'MACD', main: false },
+    { id: 'SAR', t: 'پارابولیک سار (SAR)', en: 'Parabolic SAR', main: true }, { id: 'KDJ', t: 'استوکاستیک (KDJ)', en: 'Stochastic (KDJ)', main: false },
+    { id: 'CCI', t: 'CCI', en: 'Commodity Channel Index (CCI)', main: false }, { id: 'DMI', t: 'ADX / DMI', en: 'Directional Movement (DMI / ADX)', main: false },
+    { id: 'OBV', t: 'OBV (حجمِ تعادلی)', en: 'On Balance Volume (OBV)', main: false }, { id: 'WR', t: 'ویلیامز %R', en: 'Williams %R', main: false },
+    { id: 'AO', t: 'اسیلاتورِ شگفت‌انگیز (AO)', en: 'Awesome Oscillator (AO)', main: false }
   ];
   // دوره‌های پیش‌فرضِ KLineChart و برچسبِ هر عدد
-  const IND_DEF = { VOL: [5, 10, 20], MA: [5, 10, 30, 60], EMA: [6, 12, 20], BOLL: [20, 2], RSI: [6, 12, 24], MACD: [12, 26, 9] };
+  const IND_DEF = { VOL: [5, 10, 20], MA: [5, 10, 30, 60], EMA: [6, 12, 20], BOLL: [20, 2], RSI: [6, 12, 24], MACD: [12, 26, 9],
+    SAR: [2, 2, 20], KDJ: [9, 3, 3], CCI: [20], DMI: [14, 6], OBV: [30], WR: [6, 10, 14], AO: [5, 34] };
   const indLabel = (name, i) => ({
     VOL: () => tr('میانگینِ حجمِ ' + fa(i + 1), 'Volume MA ' + (i + 1)), MA: () => tr('دوره‌ی MA ' + fa(i + 1), 'MA length ' + (i + 1)),
     EMA: () => tr('دوره‌ی EMA ' + fa(i + 1), 'EMA length ' + (i + 1)), RSI: () => tr('دوره‌ی RSI ' + fa(i + 1), 'RSI length ' + (i + 1)),
     BOLL: () => [tr('دوره', 'Length'), tr('ضریبِ انحرافِ معیار', 'StdDev multiplier')][i], MACD: () => [tr('میانگینِ سریع', 'Fast length'), tr('میانگینِ کند', 'Slow length'), tr('خطِ سیگنال', 'Signal smoothing')][i]
+    , SAR: () => [tr('شروع (٪)', 'Start (%)'), tr('گام (٪)', 'Increment (%)'), tr('بیشینه (٪)', 'Max value (%)')][i],
+    KDJ: () => [tr('دوره‌ی %K', '%K length'), tr('هموارسازیِ %K', '%K smoothing'), tr('هموارسازیِ %D', '%D smoothing')][i],
+    DMI: () => [tr('دوره‌ی DI', 'DI length'), tr('هموارسازیِ ADX', 'ADX smoothing')][i], AO: () => [tr('میانگینِ سریع', 'Fast length'), tr('میانگینِ کند', 'Slow length')][i],
+    CCI: () => tr('دوره', 'Length'), OBV: () => tr('میانگینِ OBV', 'OBV MA length'), WR: () => tr('دوره‌ی ' + fa(i + 1), 'Length ' + (i + 1))
   }[name] || (() => String(i + 1)))();
-  const FIXED_N = new Set(['BOLL', 'MACD']);   // تعدادِ عددها ثابت؛ بقیه را می‌شود کم کرد (مثلاً فقط RSI ۱۴)
+  const FIXED_N = new Set(['BOLL', 'MACD', 'SAR', 'KDJ', 'CCI', 'DMI', 'OBV', 'AO']);   // تعدادِ عددها ثابت؛ بقیه را می‌شود کم کرد (مثلاً فقط RSI ۱۴)
   function indParams(name) {
     const p = S.store?.prefs?.ip?.[name], d = IND_DEF[name];
     if (!d || !Array.isArray(p) || !p.length || p.length > d.length || (FIXED_N.has(name) && p.length !== d.length)) return null;
@@ -1709,11 +1752,14 @@
     for (const [name, pane] of Object.entries(S.panes)) S.chart.removeIndicator(pane, name);
     S.panes = {};
     const ph = S.store.prefs.ph || {};
+    // مثلِ TradingView: نمودارِ اصلی همیشه بزرگ‌ترین است — پنل‌های اندیکاتور روی‌هم حداکثر نصفِ ارتفاع را می‌گیرند
+    const subs = (S.store.prefs.ind || []).filter(n => INDICATORS.some(x => x.id === n && !x.main)).length;
+    const cap = subs ? Math.max(20, Math.floor(($('ch-canvas')?.clientHeight || 520) * 0.5 / subs)) : 400;
     for (const name of S.store.prefs.ind || []) {
       const def = INDICATORS.find(x => x.id === name); if (!def) continue;
       const p = indParams(name), v = p ? { name, calcParams: p } : name;
-      const h = clamp(+ph[name] || 90, 50, 400);
-      const pane = def.main ? S.chart.createIndicator(v, true, { id: 'candle_pane' }) : S.chart.createIndicator(v, false, { height: h });
+      const h = clamp(Math.min(+ph[name] || 90, cap), 20, 400);
+      const pane = def.main ? S.chart.createIndicator(v, true, { id: 'candle_pane' }) : S.chart.createIndicator(v, false, { height: h, minHeight: 20 });
       S.panes[name] = def.main ? 'candle_pane' : pane;
     }
   }
@@ -1772,13 +1818,18 @@
     set.has(name) ? set.delete(name) : set.add(name);
     S.store.prefs.ind = [...set]; applyIndicators(); paintInd(); scheduleSave();
   }
-  function paintInd() {
+  function paintInd(listOnly) {
     const box = $('ch-indm'); if (!box || box.hidden) return;
-    const on = new Set(S.store.prefs.ind || []);
-    const ro = readOnly();
-    box.innerHTML = INDICATORS.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${(indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
-      + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
+    const on = new Set(S.store.prefs.ind || []), ro = readOnly(), q = String(S.indQ || '').trim().toLowerCase();
+    const list = INDICATORS.filter(x => !q || [x.id, x.t, x.en].some(v => String(v).toLowerCase().includes(q)));
+    const rows = (list.length ? '' : `<div class="ch-pempty">${tr('اندیکاتوری پیدا نشد', 'No indicators found')}</div>`)
+      + list.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${(indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
+        + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
+    if (listOnly && $('ch-indlist')) { $('ch-indlist').innerHTML = rows; return; }
+    box.innerHTML = `<input class="fi ch-inds" id="ch-inds" type="search" dir="auto" autocomplete="off" value="${esc(S.indQ || '')}" placeholder="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" aria-label="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" oninput="SCCHART.indFind(this.value)">`
+      + `<div class="ch-indlist" id="ch-indlist">${rows}</div>`;
   }
+
 
   // ── انتخابگرِ نماد ──
   async function symbolsOf(src) {
@@ -1830,6 +1881,9 @@
     else if ((ev.ctrlKey || ev.metaKey) && (k === 'y' || (k === 'z' && ev.shiftKey))) { ev.preventDefault(); redo(); }
     else if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); undo(); }
     else if (ev.altKey && ev.shiftKey && ev.code === 'KeyR') { ev.preventDefault(); startTool('scRect'); }
+    else if (ev.altKey && !ev.shiftKey && !ev.ctrlKey && ev.code === 'KeyR') { ev.preventDefault(); resetView(); }
+    else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyC' && S.selected && !String(window.getSelection?.() || '')) { if (copySel()) ev.preventDefault(); }
+    else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyV' && S.clip) { if (pasteClip()) ev.preventDefault(); }
     else if (ev.shiftKey && !ev.altKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyF') { ev.preventDefault(); setMax(); }
     else if (ev.altKey && !ev.ctrlKey && !ev.metaKey && KEYS[ev.code?.replace('Key', '').toLowerCase()]) { ev.preventDefault(); startTool(KEYS[ev.code.replace('Key', '').toLowerCase()]); }
     else if (ev.key === 'Escape') {
@@ -1857,9 +1911,11 @@
     if (TFS.some(t => t.id === last.tf)) S.tf = last.tf;
     S.mag = [0, 1, 2].includes(pf.mag) ? pf.mag : 1; S.magLast = [1, 2].includes(pf.magLast) ? pf.magLast : 1;
     S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa'; S.hidden = !!pf.hid; S.theme = pf.theme === 'light' ? 'light' : 'dark';
+    S.ct = CT.includes(pf.ct) ? pf.ct : 'candle'; S.ys = pf.ys === 'log' || pf.ys === 'pct' ? pf.ys : null;
+    S.cs = pf.cs && typeof pf.cs === 'object' ? JSON.parse(JSON.stringify(pf.cs)) : {};
     el.innerHTML = shell();
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintMax(); paintTheme(); paintAuto();
+    paintMax(); paintTheme(); paintAuto(); paintBar();
     paintTools(); status(S.loadedStore ? 'saved' : 'local'); if (!S.loadedStore && !L.g(cacheKey())) $('ch-save').textContent = '';
     const phone = window.matchMedia('(max-width: 600px)').matches;
     S.phone = phone;
@@ -1869,6 +1925,7 @@
     S.chart.setOffsetRightDistance(48);
     applyIndicators();
     S.chart.subscribeAction('onZoom', saveZoomSoon);
+    for (const a of ['onZoom', 'onScroll', 'onVisibleRangeChange']) S.chart.subscribeAction(a, updRTSoon);
     S.chart.subscribeAction('onPaneDrag', () => setTimeout(savePaneHeights, 50));
     S.chart.subscribeAction('onTooltipIconClick', d => {
       if (!d?.indicatorName || readOnly()) return;
@@ -1906,7 +1963,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -1921,6 +1978,179 @@
     const b = $('ch-auto'); if (!b) return;
     const on = isAuto(), t = tr('مقیاسِ خودکارِ قیمت', 'Auto (fits data to screen)');
     b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.title = t; b.setAttribute('aria-label', t);
+  }
+  // ── نوعِ نمودار (مثلِ TradingView) ──
+  const CT = ['candle', 'hollow', 'bars', 'line', 'area', 'ha'];
+  const CT_IC = {
+    candle: svg('<path d="M8 3v3M8 16v5M16 2v5M16 15v5"/><rect x="6" y="6" width="4" height="10" rx=".6" fill="currentColor"/><rect x="14" y="7" width="4" height="8" rx=".6"/>'),
+    hollow: svg('<path d="M8 3v3M8 16v5M16 2v5M16 15v5"/><rect x="6" y="6" width="4" height="10" rx=".6"/><rect x="14" y="7" width="4" height="8" rx=".6" fill="currentColor"/>'),
+    bars: svg('<path d="M8 4v15M5 7h3M8 15h3M16 3v15M13 13h3M16 6h3"/>'),
+    line: svg('<path d="M3 17l5-6 4 3 8-9"/>'),
+    area: svg('<path d="M3 17l5-6 4 3 8-9v15H3z" fill="currentColor" fill-opacity=".22"/><path d="M3 17l5-6 4 3 8-9"/>'),
+    ha: svg('<path d="M8 3v3M8 16v5M16 3v4M16 15v6"/><rect x="6" y="6" width="4" height="10" rx="2" fill="currentColor"/><rect x="14" y="7" width="4" height="8" rx="2" fill="currentColor"/>')
+  };
+  const ctName = c => ({ candle: tr('شمعی', 'Candles'), hollow: tr('شمعیِ توخالی', 'Hollow candles'), bars: tr('میله‌ای (OHLC)', 'Bars'), line: tr('خطی', 'Line'), area: tr('ناحیه‌ای', 'Area'), ha: tr('هیکن‌آشی', 'Heikin Ashi') }[c]);
+  function ctMenu(el) {
+    openPop('ct', el, `<div class="ch-poph">${tr('نوعِ نمودار', 'Chart type')}</div>` + CT.map(c => `<button type="button" class="ch-popi ch-cti${(S.ct || 'candle') === c ? ' on' : ''}" data-ct="${c}" onclick="SCCHART.chartType('${c}')">${CT_IC[c]}<span><b>${ctName(c)}</b></span></button>`).join(''));
+  }
+  function setChartType(c) {
+    c = CT.includes(c) ? c : 'candle';
+    const was = S.ct || 'candle'; closePop();
+    if (c === was) return;
+    S.ct = c; if (S.store) { if (c === 'candle') delete S.store.prefs.ct; else S.store.prefs.ct = c; if (!readOnly()) scheduleSave(); }
+    S.chart?.setStyles(stylesFor());
+    if ((was === 'ha') !== (c === 'ha') && S.data.length) S.chart.applyNewData(viewData(S.data), S.more);
+    paintBar();
+  }
+  // ── مقیاسِ قیمت: لگاریتمی / درصدی (مثلِ «log» و «%» گوشه‌ی TradingView) ──
+  function setScale(v) {
+    v = v === S.ys ? null : (v === 'log' || v === 'pct' ? v : null);
+    S.ys = v; if (S.store) { if (v) S.store.prefs.ys = v; else delete S.store.prefs.ys; if (!readOnly()) scheduleSave(); }
+    S.chart?.setStyles(stylesFor()); paintBar();
+  }
+  // ── بازگشت به آخرین کندل (مثلِ دکمه‌ی »» در TradingView) و Alt+R ──
+  function updRT() {
+    const b = $('ch-rt'); if (!b || !S.chart) return;
+    const n = S.chart.getDataList().length, W = S.chart.getSize('candle_pane', 'main')?.width || 0;
+    const x = n ? S.chart.convertToPixel({ dataIndex: n - 1 }, { paneId: 'candle_pane' })?.x : null;
+    b.hidden = !(isNum(x) && W && (x > W - 4 || x < 0));
+  }
+  let rtTimer = null; const updRTSoon = () => { clearTimeout(rtTimer); rtTimer = setTimeout(updRT, 120); };
+  function toRealtime() { S.chart?.scrollToRealTime(250); setTimeout(updRT, 320); }
+  function resetView() { setAuto(); toRealtime(); }
+  // ── عکسِ نمودار (مثلِ دوربینِ TradingView): نمودار + شکل‌ها + سرتیترِ نماد/تایم‌فریم/منبع ──
+  async function snapshot() {
+    if (!S.chart) return;
+    const t = TH(), url = S.chart.getConvertPictureUrl(true, 'png', t.bg);
+    const img = new Image();
+    try { await new Promise((ok, no) => { img.onload = ok; img.onerror = no; img.src = url; }); } catch (_) { showToast(tr('ساختِ عکس نشد', 'Could not create the snapshot')); return; }
+    const k = img.width / Math.max(1, $('ch-canvas')?.clientWidth || img.width), pad = Math.round(34 * k);
+    const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height + pad;
+    const g = cv.getContext('2d'); g.fillStyle = t.bg; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, pad);
+    g.textBaseline = 'middle'; g.direction = 'ltr';
+    g.fillStyle = t.txt; g.font = `700 ${Math.round(14 * k)}px ${MONO}`; g.textAlign = 'left';
+    g.fillText(`${S.coin}${S.src === 'bybit' ? '/USDT' : '/USD'} · ${tfOf(S.tf).l} · ${srcName()}`, Math.round(12 * k), pad / 2);
+    g.fillStyle = t.icon; g.font = `500 ${Math.round(11 * k)}px ${MONO}`; g.textAlign = 'right';
+    g.fillText(`${fmtDate(Date.now())} (Tehran) · SamadiCapital Journal`, cv.width - Math.round(12 * k), pad / 2);
+    const name = `${S.coin}_${tfOf(S.tf).l}_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.png`;
+    const blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    S.lastShot = { w: cv.width, h: cv.height, size: blob?.size || 0, name };
+    if (!blob) { showToast(tr('ساختِ عکس نشد', 'Could not create the snapshot')); return; }
+    try {
+      const file = new File([blob], name, { type: 'image/png' });
+      if (S.touch && navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+    } catch (e) { if (e?.name === 'AbortError') return; }
+    const a = document.createElement('a'), u = URL.createObjectURL(blob);
+    a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+    showToast(tr('عکسِ نمودار ذخیره شد', 'Chart snapshot saved'));
+  }
+  // ── تایم‌فریم در گوشی: فهرستِ کشویی (مثلِ اپِ TradingView) ──
+  function tfMenu(el) {
+    openPop('tf', el, `<div class="ch-poph">${tr('تایم‌فریم', 'Time interval')}</div>` + TF_VIEW.map(t => `<button type="button" class="ch-popi${t.id === S.tf ? ' on' : ''}" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}');SCCHART.closePop()"><i></i><span><b>${tfName(t)}</b></span><small dir="ltr">${t.l}</small></button>`).join(''));
+  }
+  // ── کپی/چسباندنِ شکل (Ctrl+C / Ctrl+V، مثلِ TradingView) ──
+  function copySel() {
+    const id = S.selected, m = S.recs.get(id), o = id && S.chart.getOverlayById(id); if (!m || !o) return false;
+    S.clip = { n: m.n, p: o.points.map(pt => [tsOfPoint(pt), pt.value]), c: m.c, w: m.w, s: m.s, x: JSON.parse(JSON.stringify(m.x || {})) };
+    showToast(tr('شکل کپی شد — Ctrl+V برای چسباندن', 'Drawing copied — Ctrl+V to paste')); return true;
+  }
+  function pasteClip() {
+    const c = S.clip; if (!c || readOnly() || !T[c.n]) return false;
+    if (S.recs.size >= MAX_DRAWINGS) { showToast(tr(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد`, `Up to ${MAX_DRAWINGS} drawings per symbol`)); return false; }
+    const shift = 3 * tfMs(); c.p = c.p.map(([t, v]) => [t + shift, v]);   // هر چسباندن کمی جلوتر، تا روی هم نیفتند
+    const nid = makeOverlay({ id: newId(), n: c.n, p: c.p.map(q => q.slice()), c: c.c, w: c.w, s: c.s, x: JSON.parse(JSON.stringify(c.x)) }, false);
+    commit(); if (nid) selectId(nid); return true;
+  }
+  // ── تنظیماتِ نمودار (مثلِ Settings در TradingView): رنگِ شمع‌ها، خطِ وضعیت، خطِ قیمت، سقف/کف، شبکه، مقیاس، تم ──
+  function openChartSettings() {
+    const box = $('ch-modal'); if (!box || !S.chart) return;
+    closePop(); closeCtx(); closeFly(); $('ch-indm').hidden = true;
+    const snap = { cs: JSON.parse(JSON.stringify(S.cs || {})), ys: S.ys || null, theme: S.theme || 'dark' };
+    const cs = JSON.parse(JSON.stringify(S.cs || {}));
+    let palFor = null;
+    const live = () => { S.cs = JSON.parse(JSON.stringify(cs)); S.chart.setStyles(stylesFor()); };
+    const swc = key => (key === 'up' ? cs.up : cs.down) || (key === 'up' ? TH().up : TH().down);
+    const ck = (key, lab) => `<div class="chs-r chs-rc"><label class="chs-ck"><input type="checkbox" data-cs="${key}"${cs[key] !== false ? ' checked' : ''}><span>${lab}</span></label></div>`;
+    const seg = (key, vals, now) => `<div class="chs-seg" role="group" data-seg="${key}">${vals.map(([v, t]) => `<button type="button" data-v="${v}" class="${v === now ? 'on' : ''}" aria-pressed="${v === now}">${t}</button>`).join('')}</div>`;
+    const render = () => {
+      box.innerHTML = `<div class="ch-mcard ch-set chs" role="dialog" aria-label="${tr('تنظیماتِ نمودار', 'Chart settings')}"><div class="chs-top"><b>${tr('تنظیماتِ نمودار', 'Chart settings')}</b><button type="button" class="chs-x" id="chs-x" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+        + `<div class="chs-body"><div class="chs-p">`
+        + `<div class="chs-h">${tr('شمع‌ها', 'Candles')}</div>`
+        + `<div class="chs-r"><span class="chs-l">${tr('رنگِ صعودی', 'Up color')}</span><button type="button" class="chs-sw" data-csw="up" style="--c:${swc('up')}" aria-label="${tr('رنگِ صعودی', 'Up color')}"></button></div>`
+        + `<div class="chs-r"><span class="chs-l">${tr('رنگِ نزولی', 'Down color')}</span><button type="button" class="chs-sw" data-csw="down" style="--c:${swc('down')}" aria-label="${tr('رنگِ نزولی', 'Down color')}"></button></div>`
+        + `<div class="chs-r"><span class="chs-l">${tr('نوعِ نمودار', 'Chart type')}</span><select class="fi chs-in" data-ct>${CT.map(c => `<option value="${c}"${(S.ct || 'candle') === c ? ' selected' : ''}>${ctName(c)}</option>`).join('')}</select></div>`
+        + `<div class="chs-h">${tr('نمایش', 'Appearance')}</div>`
+        + ck('legend', tr('خطِ وضعیت (OHLC و مقدارِ اندیکاتورها)', 'Status line (OHLC and indicator values)'))
+        + ck('last', tr('خط و برچسبِ قیمتِ آخر', 'Last price line and label'))
+        + ck('hl', tr('برچسبِ بالاترین و پایین‌ترین قیمتِ صفحه', 'High and low price labels'))
+        + ck('grid', tr('خطوطِ شبکه', 'Grid lines'))
+        + `<div class="chs-r"><span class="chs-l">${tr('تم', 'Theme')}</span>${seg('theme', [['dark', tr('تیره', 'Dark')], ['light', tr('روشن', 'Light')]], S.theme === 'light' ? 'light' : 'dark')}</div>`
+        + `<div class="chs-h">${tr('مقیاسِ قیمت', 'Price scale')}</div>`
+        + `<div class="chs-r"><span class="chs-l">${tr('نوعِ مقیاس', 'Scale type')}</span>${seg('ys', [['n', tr('عادی', 'Regular')], ['pct', tr('درصدی', 'Percent')], ['log', tr('لگاریتمی', 'Logarithmic')]], S.ys || 'n')}</div>`
+        + `</div><div class="chs-pal" id="chs-pal" hidden></div></div>`
+        + `<div class="chs-foot"><button type="button" class="btn btn-ghost chs-tb" id="chs-def" style="margin-inline-end:auto">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button>`
+        + `<button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
+      box.hidden = false;
+    };
+    const close = ok => {
+      if (ok) {
+        const clean = {}; for (const [k, v] of Object.entries(S.cs || {})) if (v === false || /^#[0-9A-Fa-f]{6}$/.test(String(v))) clean[k] = v;
+        S.cs = clean; if (S.store) { if (Object.keys(clean).length) S.store.prefs.cs = clean; else delete S.store.prefs.cs; if (!readOnly()) scheduleSave(); }
+      } else {
+        S.cs = snap.cs; if (S.ys !== snap.ys) { S.ys = snap.ys; if (S.store) { if (snap.ys) S.store.prefs.ys = snap.ys; else delete S.store.prefs.ys; } }
+        if ((S.theme || 'dark') !== snap.theme) setTheme(snap.theme);
+        S.chart.setStyles(stylesFor()); paintBar();
+      }
+      box.hidden = true; box.innerHTML = ''; box.onclick = box.onchange = box.onkeydown = null;
+    };
+    render();
+    box.onclick = ev => {
+      const t = ev.target;
+      if (t === box) { close(false); return; }
+      const sw = t.closest('[data-csw]');
+      if (sw) {
+        const pal = $('chs-pal'), body = box.querySelector('.chs-body');
+        if (palFor === sw.dataset.csw && !pal.hidden) { pal.hidden = true; palFor = null; return; }
+        palFor = sw.dataset.csw;
+        pal.innerHTML = `<div class="ch-pal">${PALETTE.concat([TH().up, TH().down]).filter((c, i, a) => a.indexOf(c) === i).map(c => `<button type="button" class="ch-dot" style="--c:${c}" data-pc="${c}" aria-label="${tr('رنگ', 'Color')} ${c}"></button>`).join('')}</div>`
+          + `<button type="button" class="ch-popi" data-pc=""><i></i><span><b>${tr('رنگِ پیش‌فرض', 'Default color')}</b></span></button>`;
+        pal.hidden = false;
+        const br = body.getBoundingClientRect(), er = sw.getBoundingClientRect();
+        pal.style.top = (er.bottom - br.top + body.scrollTop + 4) + 'px'; pal.style.left = clamp(er.left - br.left, 4, Math.max(4, br.width - pal.offsetWidth - 4)) + 'px';
+        return;
+      }
+      const pc = t.closest('[data-pc]');
+      if (pc && palFor) { if (pc.dataset.pc) cs[palFor] = pc.dataset.pc; else delete cs[palFor]; box.querySelector(`[data-csw="${palFor}"]`)?.style.setProperty('--c', swc(palFor)); $('chs-pal').hidden = true; palFor = null; live(); return; }
+      if (!t.closest('#chs-pal')) { const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; }
+      const sg = t.closest('.chs-seg button');
+      if (sg) {
+        const key = sg.parentElement.dataset.seg, v = sg.dataset.v;
+        sg.parentElement.querySelectorAll('button').forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+        if (key === 'theme') setTheme(v);
+        else if (key === 'ys') { S.ys = v === 'n' ? null : v; if (S.store) { if (S.ys) S.store.prefs.ys = S.ys; else delete S.store.prefs.ys; } S.chart.setStyles(stylesFor()); paintBar(); }
+        return;
+      }
+      if (t.id === 'chs-def') { for (const k of Object.keys(cs)) delete cs[k]; live(); render(); return; }
+      if (t.id === 'ch-sok') { close(true); return; }
+      if (t.id === 'ch-sno' || t.closest('#chs-x')) { close(false); return; }
+    };
+    box.onchange = ev => {
+      const t = ev.target;
+      if (t.dataset.cs) { if (t.checked) delete cs[t.dataset.cs]; else cs[t.dataset.cs] = false; live(); return; }
+      if (t.dataset.ct != null) { setChartType(t.value); return; }
+    };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
+  }
+  function paintBar() {
+    const tl = $('ch-tfl'); if (tl) tl.textContent = tfOf(S.tf).l;
+    const set = (id, t, extra) => { const b = $(id); if (!b) return; b.title = t; b.setAttribute('aria-label', t); if (extra) extra(b); };
+    set('ch-tfb', tr('تایم‌فریم: ', 'Time interval: ') + tfName(tfOf(S.tf)));
+    set('ch-ctb', tr('نوعِ نمودار: ', 'Chart type: ') + ctName(S.ct || 'candle'), b => { b.innerHTML = CT_IC[S.ct || 'candle']; });
+    set('ch-cset', tr('تنظیماتِ نمودار', 'Chart settings'));
+    set('ch-shot', tr('عکس از نمودار', 'Take a snapshot'));
+    set('ch-rt', tr('بازگشت به آخرین کندل (Alt+R)', 'Scroll to the most recent bar (Alt+R)'));
+    set('ch-log', tr('مقیاسِ لگاریتمی', 'Log scale'), b => { const on = S.ys === 'log'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    set('ch-pct', tr('مقیاسِ درصدی', 'Percent scale'), b => { const on = S.ys === 'pct'; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
   }
   // ── تمِ تیره/روشن ──
   function setTheme(t) {
@@ -1983,7 +2213,7 @@
     al('ch-tools', tr('ابزارهای رسم', 'Drawing tools')); al('ch-lang', tr('زبانِ نمودار', 'Chart language'));
     const il = $('ch-indl'); if (il) il.textContent = tr('اندیکاتور', 'Indicators');
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax(); paintTheme(); paintAuto();
+    paintTools(); paintSel(); paintTree(); paintInd(); paintHead(); paintMax(); paintTheme(); paintAuto(); paintBar();
     if (S.saveState || readOnly()) status(S.saveState);
     if (S.hintArgs) hint(...S.hintArgs);
   }
@@ -1999,7 +2229,9 @@
     pickObj: id => { selectId(id); paintTree(); }, objHide: id => { toggleHideOne(id); paintTree(); }, objLock: id => { toggleLock(id); paintTree(); }, objDel: id => { removeId(id); paintTree(); },
     src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
-    ind: toggleIndicator, indSet: openIndSettings,
+    ind: toggleIndicator, indSet: openIndSettings, indFind: q => { S.indQ = String(q || '').slice(0, 40); paintInd(true); },
+    tfMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
+    _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
     _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
