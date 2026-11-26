@@ -35,6 +35,8 @@
    v26.45: دسته‌ی نقطه‌ها حلقه‌ی نازکِ توخالی (نه دایره‌ی رنگیِ پُر)؛ هنگامِ رسم زیرِ نشانگر فقط یک حلقه‌ی ریز.
    v26.46 (مالک: «در تریدینگ‌ویو وسطِ رسم راست‌کلیک کنی شکلِ نیمه‌کاره پاک می‌شود»): راست‌کلیک وسطِ رسم = لغو
    (مثلِ Esc؛ قبلاً منوی راست‌کلیکِ شکلِ نیمه‌کاره باز می‌شد)؛ در قلم‌مو هم؛ دکمه‌ی ✕ در نوارِ راهنما برای گوشی.
+   v26.47 (مالک: «جابه‌جاییِ لانگ و شورت و… با کیبورد انجام نمی‌شود»): شکلِ انتخاب‌شده با کلیدهای جهت جابه‌جا می‌شود،
+   مثلِ TradingView: ←/→ یک کندل، ↑/↓ یک واحدِ قیمت (کوچک‌ترین رقمِ قیمت)؛ Shift = ده برابر؛ نگه‌داشتنِ کلید = یک «برگرداندن».
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -2035,6 +2037,7 @@
     setInterval(() => wlPoll(), 8000);
     if (pf.wlo && wide()) toggleWL(true);
     document.addEventListener('keydown', onKey);
+    window.addEventListener('keydown', onNudgeKey, true);   // پیش از کتابخانه (که Shift+←/→ را برای جابه‌جاییِ نمودار می‌گیرد)
     document.addEventListener('keyup', onKeyUp);
     window.addEventListener('blur', () => { S.ctrl = false; });
     // بستنِ منوها با کلیکِ بیرون
@@ -2150,6 +2153,51 @@
     const shift = 3 * tfMs(); c.p = c.p.map(([t, v]) => [t + shift, v]);   // هر چسباندن کمی جلوتر، تا روی هم نیفتند
     const nid = makeOverlay({ id: newId(), n: c.n, p: c.p.map(q => q.slice()), c: c.c, w: c.w, s: c.s, x: JSON.parse(JSON.stringify(c.x)) }, false);
     commit(); if (nid) selectId(nid); return true;
+  }
+  // ── جابه‌جاییِ شکلِ انتخاب‌شده با کلیدهای جهت (v26.47، مثلِ TradingView) ──
+  // ←/→ = یک کندل، ↑/↓ = یک واحدِ قیمت (۱۰^-دقت)؛ Shift ده برابر. همه‌ی نقطه‌ها با هم (لانگ/شورت: ورود، هدف و حد ضرر با هم).
+  // یک رشته فشار (یا نگه‌داشتنِ کلید) = یک قدمِ «برگرداندن» (Ctrl+Z)، نه صدها قدم.
+  function idxOfTs(t, list) {
+    const n = list.length - 1, step = tfMs();
+    if (t >= list[n].timestamp) return n + (t - list[n].timestamp) / step;
+    if (t <= list[0].timestamp) return (t - list[0].timestamp) / step;
+    let lo = 0, hi = n;
+    while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (list[mid].timestamp <= t) lo = mid; else hi = mid; }
+    return t === list[lo].timestamp ? lo : lo + (t - list[lo].timestamp) / Math.max(1, list[hi].timestamp - list[lo].timestamp);
+  }
+  function tsOfIdx(i, list) {
+    const n = list.length - 1, step = tfMs();
+    if (Number.isInteger(i) && i >= 0 && i <= n) return list[i].timestamp;
+    if (i > n) return Math.round(list[n].timestamp + (i - n) * step);
+    if (i < 0) return Math.round(list[0].timestamp + i * step);
+    const lo = Math.floor(i); return Math.round(list[lo].timestamp + (i - lo) * (list[lo + 1].timestamp - list[lo].timestamp));
+  }
+  function nudge(dBars, dTicks) {
+    const id = S.selected, m = S.recs.get(id), o = id && S.chart?.getOverlayById(id);
+    if (!m || !o || readOnly() || S.drawingId || !o.points?.length) return false;
+    if (lockOf(m)) return 'locked';
+    const list = S.chart.getDataList?.() || S.data; if (!list?.length) return false;
+    const tick = Math.pow(10, -prec());
+    const pts = o.points.map(pt => {
+      const t = tsOfPoint(pt); if (!isNum(t) || !isNum(pt.value)) return pt;
+      const i = idxOfTs(t, list) + dBars;
+      return { timestamp: dBars ? tsOfIdx(i, list) : t, dataIndex: Number.isInteger(i) ? i : Math.round(i), value: dTicks ? +(pt.value + dTicks * tick).toPrecision(12) : pt.value };
+    });
+    setPoints(id, pts);
+    const now = Date.now(), first = !(S.nudge && S.nudge.id === id && now - S.nudge.t < 800);
+    S.nudge = { id, t: now };
+    commit({ history: first });
+    return true;
+  }
+  function onNudgeKey(ev) {
+    const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[ev.key];
+    if (!dir || ev.ctrlKey || ev.metaKey || ev.altKey || !S.selected || S.drawingId) return;
+    if (!$('screen-chart')?.classList.contains('active') || /INPUT|TEXTAREA|SELECT/.test(ev.target?.tagName || '') || ev.target?.isContentEditable) return;
+    if (!$('ch-modal')?.hidden || S.fly || S.pop || !$('ch-ctx')?.hidden) return;
+    const k = ev.shiftKey ? 10 : 1, r = nudge(dir[0] * k, dir[1] * k);
+    if (!r) return;
+    ev.preventDefault(); ev.stopPropagation();   // نه اسکرولِ صفحه، نه جابه‌جاییِ نمودار (Shift+←/→ کتابخانه)، نه واچ‌لیست
+    if (r === 'locked' && !ev.repeat) showToast(tr('این شکل قفل است — اول قفل را باز کن', 'This drawing is locked — unlock it first'));
   }
   // ── تنظیماتِ نمودار (مثلِ Settings در TradingView): رنگِ شمع‌ها، خطِ وضعیت، خطِ قیمت، سقف/کف، شبکه، مقیاس، تم ──
   function openChartSettings() {
