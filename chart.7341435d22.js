@@ -37,6 +37,10 @@
    (مثلِ Esc؛ قبلاً منوی راست‌کلیکِ شکلِ نیمه‌کاره باز می‌شد)؛ در قلم‌مو هم؛ دکمه‌ی ✕ در نوارِ راهنما برای گوشی.
    v26.47 (مالک: «جابه‌جاییِ لانگ و شورت و… با کیبورد انجام نمی‌شود»): شکلِ انتخاب‌شده با کلیدهای جهت جابه‌جا می‌شود،
    مثلِ TradingView: ←/→ یک کندل، ↑/↓ یک واحدِ قیمت (کوچک‌ترین رقمِ قیمت)؛ Shift = ده برابر؛ نگه‌داشتنِ کلید = یک «برگرداندن».
+   v26.48 (مالک: «تنظیماتِ RSI کامل نیست» + «لانگ و شورت در TradingView سه رنگ است»): RSI عینِ TradingView — یک خطِ ۱۴ با
+   میانگینِ RSI، باندهای ۷۰/۵۰/۳۰ با پس‌زمینه، سایه‌ی اشباعِ خرید/فروش، واگرایی و پنجره‌ی «ورودی‌ها / ظاهر» با پیش‌نمایشِ زنده
+   (prefs.ip.RSI = فقط تفاوت با پیش‌فرض؛ آرایه‌ی قدیمی = طولِ RSI). پوزیشن: ورود خاکستری، حدِ سود سبز، حدِ ضرر قرمز
+   (دسته‌ها، برچسب‌ها و نوارهای محورِ قیمت؛ محورِ زمان خاکستری) — دیگر همه آبی نیستند.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -440,12 +444,29 @@
     const tUp = ty < e.y, sUp = sy < e.y;
     return [
       F.poly(prof, 'rgba(8,153,129,.22)'), F.poly(stop, 'rgba(242,54,69,.22)'),
-      F.line([{ x: xa, y: e.y }, { x: xb, y: e.y }], '#9598A1', 1, 0),
+      F.line([{ x: xa, y: e.y }, { x: xb, y: e.y }], C.gray, 1, 0),
       F.hit(prof, true), F.hit(stop, true),
       label(k, mid, ty + (tUp ? -12 : 12), `Target: ${fmt(tv)} (${Math.abs(pct(ev, tv)).toFixed(2)}%) ${fmt(gain)}`, C.green),
       label(k, mid, sy + (sUp ? -12 : 12), `Stop: ${fmt(sv)} (${Math.abs(pct(ev, sv)).toFixed(2)}%) ${fmt(loss)}`, C.red),
-      label(k, mid, e.y, rr ? `Risk/Reward Ratio: ${rr.toFixed(2)}` : (long ? 'Long' : 'Short'), '#2A2E39', { fg: '#D1D4DC' })
+      label(k, mid, e.y, rr ? `Risk/Reward Ratio: ${rr.toFixed(2)}` : (long ? 'Long' : 'Short'), C.gray)
     ];
+  }
+  // v26.48: مثلِ TradingView سه رنگ — ورود خاکستری، حدِ سود سبز، حدِ ضرر قرمز (دسته‌ها، برچسب و نوارِ محورِ قیمت)؛ محورِ زمان خاکستری.
+  const POS_SET = new Set(['scLong', 'scShort']), POS_C = [C.gray, C.green, C.red];
+  const posShow = k => k.o.id === S.selected || k.o.id === S.drawingId;
+  function posAxisY(k) {
+    if (!posShow(k)) return [];
+    const out = [], e = k.c[0];
+    for (const i of [1, 2]) { const p = k.c[i]; if (e && p) out.push({ type: 'rect', ignoreEvent: true, attrs: { x: 0, y: Math.min(e.y, p.y), width: k.W, height: Math.abs(p.y - e.y) }, styles: { style: 'fill', color: hexA(POS_C[i], 0.2) } }); }
+    for (const i of [1, 2, 0]) if (k.c[i] && isNum(k.v[i])) out.push(...axisY({ ...k, col: POS_C[i], x: {} }, i));
+    return out;
+  }
+  function posAxisX(k) {
+    if (!posShow(k) || !k.c[0]) return [];
+    const g = { ...k, col: C.gray, x: {} }, out = [];
+    if (k.c[1] && isNum(k.t[1]) && k.t[1] !== k.t[0]) out.push({ type: 'rect', ignoreEvent: true, attrs: { x: Math.min(k.c[0].x, k.c[1].x), y: 0, width: Math.abs(k.c[1].x - k.c[0].x), height: k.H }, styles: { style: 'fill', color: hexA(C.gray, 0.2) } }, ...axisX(g, 1));
+    out.push(...axisX(g, 0));
+    return out;
   }
   function posMove({ points, performPointIndex }) {
     if (points.length < 3) return;
@@ -593,8 +614,8 @@
     { id: 'scEWCorrection', g: 'patterns', sec: 'امواجِ الیوت', fa: 'موجِ اصلاحیِ الیوت', en: 'Elliott Correction Wave (ABC)', pts: 4, color: C.blue, pn: ['شروع', '(A)', '(B)', '(C)'], ic: svg('<path d="M3 5l6 11 4-6 8 10"/>'), figs: waveFigs(['', '(A)', '(B)', '(C)']) },
     { id: 'scEWTriangle', g: 'patterns', sec: 'امواجِ الیوت', fa: 'موجِ مثلثیِ الیوت', en: 'Elliott Triangle Wave (ABCDE)', pts: 6, color: C.orange, pn: ['شروع', '(A)', '(B)', '(C)', '(D)', '(E)'], ic: svg('<path d="M2 5l4 14 4-10 4 7 4-5 4 3"/>'), figs: waveFigs(['', '(A)', '(B)', '(C)', '(D)', '(E)']) },
     { id: 'scEWCombo', g: 'patterns', sec: 'امواجِ الیوت', fa: 'ترکیبیِ دوگانه‌ی الیوت', en: 'Elliott Double Combo Wave (WXY)', pts: 4, color: C.green, pn: ['شروع', '(W)', '(X)', '(Y)'], ic: svg('<path d="M3 6l6 12 5-7 7 9"/>'), figs: waveFigs(['', '(W)', '(X)', '(Y)']) },
-    { id: 'scLong', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ خرید', en: 'Long Position', pts: 3, steps: 1, cls: 'up', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 13h16"/><rect x="4" y="4" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="13" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, true), move: posMove, done: o => posDone(o, true) },
-    { id: 'scShort', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ فروش', en: 'Short Position', pts: 3, steps: 1, cls: 'down', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 11h16"/><rect x="4" y="11" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="5" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, false), move: posMove, done: o => posDone(o, false) },
+    { id: 'scLong', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ خرید', en: 'Long Position', pts: 3, steps: 1, cls: 'up', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 13h16"/><rect x="4" y="4" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="13" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, true), move: posMove, done: o => posDone(o, true), y: posAxisY, x: posAxisX, ownAx: true },
+    { id: 'scShort', g: 'measure', sec: 'پیش‌بینی', fa: 'پوزیشنِ فروش', en: 'Short Position', pts: 3, steps: 1, cls: 'down', pn: ['قیمتِ ورود', 'حدِ سود', 'حدِ ضرر'], ic: svg('<path d="M4 11h16"/><rect x="4" y="11" width="16" height="9" rx="1" fill="currentColor" fill-opacity=".18"/><rect x="4" y="5" width="16" height="6" rx="1" stroke-dasharray="2 2"/>'), figs: k => posFigs(k, false), move: posMove, done: o => posDone(o, false), y: posAxisY, x: posAxisX, ownAx: true },
     { id: 'scPriceRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی قیمت', en: 'Price Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], ic: svg('<path d="M5 4h14M5 20h14M12 7v11"/><path d="M9 10l3-3 3 3"/>'), figs: k => rangeFigs(k, 'p') },
     { id: 'scDateRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی زمان', en: 'Date Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], noMag: true, ic: svg('<path d="M4 5v14M20 5v14M7 12h11"/><path d="M15 9l3 3-3 3"/>'), figs: k => rangeFigs(k, 'd') },
     { id: 'scDPRange', g: 'measure', sec: 'اندازه‌گیری', fa: 'بازه‌ی زمان و قیمت', en: 'Date and Price Range', pts: 2, color: C.blue, pn: ['شروع', 'پایان'], ic: svg('<rect x="4" y="5" width="16" height="14" rx="1"/><path d="M12 8v8M8 12h8"/>'), figs: k => rangeFigs(k, 'dp') },
@@ -668,6 +689,7 @@
   function registerOverlays() {
     if (registered) return; registered = true;
     const kc = window.klinecharts;
+    registerRSI(kc);
     kc.registerFigure({ name: 'scHit', draw: () => {}, checkEventOn: (p, a) => {
       const c = a.coordinates || [], tol = S.tol;
       if (a.area && c.length > 2 && inPoly(p, c)) return true;
@@ -725,7 +747,7 @@
       k.c.forEach((c, i) => {
         if (!c || !isNum(c.x) || !isNum(c.y)) return;
         const cur = i === moving;   // زیرِ نشانگر: فقط حلقه‌ی ریز، تا کندل و قیمت دیده شود
-        out.push({ type: 'scEll', ignoreEvent: true, attrs: { x: c.x, y: c.y, rx: cur ? 2.5 : r, ry: cur ? 2.5 : r, area: false, handle: true }, styles: { fill: null, border: k.col, w: cur ? 1 : 1.5, s: 0 } });
+        out.push({ type: 'scEll', ignoreEvent: true, attrs: { x: c.x, y: c.y, rx: cur ? 2.5 : r, ry: cur ? 2.5 : r, area: false, handle: true }, styles: { fill: null, border: POS_SET.has(k.o.name) ? POS_C[i] || k.col : k.col, w: cur ? 1 : 1.5, s: 0 } });
       });
       return out;
     };
@@ -742,7 +764,7 @@
       if (def.special) continue;
       const hook = arg => { if (!S.quiet && !def.noMag) magnetize(arg.performPoint); if (def.move) def.move(arg); };
       kc.registerOverlay({
-        name: def.id, totalStep: (def.steps || def.pts) + 1, needDefaultPointFigure: !def.noHandles, needDefaultXAxisFigure: !def.pad && def.pts <= 3, needDefaultYAxisFigure: !def.pad,
+        name: def.id, totalStep: (def.steps || def.pts) + 1, needDefaultPointFigure: !def.noHandles, needDefaultXAxisFigure: !def.pad && !def.ownAx && def.pts <= 3, needDefaultYAxisFigure: !def.pad && !def.ownAx,
         createPointFigures: arg => run(def.figs, arg),
         createYAxisFigures: def.y ? arg => run(def.y, arg) : null,
         createXAxisFigures: def.x ? arg => run(def.x, arg) : null,
@@ -1484,7 +1506,7 @@
     const def = T[m.n], col = m.c || def.color || C.blue;
     const b = (a, t, inner, extra = '', on = '') => `<button type="button" class="ch-selb${on}" data-a="${a}" title="${esc(t)}" aria-label="${esc(t)}"${extra}>${inner}</button>`;
     bar.innerHTML = `<span class="ch-seln">${esc(nm(def))}</span>`
-      + b('color', tr('رنگ', 'Color'), `<i class="ch-sw" style="--c:${col}"></i>`, ' onclick="SCCHART.colorMenu(this)"')
+      + (NO_COLOR.has(m.n) ? '' : b('color', tr('رنگ', 'Color'), `<i class="ch-sw" style="--c:${col}"></i>`, ' onclick="SCCHART.colorMenu(this)"'))   // پوزیشن رنگِ ثابتِ سه‌گانه دارد (v26.48)
       + (def.pad || ['scLong', 'scShort', 'scText', 'scPriceLabel'].includes(m.n) ? '' :
         b('width', tr('ضخامتِ خط', 'Line width'), `${ICON.width}<em>${m.w}px</em>`, ' onclick="SCCHART.widthMenu(this)"')
         + b('style', tr('نوعِ خط', 'Line style'), ICON.style, ' onclick="SCCHART.styleMenu(this)"'))
@@ -1817,7 +1839,7 @@
     { id: 'AO', t: 'اسیلاتورِ شگفت‌انگیز (AO)', en: 'Awesome Oscillator (AO)', main: false }
   ];
   // دوره‌های پیش‌فرضِ KLineChart و برچسبِ هر عدد
-  const IND_DEF = { VOL: [5, 10, 20], MA: [5, 10, 30, 60], EMA: [6, 12, 20], BOLL: [20, 2], RSI: [6, 12, 24], MACD: [12, 26, 9],
+  const IND_DEF = { VOL: [5, 10, 20], MA: [5, 10, 30, 60], EMA: [6, 12, 20], BOLL: [20, 2], RSI: [14], MACD: [12, 26, 9],
     SAR: [2, 2, 20], KDJ: [9, 3, 3], CCI: [20], DMI: [14, 6], OBV: [30], WR: [6, 10, 14], AO: [5, 34] };
   const indLabel = (name, i) => ({
     VOL: () => tr('میانگینِ حجمِ ' + fa(i + 1), 'Volume MA ' + (i + 1)), MA: () => tr('دوره‌ی MA ' + fa(i + 1), 'MA length ' + (i + 1)),
@@ -1834,6 +1856,294 @@
     if (!d || !Array.isArray(p) || !p.length || p.length > d.length || (FIXED_N.has(name) && p.length !== d.length)) return null;
     return p.every((v, i) => isNum(v) && v > 0 && v <= 500 && (name === 'BOLL' && i === 1 ? v <= 10 : Number.isInteger(v))) ? p.slice() : null;
   }
+  // ── RSI عینِ TradingView (v26.48): یک خطِ RSI (Wilder/RMA)، میانگینِ RSI (None/SMA/SMA+BB/EMA/RMA/WMA/VWMA)، باندهای ۷۰/۵۰/۳۰
+  //    با پس‌زمینه، سایه‌ی اشباعِ خرید/فروش و واگراییِ معمولی (پیوت ۵/۵، فاصله‌ی ۵ تا ۶۰ کندل) — همان فرمولِ اسکریپتِ خودِ TradingView.
+  const RSI_SRC = ['close', 'open', 'high', 'low', 'hl2', 'hlc3', 'ohlc4', 'hlcc4'];
+  const RSI_PX = { close: k => k.close, open: k => k.open, high: k => k.high, low: k => k.low, hl2: k => (k.high + k.low) / 2,
+    hlc3: k => (k.high + k.low + k.close) / 3, ohlc4: k => (k.open + k.high + k.low + k.close) / 4, hlcc4: k => (k.high + k.low + 2 * k.close) / 4 };
+  const RSI_MT = [['none', 'هیچ', 'None'], ['SMA', 'SMA', 'SMA'], ['BB', 'SMA + باندِ بولینگر', 'SMA + Bollinger Bands'], ['EMA', 'EMA', 'EMA'],
+    ['RMA', 'SMMA (RMA)', 'SMMA (RMA)'], ['WMA', 'WMA', 'WMA'], ['VWMA', 'VWMA', 'VWMA']];
+  const rsiDefault = () => ({ n: 14, src: 'close', div: false, mt: 'SMA', ml: 14, bb: 2,
+    rsi: { on: true, c: '#7E57C2', w: 1 }, ma: { on: true, c: '#FFEB3B', w: 1 },
+    bbu: { on: true, c: '#4CAF50' }, bbl: { on: true, c: '#4CAF50' }, bbf: { on: true, c: '#4CAF50', a: 10 },
+    bull: { on: true, c: '#4CAF50' }, bear: { on: true, c: '#FF5252' },
+    up: { on: true, c: '#787B86', s: 1, v: 70 }, mid: { on: true, c: '#787B86', s: 1, v: 50, a: 50 }, lo: { on: true, c: '#787B86', s: 1, v: 30 },
+    bg: { on: true, c: '#7E57C2', a: 10 }, ob: { on: true, c: '#4CAF50' }, os: { on: true, c: '#FF5252' } });
+  function rsiCfg(raw) {
+    const d = rsiDefault(), int = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+    if (Array.isArray(raw)) { if (int(raw[0], 1, 500)) d.n = raw[0]; return d; }   // پیش از v26.48: آرایه‌ی دوره‌ها ⇒ اولی = طولِ RSI
+    if (!raw || typeof raw !== 'object') return d;
+    if (int(raw.n, 1, 500)) d.n = raw.n;
+    if (RSI_SRC.includes(raw.src)) d.src = raw.src;
+    if (typeof raw.div === 'boolean') d.div = raw.div;
+    if (RSI_MT.some(m => m[0] === raw.mt)) d.mt = raw.mt;
+    if (int(raw.ml, 1, 500)) d.ml = raw.ml;
+    if (isNum(raw.bb) && raw.bb >= 0.001 && raw.bb <= 50) d.bb = raw.bb;
+    for (const k of Object.keys(d)) {
+      const a = d[k], b = raw[k]; if (!a || typeof a !== 'object' || !b || typeof b !== 'object') continue;
+      if (typeof b.on === 'boolean') a.on = b.on;
+      if (/^#[0-9A-Fa-f]{6}$/.test(b.c || '')) a.c = b.c;
+      if ('w' in a && [1, 2, 3, 4].includes(b.w)) a.w = b.w;
+      if ('s' in a && [0, 1, 2].includes(b.s)) a.s = b.s;
+      if ('v' in a && isNum(b.v) && b.v >= 0 && b.v <= 100) a.v = b.v;
+      if ('a' in a && int(b.a, 0, 100)) a.a = b.a;
+    }
+    return d;
+  }
+  function rsiDiff(c) {   // فقط چیزی که با پیش‌فرض فرق دارد ذخیره می‌شود
+    const d = rsiDefault(), out = {};
+    for (const k of Object.keys(d)) {
+      if (typeof d[k] !== 'object') { if (c[k] !== d[k]) out[k] = c[k]; continue; }
+      const o = {}; for (const f of Object.keys(d[k])) if (c[k][f] !== d[k][f]) o[f] = c[k][f];
+      if (Object.keys(o).length) out[k] = o;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  const rsiMtName = (mt, en) => { const m = RSI_MT.find(x => x[0] === mt) || RSI_MT[0]; return en ? m[2] : tr(m[1], m[2]); };
+  const rsiSum = () => { const c = rsiCfg(S.store?.prefs?.ip?.RSI); return `${c.n} ${c.src}` + (c.mt === 'none' ? '' : `, ${c.mt === 'BB' ? 'SMA+BB' : c.mt} ${c.ml}`); };
+  const rsiCreate = () => { const c = rsiCfg(S.store?.prefs?.ip?.RSI); return { name: 'RSI', calcParams: [c.n], extendData: c }; };
+  // سری‌ها مثلِ Pine: ta.rma / ta.ema با SMA شروع می‌شوند؛ ta.stdev با انحرافِ معیارِ جامعه
+  function rsiOf(src, n) {
+    const N = src.length, out = new Array(N).fill(null);
+    let up = 0, dn = 0;
+    for (let i = 1; i < N; i++) {
+      const ch = src[i] - src[i - 1], u = ch > 0 ? ch : 0, d = ch < 0 ? -ch : 0;
+      if (i <= n) { up += u; dn += d; if (i < n) continue; up /= n; dn /= n; }
+      else { up = (up * (n - 1) + u) / n; dn = (dn * (n - 1) + d) / n; }
+      out[i] = dn === 0 ? 100 : up === 0 ? 0 : 100 - 100 / (1 + up / dn);
+    }
+    return out;
+  }
+  function maOf(v, len, type, vol) {
+    const N = v.length, out = new Array(N).fill(null), f = v.findIndex(x => x != null);
+    if (f < 0) return out;
+    if (type === 'SMA' || type === 'BB') { let s = 0; for (let i = f; i < N; i++) { s += v[i]; if (i - f >= len) s -= v[i - len]; if (i - f >= len - 1) out[i] = s / len; } }
+    else if (type === 'EMA' || type === 'RMA') {
+      const a = type === 'EMA' ? 2 / (len + 1) : 1 / len; let s = 0, e = null;
+      for (let i = f; i < N; i++) { if (e == null) { s += v[i]; if (i - f < len - 1) continue; e = s / len; } else e = a * v[i] + (1 - a) * e; out[i] = e; }
+    } else if (type === 'WMA') {
+      const W = len * (len + 1) / 2;
+      for (let i = f + len - 1; i < N; i++) { let s = 0; for (let j = 0; j < len; j++) s += v[i - j] * (len - j); out[i] = s / W; }
+    } else if (type === 'VWMA') {
+      let a = 0, b = 0;
+      for (let i = f; i < N; i++) {
+        const w = vol[i] || 0; a += v[i] * w; b += w;
+        if (i - f >= len) { const w0 = vol[i - len] || 0; a -= v[i - len] * w0; b -= w0; }
+        if (i - f >= len - 1) out[i] = b > 0 ? a / b : null;
+      }
+    }
+    return out;
+  }
+  function rsiCalc(list, ind) {
+    const c = rsiCfg(ind.extendData), N = list.length;
+    const rsi = rsiOf(list.map(RSI_PX[c.src]), c.n);
+    const ma = c.mt === 'none' ? null : maOf(rsi, c.ml, c.mt, list.map(k => k.volume));
+    const res = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const r = {};
+      if (rsi[i] != null) r.rsi = rsi[i];
+      if (ma && ma[i] != null) {
+        r.ma = ma[i];
+        if (c.mt === 'BB') { let q = 0; for (let j = i - c.ml + 1; j <= i; j++) q += (rsi[j] - ma[i]) ** 2; const sd = Math.sqrt(q / c.ml) * c.bb; r.bbu = ma[i] + sd; r.bbl = ma[i] - sd; }
+      }
+      if (c.up.on) r.up = c.up.v;   // مثلِ TradingView: مقیاسِ خودکار باندها را هم در بر می‌گیرد
+      if (c.lo.on) r.lo = c.lo.v;
+      res[i] = r;
+    }
+    if (c.div) {   // واگراییِ معمولی: RSI کفِ بالاتر + قیمت کفِ پایین‌تر (صعودی) / برعکس (نزولی)
+      const L = 5, R = 5; let pl = -1, ph = -1;
+      for (let j = L; j + R < N; j++) {
+        const v = rsi[j]; if (v == null || rsi[j - L] == null) continue;
+        let isL = true, isH = true;
+        for (let k = 1; k <= L; k++) { const a = rsi[j - k]; if (!(v < a)) isL = false; if (!(v > a)) isH = false; }
+        for (let k = 1; k <= R; k++) { const a = rsi[j + k]; if (!(v <= a)) isL = false; if (!(v >= a)) isH = false; }
+        if (isL) { const g = j - pl - 1; if (pl >= 0 && g >= 5 && g <= 60 && v > rsi[pl] && list[j].low < list[pl].low) res[j].bull = pl; pl = j; }
+        if (isH) { const g = j - ph - 1; if (ph >= 0 && g >= 5 && g <= 60 && v < rsi[ph] && list[j].high > list[ph].high) res[j].bear = ph; ph = j; }
+      }
+    }
+    return res;
+  }
+  function rsiDraw({ ctx, indicator, visibleRange, bounding, xAxis, yAxis }) {
+    const c = indicator.extendData || rsiDefault(), r = indicator.result || [];
+    if (!r.length) return true;
+    const W = bounding.width, H = bounding.height, X = i => xAxis.convertToPixel(i), Y = v => yAxis.convertToPixel(v);
+    const a = Math.max(0, Math.floor(visibleRange.from) - 1), b = Math.min(r.length - 1, Math.ceil(visibleRange.to) + 1);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
+    const runs = (key, fn) => { let s = -1; for (let i = a; i <= b + 1; i++) { const ok = i <= b && r[i]?.[key] != null; if (ok && s < 0) s = i; else if (!ok && s >= 0) { fn(s, i - 1); s = -1; } } };
+    const area = (key, base) => { ctx.beginPath(); runs(key, (s, e) => { ctx.moveTo(X(s), Y(base)); for (let i = s; i <= e; i++) ctx.lineTo(X(i), Y(r[i][key])); ctx.lineTo(X(e), Y(base)); ctx.closePath(); }); };
+    const line = (key, col, w) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.setLineDash([]); ctx.lineJoin = 'round'; ctx.beginPath(); runs(key, (s, e) => { ctx.moveTo(X(s), Y(r[s][key])); for (let i = s + 1; i <= e; i++) ctx.lineTo(X(i), Y(r[i][key])); }); ctx.stroke(); };
+    // ۱) پس‌زمینه‌ی بینِ باندِ بالا و پایین
+    if (c.bg.on && c.bg.a > 0) { const y1 = Y(c.up.v), y2 = Y(c.lo.v); ctx.fillStyle = hexA(c.bg.c, c.bg.a / 100); ctx.fillRect(0, Math.min(y1, y2), W, Math.abs(y2 - y1)); }
+    // ۲) پس‌زمینه‌ی باندهای بولینگر
+    if (c.mt === 'BB' && c.bbf.on && c.bbf.a > 0) {
+      ctx.beginPath();
+      runs('bbu', (s, e) => { ctx.moveTo(X(s), Y(r[s].bbu)); for (let i = s + 1; i <= e; i++) ctx.lineTo(X(i), Y(r[i].bbu)); for (let i = e; i >= s; i--) ctx.lineTo(X(i), Y(r[i].bbl)); ctx.closePath(); });
+      ctx.fillStyle = hexA(c.bbf.c, c.bbf.a / 100); ctx.fill();
+    }
+    // ۳) سایه‌ی اشباعِ خرید (بالای باندِ بالا) و فروش (زیرِ باندِ پایین): از لبه‌ی باند شفاف تا ۱۰۰ / ۰ پررنگ
+    const grad = (o, edge, far) => {
+      const ye = Y(edge), yf = Y(far); if (!o.on || Math.abs(ye - yf) < 1) return;
+      ctx.save(); ctx.beginPath(); if (far > edge) ctx.rect(0, 0, W, ye); else ctx.rect(0, ye, W, H - ye); ctx.clip();
+      const g = ctx.createLinearGradient(0, yf, 0, ye); g.addColorStop(0, hexA(o.c, 1)); g.addColorStop(1, hexA(o.c, 0));
+      area('rsi', edge); ctx.fillStyle = g; ctx.fill(); ctx.restore();
+    };
+    grad(c.ob, c.up.v, 100); grad(c.os, c.lo.v, 0);
+    // ۴) باندها
+    for (const o of [c.up, c.mid, c.lo]) {
+      if (!o.on) continue;
+      const y = Math.round(Y(o.v)) + 0.5;
+      ctx.strokeStyle = hexA(o.c, (o.a ?? 100) / 100); ctx.lineWidth = 1; ctx.setLineDash(o.s === 1 ? [4, 4] : o.s === 2 ? [1, 3] : []);
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+    // ۵) خط‌ها: بولینگر، میانگین، خودِ RSI روی همه
+    if (c.mt === 'BB') { if (c.bbu.on) line('bbu', c.bbu.c, 1); if (c.bbl.on) line('bbl', c.bbl.c, 1); }
+    if (c.mt !== 'none' && c.ma.on) line('ma', c.ma.c, c.ma.w);
+    if (c.rsi.on) line('rsi', c.rsi.c, c.rsi.w);
+    // ۶) واگرایی: خط بینِ دو کف/سقفِ RSI و برچسبِ «صعودی / نزولی» (مثلِ TradingView: Bull / Bear)
+    if (c.div) {
+      const tag = (x, y, txt, col, below) => {
+        ctx.font = `600 11px ${SANS}`; const w = ctx.measureText(txt).width + 12, h = 18, t = 5, by = below ? y + t : y - t - h;
+        ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - t, below ? y + t : y - t); ctx.lineTo(x + t, below ? y + t : y - t); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x - w / 2, by, w, h, 3); else ctx.rect(x - w / 2, by, w, h); ctx.fill();
+        ctx.fillStyle = ink(col); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, by + h / 2 + 0.5);
+      };
+      ctx.setLineDash([]); ctx.lineWidth = 2;
+      for (let j = a; j < Math.min(r.length, b + 62); j++) {
+        const d = r[j]; if (!d) continue;
+        for (const [key, o, below] of [['bull', c.bull, true], ['bear', c.bear, false]]) {
+          const p = d[key]; if (p == null || !o.on || p > b || r[p]?.rsi == null) continue;
+          const x2 = X(j), y2 = Y(d.rsi);
+          ctx.strokeStyle = o.c; ctx.beginPath(); ctx.moveTo(X(p), Y(r[p].rsi)); ctx.lineTo(x2, y2); ctx.stroke();
+          tag(x2, y2, below ? tr('صعودی', 'Bull') : tr('نزولی', 'Bear'), o.c, below);
+        }
+      }
+    }
+    ctx.restore();
+    return true;   // همه را خودمان کشیدیم
+  }
+  function rsiTip({ indicator, crosshair }) {
+    const c = indicator.extendData || rsiDefault(), r = indicator.result || [];
+    const i = isNum(crosshair?.dataIndex) ? crosshair.dataIndex : r.length - 1, d = r[i] || {}, vals = [];
+    const put = (on, v, col) => { if (on) vals.push({ title: '', value: { text: isNum(v) ? v : '∅', color: col } }); };
+    put(c.rsi.on, d.rsi, c.rsi.c);
+    if (c.mt !== 'none') put(c.ma.on, d.ma, c.ma.c);
+    if (c.mt === 'BB') { put(c.bbu.on, d.bbu, c.bbu.c); put(c.bbl.on, d.bbl, c.bbl.c); }
+    return { name: 'RSI', calcParamsText: ` ${c.n} ${c.src}` + (c.mt === 'none' ? '' : ` ${rsiMtName(c.mt, true)} ${c.ml}` + (c.mt === 'BB' ? ` ${c.bb}` : '')), values: vals };
+  }
+  function registerRSI(kc) {
+    kc.registerIndicator({ name: 'RSI', shortName: 'RSI', precision: 2, calcParams: [14],
+      figures: ['rsi', 'ma', 'bbu', 'bbl', 'up', 'lo'].map(key => ({ key, type: 'line' })),
+      calc: rsiCalc, draw: rsiDraw, createTooltipDataSource: rsiTip });
+  }
+  // پنجره‌ی تنظیماتِ RSI مثلِ TradingView: «ورودی‌ها» و «ظاهر»، پیش‌نمایشِ زنده، انصراف = برگشت
+  function openRSISettings() {
+    const box = $('ch-modal'); if (!box || readOnly()) return;
+    $('ch-indm').hidden = true; closePop(); closeCtx();
+    const orig = rsiCfg(S.store.prefs.ip?.RSI), bad = new Set();
+    let c = rsiCfg(S.store.prefs.ip?.RSI), cur = 'in', palFor = null;
+    const PAL = [...new Set([...PALETTE, '#7E57C2', '#787B86', '#FF5252'].map(x => x.toUpperCase()))];
+    const apply = cfg => { const id = S.panes.RSI; if (id && S.chart) S.chart.overrideIndicator({ name: 'RSI', calcParams: [cfg.n], extendData: JSON.parse(JSON.stringify(cfg)) }, id); };
+    const sw = key => `<button type="button" class="chs-sw" data-sw="${key}" style="--c:${c[key].c}" title="${tr('رنگ', 'Color')}" aria-label="${tr('رنگ', 'Color')}"></button>`;
+    const seg = (key, f, vals) => `<div class="chs-seg" role="group" data-seg="${key}.${f}">${vals.map(([v, inner, t]) => `<button type="button" data-v="${v}" class="${v === c[key][f] ? 'on' : ''}" title="${esc(t)}" aria-label="${esc(t)}" aria-pressed="${v === c[key][f]}">${inner}</button>`).join('')}</div>`;
+    const wSeg = key => seg(key, 'w', [1, 2, 3, 4].map(w => [w, WIDTH_IC(w), w + 'px']));
+    const sSeg = key => seg(key, 's', [[0, STYLE_IC(0), tr('پیوسته', 'Solid')], [1, STYLE_IC(1), tr('خط‌چین', 'Dashed')], [2, STYLE_IC(2), tr('نقطه‌چین', 'Dotted')]]);
+    const op = key => `<input class="chs-rng" type="range" dir="ltr" min="0" max="100" step="1" value="${c[key].a}" data-a="${key}" aria-label="${tr('شفافیت', 'Opacity')}"><b class="chs-pv" dir="ltr" data-av="${key}">${c[key].a}%</b>`;
+    const num = (key, v, lab, dis) => `<input class="fi chs-in" dir="ltr" inputmode="decimal" data-n="${key}" value="${v}" aria-label="${esc(lab)}"${dis ? ' disabled' : ''}>`;
+    const row = (lab, ctl) => `<div class="chs-r"><span class="chs-l">${lab}</span>${ctl}</div>`;
+    const sel = (key, opts) => `<select class="fi chs-in" data-sel="${key}" aria-label="${esc(key)}">${opts.map(([v, t]) => `<option value="${v}"${v === c[key] ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+    const sRow = (key, lab, extra = '') => `<div class="chs-r chs-rc"><label class="chs-ck"><input type="checkbox" data-on="${key}"${c[key].on ? ' checked' : ''}><span>${lab}</span></label><div class="chs-c">${sw(key)}${extra}</div></div>`;
+    const bandIn = key => `<input class="chs-lvv chs-bv" dir="ltr" inputmode="decimal" data-n="${key}.v" value="${c[key].v}" aria-label="${tr('مقدار', 'Value')}">`;
+    const inPanel = () => `<div class="chs-h">${tr('تنظیماتِ RSI', 'RSI Settings')}</div>`
+      + row(tr('طولِ RSI', 'RSI Length'), num('n', c.n, 'RSI Length'))
+      + row(tr('منبع', 'Source'), sel('src', RSI_SRC.map(x => [x, x])))
+      + `<div class="chs-r chs-rc"><label class="chs-ck"><input type="checkbox" data-ck="div"${c.div ? ' checked' : ''}><span>${tr('محاسبه‌ی واگرایی', 'Calculate Divergence')}</span></label></div>`
+      + `<div class="chs-h">${tr('هموارسازی (میانگینِ RSI)', 'Smoothing')}</div>`
+      + row(tr('نوع', 'Type'), sel('mt', RSI_MT.map(m => [m[0], tr(m[1], m[2])])))
+      + row(tr('طول', 'Length'), num('ml', c.ml, 'MA Length', c.mt === 'none'))
+      + row(tr('ضریبِ انحرافِ معیار (بولینگر)', 'BB StdDev'), num('bb', c.bb, 'BB StdDev', c.mt !== 'BB'));
+    const stPanel = () => sRow('rsi', 'RSI', wSeg('rsi'))
+      + (c.mt === 'none' ? '' : sRow('ma', tr('میانگینِ RSI', 'RSI-based MA'), wSeg('ma')))
+      + (c.mt === 'BB' ? sRow('bbu', tr('باندِ بالای بولینگر', 'Upper Bollinger Band')) + sRow('bbl', tr('باندِ پایینِ بولینگر', 'Lower Bollinger Band')) + sRow('bbf', tr('پس‌زمینه‌ی بولینگر', 'Bollinger Bands Background Fill'), op('bbf')) : '')
+      + (c.div ? sRow('bull', tr('واگراییِ صعودی', 'Regular Bullish')) + sRow('bear', tr('واگراییِ نزولی', 'Regular Bearish')) : '')
+      + `<div class="chs-h">${tr('باندها', 'Bands')}</div>`
+      + sRow('up', tr('باندِ بالا (اشباعِ خرید)', 'RSI Upper Band'), sSeg('up') + bandIn('up'))
+      + sRow('mid', tr('باندِ میانی', 'RSI Middle Band'), sSeg('mid') + bandIn('mid'))
+      + sRow('lo', tr('باندِ پایین (اشباعِ فروش)', 'RSI Lower Band'), sSeg('lo') + bandIn('lo'))
+      + sRow('bg', tr('پس‌زمینه‌ی بینِ باندها', 'RSI Background Fill'), op('bg'))
+      + sRow('ob', tr('سایه‌ی اشباعِ خرید', 'Overbought Gradient Fill'))
+      + sRow('os', tr('سایه‌ی اشباعِ فروش', 'Oversold Gradient Fill'));
+    const TABS = [['in', tr('ورودی‌ها', 'Inputs')], ['st', tr('ظاهر', 'Style')]];
+    function render() {
+      bad.clear();
+      box.innerHTML = `<div class="ch-mcard ch-set chs" role="dialog" aria-label="${esc(tr('تنظیماتِ RSI', 'RSI settings'))}">`
+        + `<div class="chs-top"><b>${esc(tr('شاخصِ قدرتِ نسبی (RSI)', 'Relative Strength Index'))}</b><button type="button" class="chs-x" id="chs-x" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+        + `<div class="chs-tabs" role="tablist">${TABS.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === cur ? 'on' : ''}" aria-selected="${k === cur}">${t}</button>`).join('')}</div>`
+        + `<div class="chs-body"><div class="chs-p" data-p="in"${cur === 'in' ? '' : ' hidden'}>${inPanel()}</div><div class="chs-p" data-p="st"${cur === 'st' ? '' : ' hidden'}>${stPanel()}</div>`
+        + `<div class="ch-merr" id="ch-ierr" hidden></div><div class="chs-pal" id="chs-pal" hidden></div></div>`
+        + `<div class="chs-foot"><button type="button" class="btn btn-ghost ch-sdef" id="ch-idef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button>`
+        + `<button type="button" class="btn btn-ghost" id="ch-ino">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-iok">${tr('ثبت', 'Ok')}</button></div></div>`;
+      box.hidden = false; palFor = null;
+    }
+    const showTab = k => { cur = k; box.querySelectorAll('[data-tab]').forEach(b => { const on = b.dataset.tab === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); }); box.querySelectorAll('[data-p]').forEach(p => { p.hidden = p.dataset.p !== k; }); const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; };
+    function openPal(key, el) {
+      const pal = $('chs-pal'), body = box.querySelector('.chs-body'); if (!pal || !body) return;
+      if (palFor === key && !pal.hidden) { pal.hidden = true; palFor = null; return; }
+      palFor = key; const now = String(c[key].c).toUpperCase();
+      pal.innerHTML = `<div class="ch-pal">${PAL.map(x => `<button type="button" class="ch-dot${x === now ? ' on' : ''}" style="--c:${x}" data-pc="${x}" aria-label="${tr('رنگ', 'Color')} ${x}"></button>`).join('')}</div>`;
+      pal.hidden = false;
+      const br = body.getBoundingClientRect(), er = el.getBoundingClientRect();
+      pal.style.top = (er.bottom - br.top + body.scrollTop + 4) + 'px';
+      pal.style.left = clamp(er.left - br.left, 4, Math.max(4, br.width - pal.offsetWidth - 4)) + 'px';
+    }
+    const close = ok => {
+      if (ok) { const d = rsiDiff(c), all = { ...(S.store.prefs.ip || {}) }; if (d) all.RSI = d; else delete all.RSI; S.store.prefs.ip = all; apply(c); scheduleSave(); }
+      else apply(orig);
+      box.hidden = true; box.innerHTML = ''; box.onclick = box.oninput = box.onchange = box.onkeydown = null;
+    };
+    render();
+    box.onclick = ev => {
+      const t = ev.target;
+      if (t === box) { close(false); return; }   // کلیک روی پس‌زمینه‌ی تیره = انصراف
+      const tabB = t.closest('[data-tab]'); if (tabB) { showTab(tabB.dataset.tab); return; }
+      const swB = t.closest('[data-sw]'); if (swB) { openPal(swB.dataset.sw, swB); return; }
+      const pc = t.closest('[data-pc]');
+      if (pc && palFor) { c[palFor].c = pc.dataset.pc; box.querySelector(`[data-sw="${palFor}"]`)?.style.setProperty('--c', pc.dataset.pc); $('chs-pal').hidden = true; palFor = null; apply(c); return; }
+      if (!t.closest('#chs-pal')) { const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; }
+      const sg = t.closest('.chs-seg button');
+      if (sg) {
+        const [key, f] = sg.parentElement.dataset.seg.split('.'); c[key][f] = +sg.dataset.v;
+        sg.parentElement.querySelectorAll('button').forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+        apply(c); return;
+      }
+      if (t.id === 'ch-idef') { c = rsiDefault(); render(); apply(c); return; }
+      if (t.id === 'ch-iok') {
+        if (bad.size) {
+          const e = $('ch-ierr'); e.textContent = tr('عددِ نادرست: طول‌ها عددِ صحیح از ۱ تا ۵۰۰، ضریبِ بولینگر تا ۵۰ و باندها از ۰ تا ۱۰۰.', 'Invalid value: lengths are whole numbers 1–500, BB StdDev up to 50, bands 0–100.');
+          e.hidden = false; const first = box.querySelector('.bad'), p = first?.closest('[data-p]'); if (p && p.dataset.p !== cur) showTab(p.dataset.p); first?.focus(); return;
+        }
+        close(true); return;
+      }
+      if (t.id === 'ch-ino' || t.closest('#chs-x')) { close(false); return; }
+    };
+    const LIM = { n: [1, 500, true], ml: [1, 500, true], bb: [0.001, 50, false] };
+    box.oninput = ev => {
+      const t = ev.target;
+      if (t.dataset.a) { const k = t.dataset.a, v = +t.value; c[k].a = v; const b = box.querySelector(`[data-av="${k}"]`); if (b) b.textContent = v + '%'; apply(c); return; }
+      if (!t.dataset.n) return;
+      const key = t.dataset.n, v = numIn(t.value); let okv;
+      if (key.endsWith('.v')) { okv = isNum(v) && v >= 0 && v <= 100; if (okv) c[key.slice(0, -2)].v = v; }
+      else { const [lo, hi, int] = LIM[key]; okv = isNum(v) && v >= lo && v <= hi && (!int || Number.isInteger(v)); if (okv) c[key] = v; }
+      t.classList.toggle('bad', !okv); if (okv) bad.delete(key); else bad.add(key);
+      if (okv) { if (!bad.size) $('ch-ierr').hidden = true; apply(c); }
+    };
+    box.onchange = ev => {
+      const t = ev.target;
+      if (t.dataset.on) { c[t.dataset.on].on = t.checked; apply(c); return; }
+      if (t.dataset.ck === 'div') { c.div = t.checked; apply(c); render(); return; }
+      if (t.dataset.sel) { c[t.dataset.sel] = t.value; apply(c); if (t.dataset.sel === 'mt') render(); }
+    };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
+  }
   function applyIndicators() {
     for (const [name, pane] of Object.entries(S.panes)) S.chart.removeIndicator(pane, name);
     S.panes = {};
@@ -1843,7 +2153,7 @@
     const cap = subs ? Math.max(20, Math.floor(($('ch-canvas')?.clientHeight || 520) * 0.5 / subs)) : 400;
     for (const name of S.store.prefs.ind || []) {
       const def = INDICATORS.find(x => x.id === name); if (!def) continue;
-      const p = indParams(name), v = p ? { name, calcParams: p } : name;
+      const p = name === 'RSI' ? null : indParams(name), v = name === 'RSI' ? rsiCreate() : p ? { name, calcParams: p } : name;
       const h = clamp(Math.min(+ph[name] || 90, cap), 20, 400);
       const pane = def.main ? S.chart.createIndicator(v, true, { id: 'candle_pane' }) : S.chart.createIndicator(v, false, { height: h, minHeight: 20 });
       S.panes[name] = def.main ? 'candle_pane' : pane;
@@ -1863,6 +2173,7 @@
     zoomTimer = setTimeout(() => { const bs = S.chart?.getBarSpace?.(); if (isNum(bs) && bs > 0) { S.store.prefs.bs = Math.round(bs * 100) / 100; scheduleSave(); } }, 700);
   }
   function openIndSettings(name) {
+    if (name === 'RSI') { openRSISettings(); return; }
     const box = $('ch-modal'), d = IND_DEF[name]; if (!box || !d || readOnly()) return;
     $('ch-indm').hidden = true;
     const cur = indParams(name) || d;
@@ -1909,7 +2220,7 @@
     const on = new Set(S.store.prefs.ind || []), ro = readOnly(), q = String(S.indQ || '').trim().toLowerCase();
     const list = INDICATORS.filter(x => !q || [x.id, x.t, x.en].some(v => String(v).toLowerCase().includes(q)));
     const rows = (list.length ? '' : `<div class="ch-pempty">${tr('اندیکاتوری پیدا نشد', 'No indicators found')}</div>`)
-      + list.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${(indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
+      + list.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${x.id === 'RSI' ? esc(rsiSum()) : (indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
         + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
     if (listOnly && $('ch-indlist')) { $('ch-indlist').innerHTML = rows; return; }
     box.innerHTML = `<input class="fi ch-inds" id="ch-inds" type="search" dir="auto" autocomplete="off" value="${esc(S.indQ || '')}" placeholder="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" aria-label="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" oninput="SCCHART.indFind(this.value)">`
@@ -1962,7 +2273,7 @@
   function onKey(ev) {
     if (ev.key === 'Control') S.ctrl = true;
     if (!$('screen-chart')?.classList.contains('active') || /INPUT|TEXTAREA|SELECT/.test(ev.target?.tagName || '')) return;
-    if (!$('ch-modal')?.hidden) return;
+    if (!$('ch-modal')?.hidden) { const m = $('ch-modal'); if (ev.key === 'Escape' && m.onkeydown) m.onkeydown(ev); return; }   // Esc پنجره را می‌بندد حتی اگر فوکوس بیرونش باشد
     const k = String(ev.key || '').toLowerCase();
     if ((ev.key === 'Delete' || ev.key === 'Backspace') && S.selected) { ev.preventDefault(); removeId(S.selected); }
     else if ((ev.ctrlKey || ev.metaKey) && (k === 'y' || (k === 'z' && ev.shiftKey))) { ev.preventDefault(); redo(); }
@@ -2056,7 +2367,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -2558,7 +2869,7 @@
     tfMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
-    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp,
+    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
     _hitPoint: id => {
       const f = S.lastFigs.get(id) || [], cen = c => ({ x: c.reduce((s, p) => s + p.x, 0) / c.length, y: c.reduce((s, p) => s + p.y, 0) / c.length });
