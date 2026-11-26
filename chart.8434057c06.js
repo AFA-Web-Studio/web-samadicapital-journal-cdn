@@ -41,6 +41,13 @@
    میانگینِ RSI، باندهای ۷۰/۵۰/۳۰ با پس‌زمینه، سایه‌ی اشباعِ خرید/فروش، واگرایی و پنجره‌ی «ورودی‌ها / ظاهر» با پیش‌نمایشِ زنده
    (prefs.ip.RSI = فقط تفاوت با پیش‌فرض؛ آرایه‌ی قدیمی = طولِ RSI). پوزیشن: ورود خاکستری، حدِ سود سبز، حدِ ضرر قرمز
    (دسته‌ها، برچسب‌ها و نوارهای محورِ قیمت؛ محورِ زمان خاکستری) — دیگر همه آبی نیستند.
+   v26.49 (مالک: «شمارشگرِ بسته شدنِ کندل هم مثلِ TradingView باشد روی هر تایم‌فریمی»): زیرِ برچسبِ قیمتِ آخر روی محور،
+   در همان جعبه و همان رنگ، زمانِ باقی‌مانده تا بسته شدنِ کندل — هر ثانیه: «mm:ss»، از یک ساعت «hh:mm:ss»، از دو روز «Xd Yh».
+   در «تنظیماتِ نمودار ← مقیاسِ قیمت» خاموش/روشن می‌شود (prefs.cs.cd)؛ محورِ قیمت برای جا شدنش پهن‌تر می‌شود اگر لازم باشد.
+   v26.49 (مالک: «روی گوشی نمودار از نظرِ زمانی باز و بسته می‌شود ولی از نظرِ قیمتی تکان نمی‌خورد»): کتابخانه کشیدنِ انگشت روی
+   محورها را اصلاً نمی‌شناخت و دوانگشتی فقط زمان را زوم می‌کرد. حالا مثلِ اپِ TradingView: کشیدنِ انگشت روی محورِ قیمت = فشرده/کشیده
+   شدنِ قیمت (پایین = فشرده، بالا = کشیده؛ «A» خاموش)، روی محورِ زمان = زومِ زمان؛ دوانگشتیِ عمودی (انگشت‌ها بالا و پایینِ هم) = زومِ
+   قیمت دورِ همان نقطه، دوانگشتیِ افقی = زومِ زمان مثلِ قبل. دکمه‌ی «A» یا تغییرِ نماد/تایم‌فریم مقیاسِ خودکار را برمی‌گرداند.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -785,9 +792,82 @@
     if (m === 2 || bd <= S.magTol) pt.value = best;
   }
 
+  // ── شمارشِ معکوسِ بسته شدنِ کندل (v26.49، مثلِ TradingView) ──
+  const cdOn = () => !!S.chart && S.cs?.cd !== false && S.cs?.last !== false;
+  // زمانِ باقی‌مانده تا بسته شدنِ کندلی که در `open` باز شده؛ اگر کندلِ تازه هنوز نرسیده، تا بسته شدنِ کندلِ بعدی
+  function cdText(open, tf = tfMs(), now = Date.now()) {
+    if (!isNum(open) || !(tf > 0)) return '';
+    let end = open + tf;
+    if (end <= now) end += Math.ceil((now - end + 1) / tf) * tf;
+    let s = Math.max(0, Math.floor((end - now) / 1000));
+    const d = Math.floor(s / 86400); s -= d * 86400;
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60, p = n => String(n).padStart(2, '0');
+    if (tf >= 2 * 864e5 && d > 0) return `${d}d ${h}h`;
+    const hh = h + d * 24;
+    return hh > 0 ? `${p(hh)}:${p(m)}:${p(sec)}` : `${p(m)}:${p(sec)}`;
+  }
+  function cdLabel() {
+    if (!cdOn()) return '';
+    const L = S.chart.getDataList?.() || [], k = L[L.length - 1];
+    return k ? cdText(k.timestamp) : '';
+  }
+  // نمونه‌ی پهن‌ترین متن برای این تایم‌فریم (تا پهنای محور با گذرِ زمان نپرد)
+  const cdSample = () => { const tf = tfMs(); return tf >= 2 * 864e5 ? '6d 23h' : tf > 36e5 ? '00:00:00' : '00:00'; };
+  // یک جعبه با دو خط مثلِ TradingView: قیمتِ آخر و زیرش زمانِ باقی‌مانده، همان رنگ
+  function cdBox(ctx, cap, cd) {
+    const a = cap.attrs || {}, st = cap.styles || {};
+    const size = st.size || 11, fam = st.family || MONO, wt = st.weight || 600;
+    const pl = st.paddingLeft ?? 4, pr = st.paddingRight ?? 4, pt = st.paddingTop ?? 4, pb = st.paddingBottom ?? 4;
+    ctx.save(); ctx.font = `${wt} ${size}px ${fam}`;
+    const t1 = String(a.text ?? ''), W = Math.max(ctx.measureText(t1).width, ctx.measureText(cd).width) + pl + pr;
+    const top = a.y - size / 2 - pt, H = 2 * size + pt + pb + 3, x0 = a.align === 'right' ? a.x - W : a.x;
+    ctx.fillStyle = st.backgroundColor || C.blue; ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x0, top, W, H, st.borderRadius ?? 2); else ctx.rect(x0, top, W, H);
+    ctx.fill();
+    ctx.fillStyle = st.color || '#FFFFFF'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.fillText(t1, x0 + pl, a.y);
+    ctx.fillText(cd, x0 + pl, a.y + size + 3);
+    ctx.restore();
+    S.cdShown = cd; S.cdBox = { x: x0, y: top, w: W, h: H };
+  }
+  function cdTick() {
+    if (!S.chart || !cdOn() || document.hidden || !$('screen-chart')?.classList.contains('active')) return;
+    try { S.chart.getDrawPaneById?.('candle_pane')?.getYAxisWidget?.()?.update?.(0); } catch (_) {}   // فقط بومِ اصلیِ محورِ قیمت
+  }
+
   // ── وصله‌ها روی خودِ موتور (یک بار) ──
   let patched = false;
   function patchEngine(chart) {
+    // v26.49: برچسبِ قیمتِ آخر + شمارشِ معکوس در یک جعبه. متن و رنگِ قیمت را از خودِ کتابخانه می‌گیریم
+    // (همان قالب‌بندی، درصد/لگاریتم، رنگِ صعودی/نزولی) و فقط جعبه را دو خطی می‌کشیم.
+    try {
+      const cp = chart.getDrawPaneById?.('candle_pane'), view = cp?.getYAxisWidget?.()?._candleLastPriceLabelView, proto = view && Object.getPrototypeOf(view);
+      if (proto && typeof proto.drawImp === 'function' && !proto.__scCd) {
+        const draw = proto.drawImp; proto.__scCd = true;
+        proto.drawImp = function (ctx) {
+          let cd = '';
+          try { if (this.getWidget().getPane().getId() === 'candle_pane') cd = cdLabel(); } catch (_) {}
+          if (!cd) { S.cdShown = ''; return draw.call(this, ctx); }
+          const own = Object.prototype.hasOwnProperty.call(this, 'createFigure'), cf = this.createFigure;
+          let cap = null;
+          this.createFigure = (o, e) => { if (!cap && o && o.name === 'text') { cap = o; return null; } return cf.call(this, o, e); };
+          try { draw.call(this, ctx); } finally { if (own) this.createFigure = cf; else delete this.createFigure; }
+          if (cap) { try { cdBox(ctx, cap, cd); } catch (_) { cf.call(this, cap)?.draw?.(ctx); } }
+        };
+      }
+      // محورِ قیمت دست‌کم به پهنای شمارشگر (مثلاً نمادهای ارزان که عددِ محور کوتاه است)
+      const ax = cp?.getAxisComponent?.();
+      if (ax && typeof ax.getAutoSize === 'function' && !ax.__scCd) {
+        const size = ax.getAutoSize.bind(ax); ax.__scCd = true;
+        ax.getAutoSize = () => {
+          const v = size();
+          if (!cdOn() || typeof v !== 'number') return v;
+          const st = chart.getStyles?.()?.candle?.priceMark?.last?.text || {}, c = document.createElement('canvas').getContext('2d');
+          c.font = `${st.weight || 600} ${st.size || 11}px ${st.family || MONO}`;
+          return Math.max(v, Math.ceil(c.measureText(cdSample()).width + (st.paddingLeft ?? 4) + (st.paddingRight ?? 4) + 2));
+        };
+      }
+    } catch (_) {}
     // v26.40: رسم و کشیدنِ شکل همیشه روی پنلِ اصلی. کتابخانه شکل را به پنلی می‌برد که اولین ضربه آن‌جا بود
     // (حجم/RSI ⇒ «قیمتِ» نقطه عددِ حجم می‌شد) و ضربه‌ی بعدی در پنلِ دیگر را نادیده می‌گرفت ⇒ شکلِ نیمه‌کاره.
     // حالا وسطِ رسم/کشیدن، اشاره روی پنلِ اندیکاتور = همان قیمت آن‌سوی لبه‌ی پایینِ نمودارِ اصلی.
@@ -848,8 +928,31 @@
     // لمس: کتابخانه کشیدنِ انگشت را فقط افقی می‌کند؛ همان جابه‌جاییِ عمودیِ موس این‌جا برای انگشت هم ساخته شده
     if (ce && typeof ce.touchMoveEvent === 'function' && typeof ce.touchStartEvent === 'function' && !ce.__scTouchPan) {
       const tsE = ce.touchStartEvent.bind(ce), tmE = ce.touchMoveEvent.bind(ce); ce.__scTouchPan = true;
-      ce.touchStartEvent = e => { ce.__scRange = null; ce.__scY = null; return tsE(e); };
+      ce.touchStartEvent = e => {
+        ce.__scRange = null; ce.__scY = null; ce.__scAx = null;
+        try {   // v26.49: انگشت روی محورِ قیمت/زمان ⇒ مقیاس (کتابخانه این را فقط برای موس داشت)
+          const f = ce._findWidgetByEvent(e), w = f.widget, pane = f.pane, n = w?.getName?.();
+          if (n === 'yAxis' && pane) { const ax = pane.getAxisComponent(), r = ax?.getRange?.(); if (r && isNum(r.range) && ax.getScrollZoomEnabled()) ce.__scAx = { n, pane, r: { ...r }, y: e.y }; }
+          else if (n === 'xAxis') ce.__scAx = { n, x: e.x, bs: chart.getBarSpace() };
+        } catch (_) {}
+        return tsE(e);
+      };
+      const teE = typeof ce.touchEndEvent === 'function' ? ce.touchEndEvent.bind(ce) : null;
+      if (teE) ce.touchEndEvent = e => { ce.__scAx = null; return teE(e); };
       ce.touchMoveEvent = e => {
+        const A = ce.__scAx;
+        if (A) {
+          try {
+            if (A.n === 'yAxis') {   // پایین کشیدن = فشرده (بازه‌ی بزرگ‌تر)، بالا = کشیده؛ وسطِ بازه سرِ جایش
+              const ax = A.pane.getAxisComponent(), range = A.r.range * Math.exp((e.y - A.y) / 200), d = (range - A.r.range) / 2, from = A.r.from - d, to = A.r.to + d;
+              const rf = ax.convertToRealValue(from), rt = ax.convertToRealValue(to);
+              ax.setRange({ from, to, range, realFrom: rf, realTo: rt, realRange: rt - rf });
+              chart.adjustPaneViewport(false, true, true, true);
+              if (A.pane.getId() === 'candle_pane') setTimeout(paintAuto, 0);
+            } else { chart.setBarSpace(clamp(A.bs * Math.exp((e.x - A.x) / 150), 1, 50)); saveZoomSoon(); }
+            return true;
+          } catch (_) {}
+        }
         try {
           const st = ce._startScrollCoordinate, os = chart.getChartStore().getOverlayStore(), f = ce._findWidgetByEvent(e), w = f.widget, pane = f.pane;
           if (st && ce._touchCoordinate == null && w && pane && w.getName() === 'main' && pane.getId() === 'candle_pane' && !os.getPressedInstanceInfo()?.instance && !os.getProgressInstanceInfo() && !T[S.tool]?.pad) {
@@ -867,6 +970,31 @@
           }
         } catch (_) {}
         return tmE(e);
+      };
+    }
+    if (ce && typeof ce.pinchEvent === 'function' && !ce.__scPinch) {
+      const pe = ce.pinchEvent.bind(ce); ce.__scPinch = true;
+      ce.pinchEvent = (pt, scale) => {
+        const P = S.pinch;
+        if (P?.vert && isNum(scale) && scale > 0) {
+          try {
+            if (!P.pane) {
+              const f = ce._findWidgetByEvent(pt), pane = f.pane, w = f.widget;
+              if (!pane || w?.getName?.() !== 'main') { P.vert = false; return pe(pt, scale); }
+              const ax = pane.getAxisComponent(), b = w.getBounding(), r = ax.getRange();
+              if (!r || !isNum(r.range) || !ax.getScrollZoomEnabled()) { P.vert = false; return pe(pt, scale); }
+              const t = clamp((pt.y - b.top) / b.height, 0, 1);   // سهمِ نقطه‌ی وسطِ دو انگشت از بالای پنل
+              P.pane = pane; P.r = { ...r }; P.t = ax.isReverse() ? 1 - t : t;
+            }
+            const ax = P.pane.getAxisComponent(), r = P.r, range = r.range / scale, anchor = r.to - r.range * P.t;   // همان قیمتِ زیرِ انگشت‌ها می‌ماند
+            const to = anchor + range * P.t, from = to - range, rf = ax.convertToRealValue(from), rt = ax.convertToRealValue(to);
+            ax.setRange({ from, to, range, realFrom: rf, realTo: rt, realRange: rt - rf });
+            chart.adjustPaneViewport(false, true, true, true);
+            if (P.pane.getId() === 'candle_pane') setTimeout(paintAuto, 0);
+            return true;
+          } catch (_) {}
+        }
+        return pe(pt, scale);
       };
     }
     if (patched) return;
@@ -2321,6 +2449,7 @@
     S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: stylesFor() });
     patchEngine(S.chart);
     S.chart.setLoadDataCallback(onLoadData);
+    clearInterval(S.cdTimer); S.cdTimer = setInterval(cdTick, 1000);
     S.chart.setOffsetRightDistance(48);
     applyIndicators();
     S.chart.subscribeAction('onZoom', saveZoomSoon);
@@ -2333,6 +2462,11 @@
     });
     const cv = $('ch-canvas');
     if ('ResizeObserver' in window) new ResizeObserver(() => S.chart && S.chart.resize()).observe(cv);
+    cv.addEventListener('touchstart', e => {   // v26.49: دو انگشتِ بالا و پایینِ هم = زومِ قیمت؛ کنارِ هم = زومِ زمان
+      if (e.touches.length !== 2) return;
+      const a = e.touches[0], b = e.touches[1];
+      S.pinch = { vert: Math.abs(a.clientY - b.clientY) > 1.4 * Math.abs(a.clientX - b.clientX) };
+    }, { capture: true, passive: true });
     // جای آخرین اشاره (برای دوضربه‌ی سریع)، خط‌کش با Shift، و پاک شدنِ خط‌کش با کلیکِ بعدی
     cv.addEventListener('pointerdown', e => {
       const r = cv.getBoundingClientRect(); S.lastPtr = { x: e.clientX - r.left, y: e.clientY - r.top };
@@ -2536,6 +2670,7 @@
         + `<div class="chs-r"><span class="chs-l">${tr('تم', 'Theme')}</span>${seg('theme', [['dark', tr('تیره', 'Dark')], ['light', tr('روشن', 'Light')]], S.theme === 'light' ? 'light' : 'dark')}</div>`
         + `<div class="chs-h">${tr('مقیاسِ قیمت', 'Price scale')}</div>`
         + `<div class="chs-r"><span class="chs-l">${tr('نوعِ مقیاس', 'Scale type')}</span>${seg('ys', [['n', tr('عادی', 'Regular')], ['pct', tr('درصدی', 'Percent')], ['log', tr('لگاریتمی', 'Logarithmic')]], S.ys || 'n')}</div>`
+        + ck('cd', tr('شمارشِ معکوس تا بسته شدنِ کندل', 'Countdown to bar close'))
         + `</div><div class="chs-pal" id="chs-pal" hidden></div></div>`
         + `<div class="chs-foot"><button type="button" class="btn btn-ghost chs-tb" id="chs-def" style="margin-inline-end:auto">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button>`
         + `<button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
@@ -2869,7 +3004,7 @@
     tfMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
-    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg,
+    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _cdText: cdText, _styles: stylesFor,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
     _hitPoint: id => {
       const f = S.lastFigs.get(id) || [], cen = c => ({ x: c.reduce((s, p) => s + p.x, 0) / c.length, y: c.reduce((s, p) => s + p.y, 0) / c.length });
