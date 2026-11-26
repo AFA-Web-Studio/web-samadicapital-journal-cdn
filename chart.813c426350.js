@@ -30,6 +30,8 @@
    v26.43 (مالک: «حالتِ واچ‌لیست هم کامل داشته باشم»): واچ‌لیستِ کامل مثلِ TradingView — پنلِ کنارِ نمودار (دسکتاپ) /
    کشوی رویِ نمودار (گوشی)، چند لیستِ نام‌دار، قیمت و تغییرِ ۲۴ساعته‌ی زنده (/api/chart/quotes)، چشمکِ تغییرِ قیمت،
    افزودن/حذف، جابه‌جایی با کشیدن، مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ بعدی؛ در prefs.wl.
+   v26.44 (مالک: «لبه‌های قیمت و زمانِ نمودار با اسکرولِ موس تغییر نمی‌کند»): چرخِ موس روی محورِ قیمت = زومِ عمودی،
+   روی محورِ زمان = زومِ زمان (مثلِ TradingView).
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -773,6 +775,29 @@
           }
         } catch (_) {}
         return pm(e);
+      };
+    }
+    // v26.44: چرخِ موس روی محورها (مثلِ TradingView) — روی محورِ قیمت = زومِ عمودیِ همان پنل (و «A» خاموش)،
+    // روی محورِ زمان = زومِ زمان دورِ همان نقطه. کتابخانه چرخ را فقط روی خودِ نمودار می‌شناخت.
+    if (ce && typeof ce.mouseWheelVertEvent === 'function' && !ce.__scWheel) {
+      const mw = ce.mouseWheelVertEvent.bind(ce); ce.__scWheel = true;
+      ce.mouseWheelVertEvent = (e, scale) => {
+        try {
+          const f = ce._findWidgetByEvent(e), w = f.widget, pane = f.pane, name = w?.getName?.();
+          if (name === 'yAxis' && pane) {
+            const ax = pane.getAxisComponent(), r = ax.getRange();
+            if (r && isNum(r.range) && ax.getScrollZoomEnabled()) {
+              const range = r.range * (1 - clamp(scale, -1, 1) * 0.12), d = (range - r.range) / 2, from = r.from - d, to = r.to + d;
+              const rf = ax.convertToRealValue(from), rt = ax.convertToRealValue(to);
+              ax.setRange({ from, to, range, realFrom: rf, realTo: rt, realRange: rt - rf });
+              chart.adjustPaneViewport(false, true, true, true);
+              if (pane.getId() === 'candle_pane') setTimeout(paintAuto, 0);
+              return true;
+            }
+          }
+          if (name === 'xAxis' && w) { const b = w.getBounding(); chart.getChartStore().getTimeScaleStore().zoom(scale, { x: e.x - b.left, y: 0 }); return true; }
+        } catch (_) {}
+        return mw(e, scale);
       };
     }
     // لمس: کتابخانه کشیدنِ انگشت را فقط افقی می‌کند؛ همان جابه‌جاییِ عمودیِ موس این‌جا برای انگشت هم ساخته شده
@@ -2245,7 +2270,12 @@
   // فقط عددها (بی بازسازیِ فهرست تا اسکرول و کشیدن نپرد) + چشمکِ سبز/قرمز مثلِ TradingView
   function updQuotes(prev) {
     const p = $('ch-wl'); if (!p || p.hidden || S.wlDrag) return;
-    const so = wlCur().sort || ''; if (so && so.replace('-', '') !== 'sym') { paintWL(); return; }
+    // مرتب بر اساسِ قیمت/تغییر: فقط ردیف‌ها جابه‌جا شوند، نه کلِ پنل (وگرنه کلیکی که همان لحظه در جریان است گم می‌شد)
+    const so = wlCur().sort || '', list = p.querySelector('.ch-wll');
+    if (so && so.replace('-', '') !== 'sym' && list) {
+      const want = wlItems(), rows = new Map([...list.querySelectorAll('.ch-wlr')].map(r => [r.dataset.c, r]));
+      if (want.join() !== [...rows.keys()].join()) for (const c of want) { const r = rows.get(c); if (r) list.appendChild(r); }
+    }
     p.querySelectorAll('.ch-wlr').forEach(r => {
       const c = r.dataset.c, q = S.q?.[c], pe = r.querySelector('.ch-wlp'), ce = r.querySelector('.ch-wlch'), old = prev?.[c]?.p;
       pe.textContent = fmtQ(q?.p); ce.textContent = fmtC(q?.c); ce.className = 'ch-wlch ' + chgCls(q?.c);
