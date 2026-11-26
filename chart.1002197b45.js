@@ -32,6 +32,7 @@
    افزودن/حذف، جابه‌جایی با کشیدن، مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ بعدی؛ در prefs.wl.
    v26.44 (مالک: «لبه‌های قیمت و زمانِ نمودار با اسکرولِ موس تغییر نمی‌کند»): چرخِ موس روی محورِ قیمت = زومِ عمودی،
    روی محورِ زمان = زومِ زمان (مثلِ TradingView).
+   v26.45: دسته‌ی نقطه‌ها حلقه‌ی نازکِ توخالی (نه دایره‌ی رنگیِ پُر)؛ هنگامِ رسم زیرِ نشانگر فقط یک حلقه‌ی ریز.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -62,7 +63,7 @@
     tool: 'cursor', recs: new Map(), selected: null, drawingId: null, hidden: false, mag: 1, magLast: 1, stay: false, lockAll: false,
     hist: [], redo: [], store: null, rev: null, loadedStore: false, saveTimer: null, saving: false, saveAgain: false, panes: {}, symbols: {}, gen: 0,
     quiet: false, ctrl: false, lastPtr: null, measureId: null, fly: null, pop: null, touch: false, tol: 6, magTol: 16, stroke: null,
-    debug: false, lastFigs: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false
+    debug: false, lastFigs: new Map(), lastHandles: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false
   };
   const readOnly = () => !!SESSION?.isViewOnly;
   const storeKey = () => 'sc_chart_' + (SESSION?.uid || 'guest');
@@ -710,9 +711,27 @@
         xAxis: arg.xAxis, yAxis: arg.yAxis, col: m.c || def.color || C.blue, w: clamp(+m.w || 1, 1, 4), s: +m.s || 0, x: m.x || {},
         v: (o.points || []).map(p => p.value), t: (o.points || []).map(tsOfPoint) };
     };
+    // دسته‌ها مثلِ TradingView: حلقه‌ی نازکِ توخالی روی نقطه‌ها، فقط وقتی شکل انتخاب‌شده، زیرِ موس یا در حالِ رسم است
+    const handleFigs = k => {
+      const id = k.o.id, drawing = id === S.drawingId || !!k.o.isDrawing?.();
+      if (readOnly() || !(drawing || id === S.selected || id === S.hoverId)) return [];
+      // نقطه‌ای که الان با نشانگر جابه‌جا می‌شود (فقط اگر واقعاً حرکتی بوده؛ با انگشت تا ضربه‌ی بعد چنین نقطه‌ای نیست)
+      const step = k.o.currentStep || 0, moving = drawing && k.o.points?.length >= step ? step - 1 : -1;
+      const r = S.touch ? 6 : 4.5, out = [];
+      k.c.forEach((c, i) => {
+        if (!c || !isNum(c.x) || !isNum(c.y)) return;
+        const cur = i === moving;   // زیرِ نشانگر: فقط حلقه‌ی ریز، تا کندل و قیمت دیده شود
+        out.push({ type: 'scEll', ignoreEvent: true, attrs: { x: c.x, y: c.y, rx: cur ? 2.5 : r, ry: cur ? 2.5 : r, area: false, handle: true }, styles: { fill: null, border: k.col, w: cur ? 1 : 1.5, s: 0 } });
+      });
+      return out;
+    };
     const run = (fn, arg) => {
       const k = ctxOf(arg);
-      try { const f = fn(k) || []; if (S.debug && fn === k.def.figs) S.lastFigs.set(k.o.id, f); return f; }
+      try {
+        const f = fn(k) || [];
+        if (fn === k.def.figs) { if (S.debug) S.lastFigs.set(k.o.id, f.slice()); if (!k.def.noHandles) { const h = handleFigs(k); if (S.debug) S.lastHandles.set(k.o.id, h); f.push(...h); } }
+        return f;
+      }
       catch (e) { if (S.figErr.length < 50) S.figErr.push(k.o.name + ': ' + (e?.message || e)); return []; }
     };
     for (const def of TOOL_LIST) {
@@ -897,9 +916,12 @@
       overlay: { text: { family: MONO, size: 11 }, rect: { color: 'rgba(41,98,255,.12)' } }
     };
   }
-  // دسته‌ها مثلِ TradingView: حلقه‌ی توخالی به رنگِ شکل؛ زیرِ انگشت بزرگ‌تر
+  // v26.45 (مالک: «موقعِ کشیدن، دایره‌ی رنگیِ زیرِ نشانگر نمی‌گذارد درست ببینیم»): کتابخانه هر دسته را دو دایره‌ی پُر می‌کشید
+  // (در حالِ رسم یک لکه‌ی رنگیِ ۱۹ پیکسلی روی کندل). حالا دایره‌ی کتابخانه نامرئی است و فقط برای گرفتن/کشیدن می‌ماند؛
+  // حلقه‌ی نازک و توخالی را خودمان می‌کشیم (handleFigs) و نقطه‌ی زیرِ نشانگر هنگامِ رسم فقط یک حلقه‌ی ریز است.
+  const NONE = 'rgba(0,0,0,0)';
   const ovStyles = col => ({
-    point: { color: TH().bg, borderColor: col, borderSize: 1.6, radius: S.touch ? 6.5 : 4.5, activeColor: col, activeBorderColor: hexA(col, 0.3), activeBorderSize: 4, activeRadius: S.touch ? 7.5 : 5.5 },
+    point: { color: NONE, borderColor: NONE, borderSize: 2, radius: S.touch ? 8 : 5, activeColor: NONE, activeBorderColor: NONE, activeBorderSize: 2, activeRadius: S.touch ? 8 : 5 },
     text: { color: ink(col), backgroundColor: col, borderColor: col, family: MONO, size: 11 },
     rect: { color: hexA(col, 0.12) }
   });
@@ -1068,6 +1090,8 @@
   function callbacks() {
     return {
       onDrawEnd: e => { onDrawn(e.overlay); return false; },
+      onMouseEnter: e => { S.hoverId = e.overlay.id; return false; },
+      onMouseLeave: e => { if (S.hoverId === e.overlay.id) S.hoverId = null; return false; },
       onPressedMoveEnd: () => { commit(); return false; },
       onSelected: e => { if (S.tool !== 'eraser') { S.selected = e.overlay.id; paintSel(); } return false; },
       onDeselected: e => { if (S.selected === e.overlay.id) { S.selected = null; paintSel(); } return false; },
@@ -1190,6 +1214,7 @@
     const def = T[o.name]; if (!def) return;
     if (S.drawingId === o.id) S.drawingId = null;
     hint(null);
+    setTimeout(() => refresh(o.id), 0);   // دسته‌ها همان لحظه از «در حالِ رسم» به حالتِ عادی برگردند
     if (def.done) def.done(o);
     if (def.transient) { S.measureId = o.id; S.tool = 'cursor'; paintTools(); return; }
     if (def.text) setTimeout(() => editText(o.id, true), 0);
