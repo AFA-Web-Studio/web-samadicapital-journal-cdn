@@ -59,6 +59,10 @@
    v26.52 (همان درخواست: ابزارهای رسمِ کامل‌تر مثلِ TradingView): پروفایلِ حجمِ بازه‌ی ثابت (FRVP: ۲۴ ردیف، POC، ناحیه‌ی ارزشِ ۷۰٪،
    حجمِ خرید/فروش)، VWAPِ لنگردار (با باندِ ±σ)، بادبزنِ سرعتِ فیبوناچی، بادبزنِ گن (۱/۸ تا ۸/۱)، زمانِ فیبوناچیِ روندی، چنگالِ شیف و
    شیفِ اصلاح‌شده، مستطیلِ چرخان و الگوی مثلث.
+   v26.53 (مالک: پیشنهادهای ۲ و ۶ — «هشدار روی خودِ نمودار» و «انتخابِ منطقه‌ی زمانی»): مثلِ TradingView — راست‌کلیک روی نمودار
+   «افزودنِ هشدار در این قیمت»، Alt+A، دکمه‌ی زنگ و زنگِ نوارِ خطِ افقی ⇒ پنجره‌ی هشدار (شرط، قیمت، لحظه‌ای/بسته شدنِ کندل، تکرار، اعلان)
+   روی همان سیستمِ هشدارِ اپ؛ هشدارها خطِ نارنجیِ کشیدنی روی نمودارند (کشیدن = قیمتِ تازه، کلیک = ویرایش/توقف/حذف). ساعتِ زنده پایینِ
+   نمودار با UTC±، کلیک = فهرستِ منطقه‌های زمانی (تهران، UTC، نیویورک، لندن…؛ prefs.tz) — محورِ زمان، برچسب‌ها و ابزارها همه با همان.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -99,7 +103,7 @@
     tool: 'cursor', recs: new Map(), selected: null, drawingId: null, hidden: false, mag: 1, magLast: 1, stay: false, lockAll: false,
     hist: [], redo: [], store: null, rev: null, loadedStore: false, saveTimer: null, saving: false, saveAgain: false, panes: {}, symbols: {}, gen: 0,
     quiet: false, ctrl: false, lastPtr: null, measureId: null, fly: null, pop: null, touch: false, tol: 6, magTol: 16, stroke: null,
-    debug: false, lastFigs: new Map(), lastHandles: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false
+    debug: false, lastFigs: new Map(), lastHandles: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false, tz: 'Asia/Tehran', alerts: null
   };
   const readOnly = () => !!SESSION?.isViewOnly;
   const storeKey = () => 'sc_chart_' + (SESSION?.uid || 'guest');
@@ -131,7 +135,8 @@
     const m = Math.round(Math.abs(ms) / 6e4), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
     return d ? `${d}d${h ? ' ' + h + 'h' : ''}` : h ? `${h}h${mm ? ' ' + mm + 'm' : ''}` : `${mm}m`;
   }
-  const dtf = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tehran', day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  const mkDtf = z => new Intl.DateTimeFormat('en-GB', { timeZone: z, day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+  let dtf = mkDtf('Asia/Tehran');   // v26.53: با منطقه‌ی زمانیِ انتخابی عوض می‌شود
   const fmtDate = t => isNum(t) ? dtf.format(new Date(t)).replace(',', '') : '';
   const newId = () => 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
@@ -829,6 +834,7 @@
     eyeOff: svg('<path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.7 8.3 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/>'),
     trash: svg('<path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/>'),
     undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
+    bell: svg('<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
     redo: svg('<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
     tree: svg('<path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h10M10 18h10"/>'),
     gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
@@ -857,6 +863,9 @@
     if (registered) return; registered = true;
     const kc = window.klinecharts;
     registerRSI(kc); registerSpecs(kc);
+    kc.registerOverlay({ name: 'scAlertLine', totalStep: 2, needDefaultPointFigure: false, needDefaultXAxisFigure: false, needDefaultYAxisFigure: false,
+      createPointFigures: arg => { try { return alertFigs(alertCtx(arg)); } catch (_) { return []; } },
+      createYAxisFigures: arg => { try { return alertAxis(alertCtx(arg)); } catch (_) { return []; } } });
     kc.registerFigure({ name: 'scHit', draw: () => {}, checkEventOn: (p, a) => {
       const c = a.coordinates || [], tol = S.tol;
       if (a.area && c.length > 2 && inPoly(p, c)) return true;
@@ -993,6 +1002,7 @@
     S.cdShown = cd; S.cdBox = { x: x0, y: top, w: W, h: H };
   }
   function cdTick() {
+    paintClock();
     if (!S.chart || !cdOn() || document.hidden || !$('screen-chart')?.classList.contains('active')) return;
     try { S.chart.getDrawPaneById?.('candle_pane')?.getYAxisWidget?.()?.update?.(0); } catch (_) {}   // فقط بومِ اصلیِ محورِ قیمت
   }
@@ -1286,7 +1296,7 @@
     setTimeout(() => { paintAuto(); updRT(); }, 0);
     const bs = S.store?.prefs?.bs; if (isNum(bs) && bs >= 1 && bs <= 50) S.chart.setBarSpace(bs);   // زومِ خودِ دانشجو
     msg('');
-    restoreDrawings();
+    restoreDrawings(); paintAlerts();
     paintHead();
     startPoll();
   }
@@ -1417,7 +1427,7 @@
       onClick: e => { if (S.tool === 'eraser' && !readOnly()) { const id = e.overlay.id; setTimeout(() => removeId(id), 0); } return false; },
       onDoubleClick: e => { if (!readOnly() && S.recs.has(e.overlay.id)) openSettings(e.overlay.id); return false; },
       onRightClick: e => {   // true = کتابخانه شکل را پاک نکند
-        if (S.drawingId) { startTool('cursor'); return true; }   // وسطِ رسم (روی هر شکلی) = لغو، مثلِ TradingView (نه منوی شکلِ نیمه‌کاره)
+        if (S.drawingId) { S.ctxAt = Date.now(); startTool('cursor'); return true; }   // وسطِ رسم (روی هر شکلی) = لغو، مثلِ TradingView (نه منوی شکلِ نیمه‌کاره)
         if (S.recs.has(e.overlay.id)) openCtx(e.overlay.id, e); return true; },
       onRemoved: e => { const id = e.overlay.id; if (S.recs.has(id) && id !== S.drawingId) { S.recs.delete(id); commit(); } return false; }
     };
@@ -1644,7 +1654,7 @@
     el.addEventListener('contextmenu', e => e.preventDefault());
     el.addEventListener('pointerdown', e => {
       if (!T[S.tool]?.pad) return;
-      if (e.button !== 0) { e.preventDefault(); if (e.button === 2 && !S.stroke) startTool('cursor'); return; }   // راست‌کلیک = لغو؛ دکمه‌ی وسط خط نکشد
+      if (e.button !== 0) { e.preventDefault(); if (e.button === 2 && !S.stroke) { S.ctxAt = Date.now(); startTool('cursor'); } return; }   // راست‌کلیک = لغو؛ دکمه‌ی وسط خط نکشد
       e.preventDefault(); el.setPointerCapture?.(e.pointerId);
       S.stroke = [pos(e)];
       const def = T[S.tool], col = styleFor(S.tool).c || S.store.prefs?.pc?.[S.tool] || def.color, ctx = g();
@@ -1725,8 +1735,11 @@
     const cs = $('ch-csrc'); if (cs) cs.textContent = isG() ? (gName(S.coin) || srcName()) : srcName();
     const logo = $('ch-logo'); if (logo) logo.innerHTML = symLogo(S.coin);
     const info = $('ch-srcinfo'); if (info) info.textContent = isG()
-      ? tr('داده: Yahoo Finance (آتی‌ها و شاخص‌ها ممکن است چند دقیقه تأخیر داشته باشند) · زمانِ تهران', 'Data: Yahoo Finance (futures and indices may be delayed) · Tehran time')
-      : tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''} · Tehran time`);
+      ? tr('داده: Yahoo Finance (آتی‌ها و شاخص‌ها ممکن است چند دقیقه تأخیر داشته باشند)', 'Data: Yahoo Finance (futures and indices may be delayed)')
+      : tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''}`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''}`);
+    paintClock();
+    const ab = $('ch-alertb'); if (ab) { ab.disabled = isG(); ab.title = isG() ? tr('هشدار فقط برای رمزارزها', 'Alerts: crypto symbols only') : tr('افزودنِ هشدار (Alt+A)', 'Create alert (Alt+A)'); ab.setAttribute('aria-label', ab.title); }
+
   }
   const groupTool = g => { const last = S.store?.prefs?.gl?.[g.id]; return g.tools.includes(last) ? last : g.tools[0]; };
   const btn = (cls, title, onclick, inner, extra = '') => `<button type="button" class="ch-tool${cls}" title="${esc(title)}" aria-label="${esc(title)}" onclick="${onclick}"${extra}>${inner}</button>`;
@@ -1742,6 +1755,7 @@
       }
       h += '<span class="ch-sep"></span>';
       h += btn(S.tool === 'scMeasure' || S.measureId ? ' on' : '', tr('خط‌کش — اندازه‌گیریِ موقت (Shift + کلیک)', 'Measure (Shift + Click)'), "SCCHART.tool('scMeasure')", T.scMeasure.ic, ' data-t="ruler"');
+      h += btn('', isG() ? tr('هشدار فقط برای رمزارزها', 'Alerts: crypto symbols only') : tr('افزودنِ هشدار (Alt+A)', 'Create alert (Alt+A)'), 'SCCHART.alert()', ICON.bell, ` data-t="alert"${isG() ? ' disabled' : ''}`);
       h += '<span class="ch-sep"></span>';
       h += `<div class="ch-gw">${btn(S.mag ? ' on' : '', S.mag === 2 ? tr('آهنربای قوی', 'Strong magnet') : S.mag ? tr('آهنربای ضعیف', 'Weak magnet') : tr('آهنربا (خاموش)', 'Magnet mode (off)'), 'SCCHART.magBtn(this)', S.mag === 2 ? ICON.magnetS : ICON.magnet, ` data-t="magnet" aria-pressed="${!!S.mag}"`)}`
         + `<button type="button" class="ch-garr" aria-label="${tr('حالتِ آهنربا', 'Magnet mode')}" onclick="SCCHART.magMenu(this)">${ICON.tri}</button></div>`;
@@ -1849,6 +1863,7 @@
         b('width', tr('ضخامتِ خط', 'Line width'), `${ICON.width}<em>${m.w}px</em>`, ' onclick="SCCHART.widthMenu(this)"')
         + b('style', tr('نوعِ خط', 'Line style'), ICON.style, ' onclick="SCCHART.styleMenu(this)"'))
       + (def.text ? b('text', tr('ویرایشِ متن', 'Edit text'), ICON.textEdit, ' onclick="SCCHART.editText()"') : '')
+      + ((m.n === 'scHLine' || m.n === 'scHRay') && alertOk() ? b('alert', tr('هشدار روی این خط', 'Add alert on this line'), ICON.bell, ' onclick="SCCHART.alertLine()"') : '')
       + b('settings', tr('تنظیمات', 'Settings'), ICON.gear, ' onclick="SCCHART.settings()"')
       + b('lock', m.k ? tr('باز کردنِ قفل', 'Unlock') : tr('قفل', 'Lock'), m.k ? ICON.lock : ICON.unlock, ` aria-pressed="${m.k}" onclick="SCCHART.lock()"`, m.k ? ' on' : '')
       + b('clone', tr('کپی', 'Clone'), ICON.clone, ' onclick="SCCHART.clone()"')
@@ -1883,6 +1898,7 @@
   // ── منوی راست‌کلیک ──
   function openCtx(id, e) {
     const box = $('ch-ctx'), m = S.recs.get(id); if (!box || !m || readOnly()) return;
+    S.ctxAt = Date.now(); S.ctxChart = false;
     closePop(); closeFly(); selectId(id);
     const it = (a, icon, t, k) => `<button type="button" class="ch-ctxi" data-a="${a}" onclick="SCCHART.ctx('${a}')">${icon}<span>${t}</span>${k ? `<kbd dir="ltr">${k}</kbd>` : ''}</button>`;
     box.innerHTML = it('settings', ICON.gear, tr('تنظیمات…', 'Settings…')) + it('clone', ICON.clone, tr('نسخه‌ی دوم (Clone)', 'Clone')) + it('copy', ICON.clone, tr('کپی', 'Copy'), 'Ctrl+C')
@@ -1895,6 +1911,10 @@
   function closeCtx() { const b = $('ch-ctx'); if (b) { b.hidden = true; b.innerHTML = ''; } }
   function ctxAction(a) {
     const id = S.selected; closeCtx();
+    if (a === 'alert') { alertDialog(null, S.ctxPrice); return; }
+    if (a === 'hline') { hlineAt(S.ctxPrice); return; }
+    if (a === 'rt') { resetView(); return; }
+    if (a === 'cset') { openChartSettings(); return; }
     if (a === 'settings') openSettings(id); else if (a === 'clone') cloneSel(id); else if (a === 'copy') { S.selected = id; copySel(); } else if (a === 'lock') toggleLock(id);
     else if (a === 'hide') toggleHideOne(id); else if (a === 'delete') removeId(id);
   }
@@ -2136,6 +2156,7 @@
         <button type="button" class="ch-tfb" id="ch-tfb" onclick="SCCHART.tfMenu(this)" aria-haspopup="true"><b id="ch-tfl" dir="ltr">${tfOf(S.tf).l}</b>${ICON.chev}</button>
         <button type="button" class="ch-fullb ch-bb" id="ch-ctb" onclick="SCCHART.ctMenu(this)" aria-haspopup="true">${CT_IC[S.ct] || CT_IC.candle}</button>
         <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span id="ch-indl">${tr('اندیکاتور', 'Indicators')}</span></button>
+        <button type="button" class="ch-fullb ch-bb ch-alertb" id="ch-alertb" onclick="SCCHART.alert()"${readOnly() ? ' hidden' : ''}>${ICON.bell}</button>
         <div class="ch-ur" id="ch-ur"${readOnly() ? ' hidden' : ''}><button type="button" class="ch-fullb ch-bb" id="ch-undo" onclick="SCCHART.undo()" disabled>${ICON.undo}</button><button type="button" class="ch-fullb ch-bb" id="ch-redo" onclick="SCCHART.redo()" disabled>${ICON.redo}</button></div>
         <button type="button" class="ch-fullb ch-bb" id="ch-cset" onclick="SCCHART.chartSettings()">${ICON.gear}</button>
         <button type="button" class="ch-fullb ch-bb" id="ch-shot" onclick="SCCHART.snapshot()">${ICON.camera}</button>
@@ -2163,7 +2184,7 @@
         </div>
         <aside class="ch-wl" id="ch-wl" dir="${d}" hidden></aside>
       </div>
-      <div class="ch-foot"><span id="ch-save" class="ch-save"></span><span id="ch-srcinfo"></span></div>
+      <div class="ch-foot"><span id="ch-save" class="ch-save"></span><span id="ch-srcinfo"></span><button type="button" class="ch-clock" id="ch-clock" onclick="SCCHART.tzMenu(this)" aria-haspopup="true"></button></div>
     </div>`;
   }
 
@@ -2999,7 +3020,7 @@
       const nx = lk[isG(src) ? 'g' : 'c']; S.coin = /^[A-Z0-9]{1,15}$/.test(nx || '') ? nx : isG(src) ? 'GOLD' : 'BTC';
       S.hist = []; S.redo = []; S.prec = null;
     }
-    S.src = src; remember(); loadSeries(); S.q = {}; if (wlOpen()) { S.wlMenu = false; paintWL(); } wlPoll();
+    S.src = src; remember(); loadSeries(); S.q = {}; if (wlOpen()) { S.wlMenu = false; paintWL(); } wlPoll(); paintTools(); paintAlerts();
   }
   function setTf(tf) { if (!TFS.some(t => t.id === tf) || tf === S.tf) return; cancelDrawing(); S.tf = tf; remember(); loadSeries(); }
   function remember() { if (!S.store) return; S.store.last = { src: S.src, coin: S.coin, tf: S.tf }; if (!readOnly()) { L.s(cacheKey(), S.store); clearTimeout(S.saveTimer); S.saveTimer = setTimeout(save, 2500); } }
@@ -3016,6 +3037,7 @@
     else if ((ev.ctrlKey || ev.metaKey) && k === 'z') { ev.preventDefault(); undo(); }
     else if (ev.altKey && ev.shiftKey && ev.code === 'KeyR') { ev.preventDefault(); startTool('scRect'); }
     else if (ev.altKey && !ev.shiftKey && !ev.ctrlKey && ev.code === 'KeyR') { ev.preventDefault(); resetView(); }
+    else if (ev.altKey && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey && ev.code === 'KeyA') { ev.preventDefault(); if (!readOnly()) alertDialog(null, lastClose()); }
     else if (wlOpen() && !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey && (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !S.drawingId) { ev.preventDefault(); wlStep(ev.key === 'ArrowDown' ? 1 : -1); }
     else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyC' && S.selected && !String(window.getSelection?.() || '')) { if (copySel()) ev.preventDefault(); }
     else if ((ev.ctrlKey || ev.metaKey) && !ev.shiftKey && ev.code === 'KeyV' && S.clip) { if (pasteClip()) ev.preventDefault(); }
@@ -3048,16 +3070,19 @@
     S.stay = !!pf.stay; S.lockAll = !!pf.lock; S.lang = pf.lang === 'en' ? 'en' : 'fa'; S.hidden = !!pf.hid; S.theme = pf.theme === 'light' ? 'light' : 'dark';
     S.ct = CT.includes(pf.ct) ? pf.ct : 'candle'; S.ys = pf.ys === 'log' || pf.ys === 'pct' ? pf.ys : null;
     S.cs = pf.cs && typeof pf.cs === 'object' ? JSON.parse(JSON.stringify(pf.cs)) : {};
+    S.tz = tzOk(pf.tz) ? pf.tz : 'Asia/Tehran'; dtf = mkDtf(S.tz); clockFmt = null;
     el.innerHTML = shell();
     document.querySelectorAll('#ch-lang button').forEach(b => { const on = b.dataset.l === S.lang; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
     paintMax(); paintTheme(); paintAuto(); paintBar();
     paintTools(); status(S.loadedStore ? 'saved' : 'local'); if (!S.loadedStore && !L.g(cacheKey())) $('ch-save').textContent = '';
     const phone = window.matchMedia('(max-width: 600px)').matches;
     S.phone = phone;
-    S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: 'Asia/Tehran', styles: stylesFor() });
+    S.chart = kc.init($('ch-canvas'), { locale: 'en-US', timezone: S.tz, styles: stylesFor() });
     patchEngine(S.chart);
     S.chart.setLoadDataCallback(onLoadData);
     clearInterval(S.cdTimer); S.cdTimer = setInterval(cdTick, 1000);
+    clearInterval(S.alTimer); S.alTimer = setInterval(() => { if (alertOk() && !document.hidden && $('screen-chart')?.classList.contains('active')) alertsLoad(); }, 60000);
+    alertsLoad();
     S.chart.setOffsetRightDistance(48);
     applyIndicators();
     S.chart.subscribeAction('onZoom', saveZoomSoon);
@@ -3081,7 +3106,14 @@
       if (S.measureId && !S.drawingId) { dropMeasure(); paintTools(); }
       if (e.shiftKey && S.tool === 'cursor' && !readOnly()) startTool('scMeasure');
     }, true);
-    cv.addEventListener('contextmenu', e => { e.preventDefault(); if (e.pointerType === 'mouse' && !readOnly() && (S.drawingId || T[S.tool]?.pad)) startTool('cursor'); });
+    cv.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (e.pointerType === 'mouse' && !readOnly() && (S.drawingId || T[S.tool]?.pad)) { startTool('cursor'); return; }
+      // v26.53: جای خالی ⇒ منوی نمودار (هشدار/خطِ افقی در این قیمت)؛ راست‌کلیکِ شکل یا لغوِ رسم همین الان منوی خودش را داشت
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      if (Date.now() - (S.ctxAt || 0) < 300 || S.tool !== 'cursor') return;
+      chartCtx(e);
+    });
     // کشیدن یا دوبار-کلیکِ محورِ قیمت هم حالتِ خودکار را عوض می‌کند ⇒ دکمه‌ی A همگام بماند
     for (const t of ['pointerup', 'dblclick']) cv.addEventListener(t, () => setTimeout(paintAuto, 0));
     padEvents($('ch-pad'));
@@ -3109,7 +3141,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}.ch-ur{display:flex;gap:4px;flex:0 0 auto}.ch-ur[hidden]{display:none}.ch-ur .ch-fullb:disabled{opacity:.38;cursor:default}.ch-tfm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer;min-height:34px;width:28px;padding:0}.ch-tfm svg{width:14px;height:14px}.ch-tfs button.ch-tfx{border-style:dashed}.ch-tfr{display:flex;align-items:center;gap:2px}.ch-tfr .ch-popi{flex:1;min-width:0}.ch-tfr .ch-popi small{margin-inline-start:auto;color:var(--muted);font-size:11px}.ch-tfst{flex:none;width:32px;height:32px;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}.ch-tfst.on{color:var(--gold)}.ch-tfst:hover{background:rgba(127,127,127,.12)}.ch-srcb{display:flex;align-items:center;gap:4px}.ch-srcb svg{width:13px;height:13px}.ch-psep{flex:0 0 1px;align-self:stretch;background:var(--border);margin:4px 2px}.ch-pcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px}.ch-pcats button{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);color:var(--text2);font:600 12px var(--f-body);padding:6px 11px;border-radius:99px;cursor:pointer}.ch-pcats button.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}.ch-prows{display:grid;gap:2px}.ch-prow{display:grid;grid-template-columns:24px 78px minmax(0,1fr) auto;align-items:center;gap:8px;background:none;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 4px;cursor:pointer;text-align:start}.ch-prow:hover{background:rgba(127,127,127,.08)}.ch-prow b{font:700 12.5px var(--f-mono)}.ch-prow span{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-prow small{font-size:10.5px;color:var(--muted)}.ch-prow .t-icon{width:22px;height:22px}.ch-gico{display:flex;align-items:center;justify-content:center;font:800 8.5px/1 var(--f-mono);letter-spacing:-.2px;color:#fff;background:#5d606b}.ch-gico[data-k=fx]{background:#2962ff}.ch-gico[data-k=metal]{background:#b8860b}.ch-gico[data-k=energy]{background:#3a3f4b}.ch-gico[data-k=index]{background:#7e57c2}.ch-gico[data-k=stock]{background:#089981}.ch-gico[data-k=agri]{background:#6d8b2f}@media(max-width:600px){.ch-bar{gap:5px}.ch-bar .ch-fullb{width:32px}.ch-ur{gap:3px}}@media(max-width:380px){.ch-bar{gap:3px}.ch-ur{gap:3px}.ch-bar .ch-fullb{width:28px}.ch-bar .ch-indb{padding:6px 6px}.ch-tfb{padding:6px 5px;gap:2px}}.ch-pop{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}.ch-fly{scroll-padding-top:52px}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}.ch-ur{display:flex;gap:4px;flex:0 0 auto}.ch-ur[hidden]{display:none}.ch-ur .ch-fullb:disabled{opacity:.38;cursor:default}.ch-tfm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer;min-height:34px;width:28px;padding:0}.ch-tfm svg{width:14px;height:14px}.ch-tfs button.ch-tfx{border-style:dashed}.ch-tfr{display:flex;align-items:center;gap:2px}.ch-tfr .ch-popi{flex:1;min-width:0}.ch-tfr .ch-popi small{margin-inline-start:auto;color:var(--muted);font-size:11px}.ch-tfst{flex:none;width:32px;height:32px;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}.ch-tfst.on{color:var(--gold)}.ch-tfst:hover{background:rgba(127,127,127,.12)}.ch-srcb{display:flex;align-items:center;gap:4px}.ch-srcb svg{width:13px;height:13px}.ch-psep{flex:0 0 1px;align-self:stretch;background:var(--border);margin:4px 2px}.ch-pcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px}.ch-pcats button{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);color:var(--text2);font:600 12px var(--f-body);padding:6px 11px;border-radius:99px;cursor:pointer}.ch-pcats button.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}.ch-prows{display:grid;gap:2px}.ch-prow{display:grid;grid-template-columns:24px 78px minmax(0,1fr) auto;align-items:center;gap:8px;background:none;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 4px;cursor:pointer;text-align:start}.ch-prow:hover{background:rgba(127,127,127,.08)}.ch-prow b{font:700 12.5px var(--f-mono)}.ch-prow span{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-prow small{font-size:10.5px;color:var(--muted)}.ch-prow .t-icon{width:22px;height:22px}.ch-gico{display:flex;align-items:center;justify-content:center;font:800 8.5px/1 var(--f-mono);letter-spacing:-.2px;color:#fff;background:#5d606b}.ch-gico[data-k=fx]{background:#2962ff}.ch-gico[data-k=metal]{background:#b8860b}.ch-gico[data-k=energy]{background:#3a3f4b}.ch-gico[data-k=index]{background:#7e57c2}.ch-gico[data-k=stock]{background:#089981}.ch-gico[data-k=agri]{background:#6d8b2f}@media(max-width:600px){.ch-bar{gap:5px}.ch-bar .ch-fullb{width:32px}.ch-ur{gap:3px}}@media(max-width:380px){.ch-bar{gap:3px}.ch-ur{gap:3px}.ch-bar .ch-fullb{width:28px}.ch-bar .ch-indb{padding:6px 6px}.ch-tfb{padding:6px 5px;gap:2px}}.ch-pop{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}.ch-fly{scroll-padding-top:52px}.ch-clock{background:none;border:0;color:var(--muted);font:600 11px var(--f-mono);cursor:pointer;padding:2px 4px;border-radius:6px;margin-inline-start:auto;direction:ltr}.ch-clock:hover{color:var(--text);background:rgba(127,127,127,.12)}.ch-alertb svg{width:16px;height:16px}.ch-alertb:disabled{opacity:.4;cursor:default}@media(max-width:600px){.ch-alertb{display:none}}.ch-almod .chs-seg{flex-wrap:wrap}.ch-almod .chs-seg button{padding:0 9px}.chs-rw{flex-wrap:wrap}.chs-rw .chs-seg,.chs-rw .chs-c{max-width:100%}.ch-alnote{background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.35);border-radius:10px;padding:10px;font-size:12.5px;line-height:1.9;color:var(--text)}.ch-alnote .btn{width:auto;margin:6px 0 0;padding:6px 12px;font-size:12px}.ch-ctxi:disabled{opacity:.5;cursor:default}.ch-tool[data-t=alert]:disabled{opacity:.35}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -3210,6 +3242,202 @@
     const nid = makeOverlay({ id: newId(), n: c.n, p: c.p.map(q => q.slice()), c: c.c, w: c.w, s: c.s, x: JSON.parse(JSON.stringify(c.x)) }, false);
     commit(); if (nid) selectId(nid); return true;
   }
+  // ── v26.53: منطقه‌ی زمانی (مثلِ TradingView: ساعتِ زنده پایینِ نمودار، کلیک = فهرست) ──
+  const TZS = [['Asia/Tehran', 'تهران', 'Tehran'], ['Etc/UTC', 'UTC', 'UTC'], ['America/New_York', 'نیویورک', 'New York'], ['America/Chicago', 'شیکاگو', 'Chicago'],
+    ['America/Los_Angeles', 'لس‌آنجلس', 'Los Angeles'], ['Europe/London', 'لندن', 'London'], ['Europe/Berlin', 'فرانکفورت / برلین', 'Frankfurt / Berlin'],
+    ['Europe/Istanbul', 'استانبول', 'Istanbul'], ['Asia/Dubai', 'دبی', 'Dubai'], ['Asia/Kolkata', 'بمبئی', 'Mumbai'], ['Asia/Singapore', 'سنگاپور', 'Singapore'],
+    ['Asia/Hong_Kong', 'هنگ‌کنگ / شانگهای', 'Hong Kong / Shanghai'], ['Asia/Tokyo', 'توکیو', 'Tokyo'], ['Australia/Sydney', 'سیدنی', 'Sydney']];
+  const tzOk = z => TZS.some(t => t[0] === z);
+  const tzName = (z = S.tz) => { const t = TZS.find(x => x[0] === z) || TZS[0]; return tr(t[1], t[2]); };
+  function tzOffset(z = S.tz, t = Date.now()) {   // «UTC+3:30» / «UTC−5»
+    try {
+      const p = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'shortOffset' }).formatToParts(new Date(t)).find(x => x.type === 'timeZoneName')?.value || 'GMT';
+      const m = /GMT([+-])(\d+)(?::(\d+))?/.exec(p); return m && (+m[2] || +m[3]) ? `UTC${m[1] === '-' ? '−' : '+'}${+m[2]}${m[3] && m[3] !== '00' ? ':' + m[3] : ''}` : 'UTC';   // UTC خودش = «UTC» (مثلِ TradingView)
+    } catch (_) { return 'UTC'; }
+  }
+  let clockFmt = null;
+  function paintClock() {
+    const b = $('ch-clock'); if (!b || document.hidden) return;
+    if (!clockFmt || clockFmt.tz !== S.tz) clockFmt = { tz: S.tz, f: new Intl.DateTimeFormat('en-GB', { timeZone: S.tz, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) };
+    b.textContent = `${clockFmt.f.format(new Date())} (${tzOffset()})`;
+    b.title = tr('منطقه‌ی زمانی: ', 'Time zone: ') + tzName(); b.setAttribute('aria-label', b.title);
+  }
+  function setTz(z) {
+    if (!tzOk(z)) return;
+    S.tz = z; dtf = mkDtf(z); clockFmt = null;
+    if (S.chart) { S.chart.setTimezone(z); S.chart.setStyles(stylesFor()); }
+    if (S.store && !readOnly()) { if (z === 'Asia/Tehran') delete S.store.prefs.tz; else S.store.prefs.tz = z; scheduleSave(); }
+    paintClock(); paintHead();
+  }
+  function tzMenu(el) {
+    openPop('tz', el, `<div class="ch-poph">${tr('منطقه‌ی زمانی', 'Time zone')}</div>` + TZS.map(([z, f, e]) => `<button type="button" class="ch-popi${z === S.tz ? ' on' : ''}" data-tz="${z}" onclick="SCCHART.setTz('${z}');SCCHART.closePop()"><i></i><span><b>${esc(tr(f, e))}</b></span><small dir="ltr">${tzOffset(z)}</small></button>`).join(''));
+  }
+
+  // ── v26.53: هشدارِ قیمت روی خودِ نمودار (مثلِ TradingView) — همان سیستمِ هشدارِ اپ (/api/alerts)، فقط رمزارز ──
+  //    راست‌کلیک روی نمودار / Alt+A / دکمه‌ی زنگ / زنگِ نوارِ خطِ افقی ⇒ پنجره‌ی هشدار؛ هشدارها خطِ نارنجیِ کشیدنی روی نمودارند.
+  const AL_COL = '#FF9800';
+  const alertOk = () => !readOnly() && !isG() && !!SESSION;   // مالک (منتور) هم هشدارِ شخصیِ خودش را دارد؛ دیدنِ نمودارِ دانشجو (فقط‌خواندنی) نه
+  const AL_TF = [['', 'لحظه‌ای', 'Immediately'], ['5m', '۵ دقیقه', '5m'], ['15m', '۱۵ دقیقه', '15m'], ['1h', '۱ ساعت', '1H'], ['4h', '۴ ساعت', '4H'], ['1d', 'روزانه', '1D']];
+  const alCond = c => c === 'above' ? tr('عبور رو به بالا', 'Crossing up') : c === 'below' ? tr('عبور رو به پایین', 'Crossing down') : tr('ورود به محدوده', 'Entering zone');
+  const invalidateAppAlerts = () => { try { if (typeof ALERT_STATE !== 'undefined' && ALERT_STATE) ALERT_STATE.loaded = false; } catch (_) {} };
+  async function alertsLoad() {
+    if (readOnly() || !SESSION) return;
+    try {
+      const r = await apiFetch('/api/alerts/mine', {}, { retries: 1 }); if (!r || !r.ok) return;
+      const d = await r.json(); S.alerts = { list: Array.isArray(d.alerts) ? d.alerts : [], entitled: d.entitled !== false, at: Date.now() };
+    } catch (_) { return; }
+    paintAlerts();
+  }
+  const alertCtx = arg => ({ o: arg.overlay, a: arg.overlay?.extendData?.a, c: arg.coordinates || [], W: arg.bounding.width, H: arg.bounding.height, yAxis: arg.yAxis, v: (arg.overlay?.points || []).map(p => p.value), x: {} });
+  function alertFigs(k) {
+    const a = k.a, c = k.c[0]; if (!a || !c || !isNum(k.v[0])) return [];
+    const col = a.status === 'paused' ? C.gray : AL_COL, y = c.y, out = [], L = [{ x: 0, y }, { x: k.W, y }];
+    if (a.condition === 'zone' && isNum(+a.tolerance)) { const d = k.v[0] * a.tolerance / 100; out.push(F.poly(rectPts(0, k.yAxis.convertToPixel(k.v[0] + d), k.W, k.yAxis.convertToPixel(k.v[0] - d)), hexA(col, 0.1))); }
+    out.push(F.line(L, hexA(col, a.status === 'triggered' ? 0.55 : 1), 1, a.status === 'paused' ? 2 : 1), F.hit(L));
+    const tf = a.candleTf ? (AL_TF.find(t => t[0] === a.candleTf) || [])[2] : '';
+    const txt = `${tr('هشدار', 'Alert')} ${a.condition === 'above' ? '▲' : a.condition === 'below' ? '▼' : '⇕'} ${fmt(k.v[0])}${tf ? ' · ' + tf : ''}${a.status === 'paused' ? ' · ' + tr('متوقف', 'paused') : ''}`;
+    out.push(label({ W: k.W, H: k.H }, k.W - 8, y, txt, col, { align: 'right', ev: true }));
+    return out;
+  }
+  const alertAxis = k => (!k.a || !k.c[0]) ? [] : axisY({ ...k, col: k.a.status === 'paused' ? C.gray : AL_COL, x: {} }, 0);
+  function paintAlerts() {
+    if (!S.chart) return;
+    S.alertOv = S.alertOv || new Set();
+    const want = new Map(alertOk() ? (S.alerts?.list || []).filter(a => a.symbol === S.coin && +a.targetPrice > 0).map(a => ['alert_' + a.id, a]) : []);
+    for (const oid of [...S.alertOv]) if (!want.has(oid)) { S.chart.removeOverlay(oid); S.alertOv.delete(oid); }
+    const L = S.chart.getDataList(), t = L[L.length - 1]?.timestamp; if (!isNum(t)) return;
+    for (const [oid, a] of want) {
+      const pts = [{ timestamp: t, value: +a.targetPrice }];
+      if (S.alertOv.has(oid) && S.chart.getOverlayById(oid)) { S.chart.overrideOverlay({ id: oid, points: pts, extendData: { a } }); continue; }
+      S.chart.createOverlay({ name: 'scAlertLine', id: oid, points: pts, extendData: { a }, lock: false, zLevel: 4,
+        onClick: e => { if (S.tool === 'cursor' && !S.drawingId) alertDialog(e.overlay.extendData.a.id); return true; },
+        onRightClick: e => { S.ctxAt = Date.now(); if (!S.drawingId) alertDialog(e.overlay.extendData.a.id); return true; },
+        onPressedMoveEnd: e => { alertMoved(e.overlay.extendData.a.id, e.overlay.points[0]?.value); return true; } }, 'candle_pane');
+      S.alertOv.add(oid);
+    }
+  }
+  async function alertMoved(id, v) {
+    const a = (S.alerts?.list || []).find(x => x.id === id); if (!a || !isNum(v) || v <= 0) return;
+    const p = +v.toFixed(prec()), prev = +a.targetPrice; if (Math.abs(p - prev) < Math.pow(10, -prec()) / 2) { paintAlerts(); return; }
+    a.targetPrice = p; paintAlerts();
+    const r = await apiFetch('/api/alerts/' + id, { method: 'PUT', body: JSON.stringify({ targetPrice: p }) });
+    if (r?.ok) { showToast(tr(`هشدار به ${fmt(p)} منتقل شد`, `Alert moved to ${fmt(p)}`)); invalidateAppAlerts(); }
+    else { a.targetPrice = prev; paintAlerts(); showToast(tr('جابه‌جاییِ هشدار ذخیره نشد', 'Could not move the alert')); }
+  }
+  const lastClose = () => { const L = S.data; return L[L.length - 1]?.close; };
+  function goAlertsPage() {
+    const box = $('ch-modal'); if (box) { box.hidden = true; box.innerHTML = ''; }
+    if (typeof nav === 'function') nav('alerts', document.getElementById('nav-alerts'));
+  }
+  // پنجره‌ی هشدار (ساخت / ویرایش)
+  function alertDialog(id, price) {
+    const box = $('ch-modal'); if (!box || readOnly()) return;
+    closePop(); closeCtx(); closeFly();
+    if (isG()) { showToast(tr('هشدارِ قیمت فعلاً فقط برای رمزارزهاست (بازارهای جهانی نه)', 'Price alerts are available for crypto symbols only')); return; }
+    if (!S.alerts) alertsLoad();
+    const ex = id ? (S.alerts?.list || []).find(a => a.id === id) : null; if (id && !ex) return;
+    const last = lastClose(), p0 = isNum(+price) && +price > 0 ? +price : last;
+    const d = ex ? { cond: ex.condition, price: +ex.targetPrice, tol: +ex.tolerance || 0.5, tf: ex.candleTf || '', freq: ex.frequency || 'once', note: ex.note || '', ch: { telegram: ex.channels?.telegram !== false, push: ex.channels?.push !== false, inApp: ex.channels?.inApp !== false } }
+      : { cond: isNum(last) && p0 < last ? 'below' : 'above', price: +(+p0).toFixed(prec()), tol: 0.5, tf: '', freq: 'once', note: '', ch: { telegram: true, push: true, inApp: true } };
+    const seg = (key, vals, now) => `<div class="chs-seg" role="group" data-aseg="${key}">${vals.map(([v, t]) => `<button type="button" data-v="${v}" class="${v === now ? 'on' : ''}" aria-pressed="${v === now}">${t}</button>`).join('')}</div>`;
+    const dist = () => { const v = numIn($('ch-alp')?.value ?? d.price); if (!isNum(v) || !isNum(last) || !last) return ''; const p = (v - last) / last * 100; return tr(`قیمتِ فعلی ${fmt(last)} · ${Math.abs(p).toFixed(2)}٪ ${p >= 0 ? 'بالاتر' : 'پایین‌تر'}`, `Last ${fmt(last)} · ${Math.abs(p).toFixed(2)}% ${p >= 0 ? 'above' : 'below'}`); };
+    const render = () => {
+      const ent = S.alerts?.entitled !== false;
+      box.innerHTML = `<div class="ch-mcard ch-set chs ch-almod" role="dialog" aria-label="${esc(tr('هشدارِ قیمت', 'Price alert'))}">`
+        + `<div class="chs-top"><b>${ex ? tr('ویرایشِ هشدار', 'Edit alert') : tr('هشدارِ تازه', 'Create alert')} · <span dir="ltr">${esc(S.coin)}</span></b><button type="button" class="chs-x" id="chs-x" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+        + `<div class="chs-body"><div class="chs-p">`
+        + (ent ? '' : `<div class="ch-alnote">${tr('برای هشدارِ قیمت، اشتراکِ «هشدارِ هوشمندِ قیمت» لازم است.', 'Price alerts need an active alert subscription.')} <button type="button" class="btn btn-ghost" id="ch-algo">${tr('رفتن به صفحه‌ی هشدارها', 'Open the alerts page')}</button></div>`)
+        + `<div class="chs-r"><span class="chs-l">${tr('شرط', 'Condition')}</span>${seg('cond', [['above', '▲ ' + alCond('above')], ['below', '▼ ' + alCond('below')], ['zone', '⇕ ' + alCond('zone')]], d.cond)}</div>`
+        + `<div class="chs-r"><span class="chs-l">${tr('قیمت', 'Price')}<small id="ch-aldist">${esc(dist())}</small></span><input class="fi chs-in" id="ch-alp" dir="ltr" inputmode="decimal" value="${d.price}" aria-label="${tr('قیمت', 'Price')}"></div>`
+        + (d.cond === 'zone' ? `<div class="chs-r"><span class="chs-l">${tr('پهنای محدوده (٪ از قیمت)', 'Zone width (% of price)')}</span><input class="fi chs-in" id="ch-altol" dir="ltr" inputmode="decimal" value="${d.tol}" aria-label="${tr('پهنای محدوده', 'Zone width')}"></div>`
+          : `<div class="chs-r chs-rw"><span class="chs-l">${tr('کِی بررسی شود؟', 'Trigger')}<small>${tr('لحظه‌ای یا فقط با بسته شدنِ کندل (شکستِ واقعی)', 'Immediately or only on bar close (a real breakout)')}</small></span>${seg('tf', AL_TF.map(([v, f, e]) => [v, tr(f, e)]), d.tf)}</div>`)
+        + `<div class="chs-r"><span class="chs-l">${tr('تکرار', 'Frequency')}</span>${seg('freq', [['once', tr('یک بار', 'Only once')], ['cross', tr('هر بار عبور', 'Every crossing')]], d.freq)}</div>`
+        + `<div class="chs-r chs-rw"><span class="chs-l">${tr('اعلان', 'Notify via')}</span><div class="chs-c">${[['telegram', tr('تلگرام', 'Telegram')], ['push', tr('اعلانِ گوشی', 'Push')], ['inApp', tr('داخلِ اپ', 'In app')]].map(([k, t]) => `<label class="chs-ck"><input type="checkbox" data-alch="${k}"${d.ch[k] ? ' checked' : ''}><span>${t}</span></label>`).join('')}</div></div>`
+        + `<label class="chs-h" for="ch-alnote">${tr('یادداشت (اختیاری)', 'Message (optional)')}</label><input class="fi" id="ch-alnote" dir="auto" maxlength="500" value="${esc(d.note)}">`
+        + `</div><div class="ch-merr" id="ch-aerr" hidden></div></div>`
+        + `<div class="chs-foot">${ex ? `<button type="button" class="btn btn-ghost ch-sdef ch-aldel" id="ch-aldel">${tr('حذف', 'Delete')}</button><button type="button" class="btn btn-ghost" id="ch-alpause">${ex.status === 'paused' ? tr('ادامه', 'Resume') : tr('توقف', 'Pause')}</button>` : '<span class="ch-sdef"></span>'}`
+        + `<button type="button" class="btn btn-ghost" id="ch-alno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-alok"${ent ? '' : ' disabled'}>${ex ? tr('ثبت', 'Save') : tr('ساختِ هشدار', 'Create')}</button></div></div>`;
+      box.hidden = false;
+    };
+    const close = () => { box.hidden = true; box.innerHTML = ''; box.onclick = box.oninput = box.onchange = box.onkeydown = null; };
+    const err = t => { const e = $('ch-aerr'); if (e) { e.textContent = t; e.hidden = false; } };
+    const read = () => { d.price = numIn($('ch-alp')?.value); if ($('ch-altol')) d.tol = numIn($('ch-altol').value); d.note = String($('ch-alnote')?.value || '').trim().slice(0, 500); };
+    async function save() {
+      read();
+      if (!isNum(d.price) || d.price <= 0) return err(tr('قیمتِ هدف معتبر نیست.', 'Enter a valid target price.'));
+      if (d.cond === 'zone' && !(d.tol >= 0.05 && d.tol <= 5)) return err(tr('پهنای محدوده باید بین ۰٫۰۵ تا ۵ درصد باشد.', 'Zone width must be 0.05–5%.'));
+      if (!d.ch.telegram && !d.ch.push && !d.ch.inApp) return err(tr('دست‌کم یک راهِ اعلان را انتخاب کن.', 'Choose at least one notification channel.'));
+      const body = { symbol: S.coin, targetPrice: +d.price.toFixed(Math.max(prec(), 2)), condition: d.cond, candleTf: d.cond === 'zone' ? null : (d.tf || null), tolerance: d.cond === 'zone' ? d.tol : 0.5,
+        frequency: d.freq, deliveryMode: ex?.deliveryMode || 'standard', severity: 'important', telegramEnabled: d.ch.telegram, pushEnabled: d.ch.push, inAppEnabled: d.ch.inApp, note: d.note };
+      const b = $('ch-alok'); if (b) b.disabled = true;
+      const r = await apiFetch(ex ? '/api/alerts/' + ex.id : '/api/alerts', { method: ex ? 'PUT' : 'POST', body: JSON.stringify(body) });
+      if (r?.ok) {
+        const j = await r.json().catch(() => ({}));
+        if (!ex && j.id) { S.alerts = S.alerts || { list: [], entitled: true }; S.alerts.list.unshift({ id: j.id, symbol: S.coin, targetPrice: body.targetPrice, condition: body.condition, tolerance: body.tolerance, status: 'active', candleTf: body.candleTf, frequency: body.frequency, note: body.note, channels: { telegram: body.telegramEnabled, push: body.pushEnabled, inApp: body.inAppEnabled } }); }
+        else if (ex) Object.assign(ex, { targetPrice: body.targetPrice, condition: body.condition, tolerance: body.tolerance, candleTf: body.candleTf, frequency: body.frequency, note: body.note, channels: { telegram: body.telegramEnabled, push: body.pushEnabled, inApp: body.inAppEnabled } });
+        close(); paintAlerts(); invalidateAppAlerts(); alertsLoad();
+        showToast(ex ? tr('هشدار به‌روز شد', 'Alert updated') : tr(`هشدار ساخته شد: ${S.coin} ${alCond(body.condition)} ${fmt(body.targetPrice)}`, `Alert created: ${S.coin} ${alCond(body.condition)} ${fmt(body.targetPrice)}`));
+        return;
+      }
+      if (b) b.disabled = false;
+      const st = r?.status;
+      if (st === 402) { if (S.alerts) S.alerts.entitled = false; render(); return; }
+      err(st === 409 ? tr('سقفِ تعدادِ هشدارهایت پر است — یکی را در صفحه‌ی هشدارها حذف کن.', 'You have reached your alert limit.')
+        : st === 503 ? tr('سرویسِ هشدار موقتاً خاموش است.', 'The alert service is temporarily off.')
+        : !r ? tr('اینترنت در دسترس نیست.', 'You are offline.') : tr('ذخیره نشد — دوباره امتحان کن.', 'Could not save — try again.'));
+    }
+    render();
+    box.onclick = async ev => {
+      const t = ev.target;
+      if (t === box || t.id === 'ch-alno' || t.closest('#chs-x')) { close(); return; }
+      if (t.id === 'ch-algo') { goAlertsPage(); return; }
+      const sg = t.closest('[data-aseg] button');
+      if (sg) { const key = sg.parentElement.dataset.aseg; read(); d[key] = sg.dataset.v; render(); return; }
+      if (t.id === 'ch-alok') { save(); return; }
+      if (t.id === 'ch-aldel' && ex) {
+        if (typeof uiConfirm === 'function' && !await uiConfirm(tr('این هشدار حذف شود؟', 'Delete this alert?'))) return;
+        const r = await apiFetch('/api/alerts/' + ex.id, { method: 'DELETE' });
+        if (r?.ok) { S.alerts.list = S.alerts.list.filter(a => a.id !== ex.id); close(); paintAlerts(); invalidateAppAlerts(); showToast(tr('هشدار حذف شد', 'Alert deleted')); } else err(tr('حذف نشد', 'Could not delete'));
+        return;
+      }
+      if (t.id === 'ch-alpause' && ex) {
+        const status = ex.status === 'paused' ? 'active' : 'paused';
+        const r = await apiFetch('/api/alerts/' + ex.id, { method: 'PUT', body: JSON.stringify({ status }) });
+        if (r?.ok) { ex.status = status; close(); paintAlerts(); invalidateAppAlerts(); showToast(status === 'paused' ? tr('هشدار متوقف شد', 'Alert paused') : tr('هشدار دوباره فعال شد', 'Alert resumed')); } else err(tr('انجام نشد', 'Failed'));
+      }
+    };
+    box.oninput = ev => { if (ev.target.id === 'ch-alp') { const s0 = $('ch-aldist'); d.price = numIn(ev.target.value); if (s0) s0.textContent = dist(); } };
+    box.onchange = ev => { const k = ev.target.dataset.alch; if (k) d.ch[k] = ev.target.checked; };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(); } else if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') { ev.preventDefault(); save(); } };
+    setTimeout(() => { const i = $('ch-alp'); if (i && !S.touch) { i.focus(); i.select(); } }, 30);
+  }
+  // منوی راست‌کلیکِ نمودار (جای خالی) مثلِ TradingView: هشدار در این قیمت، خطِ افقی، بازگشت به آخرین کندل، تنظیمات
+  function chartCtx(e) {
+    const box = $('ch-ctx'), cv = $('ch-canvas'); if (!box || !cv || !S.chart || readOnly()) return;
+    const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, sz = S.chart.getSize('candle_pane');
+    if (!sz || x < 0 || y < 0 || x > sz.width || y > sz.height) return;
+    const v = S.chart.convertFromPixel([{ x, y }], { paneId: 'candle_pane' })[0]?.value; if (!isNum(v) || v <= 0) return;
+    closePop(); closeFly(); deselect();
+    S.ctxPrice = +v.toFixed(prec());
+    const it = (a, icon, t, k, dis) => `<button type="button" class="ch-ctxi" data-a="${a}"${dis ? ' disabled' : ''} onclick="SCCHART.ctx('${a}')">${icon}<span>${t}</span>${k ? `<kbd dir="ltr">${k}</kbd>` : ''}</button>`;
+    box.innerHTML = (isG() ? it('alert', ICON.bell, tr('هشدار فقط برای رمزارزها', 'Alerts: crypto symbols only'), '', true) : it('alert', ICON.bell, tr(`افزودنِ هشدار در ${fmt(S.ctxPrice)}`, `Add alert on ${S.coin} at ${fmt(S.ctxPrice)}`), 'Alt+A'))
+      + it('hline', T.scHLine.ic, tr(`خطِ افقی در ${fmt(S.ctxPrice)}`, `Draw horizontal line at ${fmt(S.ctxPrice)}`), 'Alt+H')
+      + '<hr>' + it('rt', ICON.rt, tr('بازگشت به آخرین کندل', 'Reset chart view'), 'Alt+R') + it('cset', ICON.gear, tr('تنظیماتِ نمودار…', 'Settings…'));
+    box.hidden = false; S.ctxChart = true;
+    const sr = box.parentElement.getBoundingClientRect();
+    box.style.left = clamp(x, 4, sr.width - box.offsetWidth - 4) + 'px'; box.style.top = clamp(y, 4, sr.height - box.offsetHeight - 4) + 'px';
+  }
+  function hlineAt(v) {
+    if (readOnly() || !isNum(v)) return;
+    if (S.recs.size >= MAX_DRAWINGS) { showToast(tr(`حداکثر ${fa(MAX_DRAWINGS)} شکل برای هر نماد`, `Up to ${MAX_DRAWINGS} drawings per symbol`)); return; }
+    const L = S.chart.getDataList(), t = L[L.length - 1]?.timestamp, st = newStyle('scHLine'); if (!isNum(t)) return;
+    const nid = makeOverlay({ id: newId(), n: 'scHLine', p: [[t, v]], c: st.c || null, w: st.w || 1, s: st.s || 0, x: st.x ? JSON.parse(JSON.stringify(st.x)) : {} }, false);
+    commit(); if (nid) selectId(nid);
+  }
+  function alertOnLine() {   // زنگِ نوارِ خطِ افقی / ریِ افقی: هشدار در قیمتِ همان خط
+    const o = S.selected && S.chart.getOverlayById(S.selected); if (!o) return;
+    alertDialog(null, o.points?.[0]?.value);
+  }
   // ── جابه‌جاییِ شکلِ انتخاب‌شده با کلیدهای جهت (v26.47، مثلِ TradingView) ──
   // ←/→ = یک کندل، ↑/↓ = یک واحدِ قیمت (۱۰^-دقت)؛ Shift ده برابر. همه‌ی نقطه‌ها با هم (لانگ/شورت: ورود، هدف و حد ضرر با هم).
   // یک رشته فشار (یا نگه‌داشتنِ کلید) = یک قدمِ «برگرداندن» (Ctrl+Z)، نه صدها قدم.
@@ -3259,7 +3487,7 @@
   function openChartSettings() {
     const box = $('ch-modal'); if (!box || !S.chart) return;
     closePop(); closeCtx(); closeFly(); $('ch-indm').hidden = true;
-    const snap = { cs: JSON.parse(JSON.stringify(S.cs || {})), ys: S.ys || null, theme: S.theme || 'dark' };
+    const snap = { cs: JSON.parse(JSON.stringify(S.cs || {})), ys: S.ys || null, theme: S.theme || 'dark', tz: S.tz };
     const cs = JSON.parse(JSON.stringify(S.cs || {}));
     let palFor = null;
     const live = () => { S.cs = JSON.parse(JSON.stringify(cs)); S.chart.setStyles(stylesFor()); };
@@ -3282,6 +3510,7 @@
         + `<div class="chs-h">${tr('مقیاسِ قیمت', 'Price scale')}</div>`
         + `<div class="chs-r"><span class="chs-l">${tr('نوعِ مقیاس', 'Scale type')}</span>${seg('ys', [['n', tr('عادی', 'Regular')], ['pct', tr('درصدی', 'Percent')], ['log', tr('لگاریتمی', 'Logarithmic')]], S.ys || 'n')}</div>`
         + ck('cd', tr('شمارشِ معکوس تا بسته شدنِ کندل', 'Countdown to bar close'))
+        + `<div class="chs-h">${tr('زمان', 'Time')}</div><div class="chs-r"><span class="chs-l">${tr('منطقه‌ی زمانی', 'Time zone')}</span><select class="fi chs-in" data-tzsel aria-label="${tr('منطقه‌ی زمانی', 'Time zone')}">${TZS.map(([z, f, e]) => `<option value="${z}"${z === S.tz ? ' selected' : ''}>${esc(tr(f, e))} (${tzOffset(z)})</option>`).join('')}</select></div>`
         + `</div><div class="chs-pal" id="chs-pal" hidden></div></div>`
         + `<div class="chs-foot"><button type="button" class="btn btn-ghost chs-tb" id="chs-def" style="margin-inline-end:auto">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button>`
         + `<button type="button" class="btn btn-ghost" id="ch-sno">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-sok">${tr('ثبت', 'Ok')}</button></div></div>`;
@@ -3294,6 +3523,7 @@
       } else {
         S.cs = snap.cs; if (S.ys !== snap.ys) { S.ys = snap.ys; if (S.store) { if (snap.ys) S.store.prefs.ys = snap.ys; else delete S.store.prefs.ys; } }
         if ((S.theme || 'dark') !== snap.theme) setTheme(snap.theme);
+        if (S.tz !== snap.tz) setTz(snap.tz);
         S.chart.setStyles(stylesFor()); paintBar();
       }
       box.hidden = true; box.innerHTML = ''; box.onclick = box.onchange = box.onkeydown = null;
@@ -3331,6 +3561,7 @@
     };
     box.onchange = ev => {
       const t = ev.target;
+      if (t.matches?.('select[data-tzsel]')) { setTz(t.value); return; }
       if (t.dataset.cs) { if (t.checked) delete cs[t.dataset.cs]; else cs[t.dataset.cs] = false; live(); return; }
       if (t.dataset.ct != null) { setChartType(t.value); return; }
     };
@@ -3614,10 +3845,10 @@
     src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, watchlist: on => toggleWL(on), _wlPoll: wlPoll, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator, indSet: openIndSettings, indFind: q => { S.indQ = String(q || '').slice(0, 40); paintInd(true); },
-    tfMenu, tfFav, srcMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
+    tfMenu, tfFav, srcMenu, setTz, tzMenu, alert: () => alertDialog(null, lastClose()), alertLine: alertOnLine, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
-    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _specCfg: specCfg, _SPECS: SPECS, _cdText: cdText, _styles: stylesFor,
+    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _specCfg: specCfg, _SPECS: SPECS, _alertsLoad: alertsLoad, _tzOffset: tzOffset, _fmtDate: t => fmtDate(t), _cdText: cdText, _styles: stylesFor,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
     _hitPoint: id => {
       const f = S.lastFigs.get(id) || [], cen = c => ({ x: c.reduce((s, p) => s + p.x, 0) / c.length, y: c.reduce((s, p) => s + p.y, 0) / c.length });
