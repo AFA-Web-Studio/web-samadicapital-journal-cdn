@@ -48,26 +48,41 @@
    محورها را اصلاً نمی‌شناخت و دوانگشتی فقط زمان را زوم می‌کرد. حالا مثلِ اپِ TradingView: کشیدنِ انگشت روی محورِ قیمت = فشرده/کشیده
    شدنِ قیمت (پایین = فشرده، بالا = کشیده؛ «A» خاموش)، روی محورِ زمان = زومِ زمان؛ دوانگشتیِ عمودی (انگشت‌ها بالا و پایینِ هم) = زومِ
    قیمت دورِ همان نقطه، دوانگشتیِ افقی = زومِ زمان مثلِ قبل. دکمه‌ی «A» یا تغییرِ نماد/تایم‌فریم مقیاسِ خودکار را برمی‌گرداند.
+   v26.50 (مالک: «همه‌ی بخش‌ها را با TradingView مقایسه کن… تایم‌فریمِ ماهانه، صرافی‌های دیگر، فارکس، طلا، نفت، نقره، مس…؛
+   برگرداندن و دوباره‌انجام را از پایین بیاور بالا»): ↶ ↷ در نوارِ بالا (مثلِ TradingView)؛ تایم‌فریم‌های 3m، 2H، 12H و 1M با
+   «تایم‌فریم‌های محبوب» (ستاره، prefs.tff) و فهرستِ کامل؛ منبع‌ها: Hyperliquid، SoDEX، Bybit، MEXC، BingX و «بازارهای جهانی»
+   (فارکس، فلزات، انرژی، شاخص‌ها، سهام، کشاورزی از Yahoo) با انتخابگرِ دسته‌دار، نامِ فارسی/انگلیسی، رقمِ اعشارِ درستِ هر بازار
+   (EURUSD پنج رقم)، واچ‌لیستِ جدا (prefs.wlg) و آخرین نمادِ جدا برای کریپتو و بازارهای جهانی (prefs.lastk).
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
   'use strict';
-  const SOURCES = [{ id: 'hl', name: 'Hyperliquid' }, { id: 'sodex', name: 'SoDEX' }, { id: 'bybit', name: 'Bybit' }];
+  const SOURCES = [{ id: 'hl', name: 'Hyperliquid' }, { id: 'sodex', name: 'SoDEX' }, { id: 'bybit', name: 'Bybit' }, { id: 'mexc', name: 'MEXC' }, { id: 'bingx', name: 'BingX' },
+    { id: 'yahoo', name: 'Global markets', fa: 'بازارهای جهانی', g: true }];
+  const isG = (src = S.src) => src === 'yahoo';   // بازارهای جهانی (فارکس، فلزات، …) — بقیه کریپتو
+  // ترتیبِ TFS ثابت است (بیتِ x.vis)؛ تایم‌فریمِ تازه فقط آخرِ فهرست
   const TFS = [
     { id: '1m', l: '1m', ms: 6e4, poll: 4000 }, { id: '5m', l: '5m', ms: 3e5, poll: 5000 }, { id: '15m', l: '15m', ms: 9e5, poll: 8000 },
     { id: '1h', l: '1H', ms: 36e5, poll: 10000 }, { id: '4h', l: '4H', ms: 144e5, poll: 15000 }, { id: '1d', l: '1D', ms: 864e5, poll: 30000 },
-    { id: '30m', l: '30m', ms: 18e5, poll: 9000 }, { id: '1w', l: '1W', ms: 6048e5, poll: 60000 }
+    { id: '30m', l: '30m', ms: 18e5, poll: 9000 }, { id: '1w', l: '1W', ms: 6048e5, poll: 60000 },
+    { id: '3m', l: '3m', ms: 18e4, poll: 4000 }, { id: '2h', l: '2H', ms: 72e5, poll: 12000 }, { id: '12h', l: '12H', ms: 432e5, poll: 20000 }, { id: '1M', l: '1M', ms: 2592e6, poll: 60000 }
   ];
-  const TF_VIEW = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w'].map(id => TFS.find(t => t.id === id));
+  const TF_VIEW = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '12h', '1d', '1w', '1M'].map(id => TFS.find(t => t.id === id));
+  const TF_FAV = ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M'];   // پیش‌فرضِ «محبوب‌ها» در نوارِ بالا (مثلِ ستاره‌ی TradingView)
   const ALL_TF = (1 << TFS.length) - 1;
   const tfName = t => ({ '1m': tr('۱ دقیقه', '1 minute'), '5m': tr('۵ دقیقه', '5 minutes'), '15m': tr('۱۵ دقیقه', '15 minutes'), '30m': tr('۳۰ دقیقه', '30 minutes'),
-    '1h': tr('۱ ساعت', '1 hour'), '4h': tr('۴ ساعت', '4 hours'), '1d': tr('۱ روز', '1 day'), '1w': tr('۱ هفته', '1 week') }[t.id] || t.l);
+    '1h': tr('۱ ساعت', '1 hour'), '4h': tr('۴ ساعت', '4 hours'), '1d': tr('۱ روز', '1 day'), '1w': tr('۱ هفته', '1 week'),
+    '3m': tr('۳ دقیقه', '3 minutes'), '2h': tr('۲ ساعت', '2 hours'), '12h': tr('۱۲ ساعت', '12 hours'), '1M': tr('۱ ماه', '1 month') }[t.id] || t.l);
   const GOLD = '#C8A84B', UP = '#22C97A', DOWN = '#E8505B';
   // رنگ‌های پیش‌فرضِ TradingView
   const C = { blue: '#2962FF', red: '#F23645', green: '#089981', orange: '#FF9800', purple: '#9C27B0', gray: '#787B86', cyan: '#00BCD4',
     pink: '#E91E63', yellow: '#FFEB3B', lime: '#4CAF50', violet: '#673AB7' };
   const PALETTE = ['#FFFFFF', '#D1D4DC', '#9598A1', '#5D606B', C.red, C.orange, C.yellow, C.lime, C.green, C.cyan, C.blue, C.violet, C.purple, C.pink, GOLD, UP];
   const POPULAR = ['BTC', 'ETH', 'SOL', 'HYPE', 'XRP', 'BNB', 'DOGE', 'SUI', 'LINK', 'AVAX'];
+  const POPULAR_G = ['GOLD', 'SILVER', 'USOIL', 'UKOIL', 'EURUSD', 'GBPUSD', 'USDJPY', 'DXY', 'SPX', 'NDX', 'US100', 'COPPER'];
+  const popular = () => isG() ? POPULAR_G : POPULAR;
+  // دسته‌های بازارهای جهانی (مثلِ زبانه‌های جست‌وجوی TradingView)
+  const GCATS = [['fx', 'فارکس', 'Forex'], ['metal', 'فلزات', 'Metals'], ['energy', 'انرژی', 'Energy'], ['index', 'شاخص‌ها', 'Indices'], ['stock', 'سهام و ETF', 'Stocks & ETFs'], ['agri', 'کشاورزی', 'Agriculture']];
   const MAX_DRAWINGS = 200, BARS = 400, MAX_PATH = 400;
   const MONO = 'JetBrains Mono, Estedad, monospace', SANS = 'Estedad, Vazirmatn, system-ui, sans-serif';
   const LEGACY = { segment: 'scTrend', rayLine: 'scRay', straightLine: 'scExtended', horizontalStraightLine: 'scHLine', horizontalRayLine: 'scHRay',
@@ -100,7 +115,7 @@
   function precisionOf(p) { p = Math.abs(+p) || 0; return p >= 1000 ? 1 : p >= 100 ? 2 : p >= 1 ? 3 : p >= 0.1 ? 4 : p >= 0.01 ? 5 : p >= 0.0001 ? 6 : 8; }
   const prec = () => S.chart?.getPriceVolumePrecision?.()?.price ?? 2;
   const fmt = (v, p = prec()) => isNum(v) ? v.toLocaleString('en-US', { minimumFractionDigits: p, maximumFractionDigits: p }) : '—';
-  const fmtP = v => { if (!isNum(v)) return '—'; const d = precisionOf(v); return v.toLocaleString('en-US', { minimumFractionDigits: Math.min(d, 2), maximumFractionDigits: d }); };
+  const fmtP = v => { if (!isNum(v)) return '—'; const d = isG() ? (isNum(S.prec) ? S.prec : 6) : precisionOf(v); return v.toLocaleString('en-US', { minimumFractionDigits: Math.min(d, 2), maximumFractionDigits: d }); };
   const sgn = v => v > 0 ? '+' : v < 0 ? '−' : '';
   const fmtS = v => sgn(v) + fmt(Math.abs(v));
   const pct = (a, b) => (b - a) / a * 100;
@@ -798,6 +813,7 @@
   function cdText(open, tf = tfMs(), now = Date.now()) {
     if (!isNum(open) || !(tf > 0)) return '';
     let end = open + tf;
+    if (tf >= 28 * 864e5) { const d = new Date(open), nx = mo => Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + mo, 1); let k = 1; end = nx(k); while (end <= now && k < 600) end = nx(++k); }
     if (end <= now) end += Math.ceil((now - end + 1) / tf) * tf;
     let s = Math.max(0, Math.floor((end - now) / 1000));
     const d = Math.floor(s / 86400); s -= d * 86400;
@@ -809,6 +825,7 @@
   function cdLabel() {
     if (!cdOn()) return '';
     const L = S.chart.getDataList?.() || [], k = L[L.length - 1];
+    if (k && isG() && tfMs() < 28 * 864e5 && Date.now() >= k.timestamp + tfMs()) return '';   // بازارِ بسته: کندلِ زنده‌ای نیست
     return k ? cdText(k.timestamp) : '';
   }
   // نمونه‌ی پهن‌ترین متن برای این تایم‌فریم (تا پهنای محور با گذرِ زمان نپرد)
@@ -1098,7 +1115,7 @@
     if (!r) return { ok: false, err: 'offline' };
     const d = await r.json().catch(() => ({}));
     if (!r.ok) return { ok: false, err: d.error || 'http_' + r.status, status: r.status };
-    return { ok: true, list: (d.candles || []).map(toK), more: !!d.more };
+    return { ok: true, list: (d.candles || []).map(toK), more: !!d.more, prec: isNum(d.prec) ? d.prec : null };
   }
   async function loadSeries() {
     const gen = ++S.gen;
@@ -1115,7 +1132,9 @@
     S.data = res.list; S.more = res.more;
     if (S.store) S.store.recent = [S.coin, ...(S.store.recent || []).filter(x => x !== S.coin)].slice(0, 10);
     const last = S.data[S.data.length - 1];
-    S.chart.setPriceVolumePrecision(precisionOf(last?.close), 2);
+    if (isG() && !S.symMeta?.yahoo) symbolsOf('yahoo').then(() => { paintHead(); paintWL(); });
+    S.prec = isNum(res.prec) ? res.prec : null;   // بازارهای جهانی: رقمِ اعشارِ خودِ بازار (EURUSD پنج رقم، ین سه رقم)
+    S.chart.setPriceVolumePrecision(isNum(S.prec) ? S.prec : precisionOf(last?.close), 2);
     { const a = candleAxis(); if (a && !a.getAutoCalcTickFlag()) a.setAutoCalcTickFlag(true); }   // نماد/تایم‌فریمِ تازه = مقیاسِ خودکار
     S.chart.applyNewData(viewData(S.data), S.more);
     setTimeout(() => { paintAuto(); updRT(); }, 0);
@@ -1259,7 +1278,10 @@
   }
   const lockOf = m => readOnly() || S.lockAll || !!m.k;
   // x.vis = تایم‌فریم‌هایی که شکل روی‌شان دیده می‌شود (بیتِ i = TFS[i])؛ نبودنش = همه
-  const visOn = m => !isNum(m.x?.vis) || !!(m.x.vis & (1 << Math.max(0, TFS.findIndex(t => t.id === S.tf))));
+  // v26.50: ۱۲ تایم‌فریم. نقابِ تازه نشانِ VIS2 دارد؛ نقابِ قدیمی (۸ بیت) ⇒ روی تایم‌فریم‌های تازه دیده می‌شود
+  const VIS2 = 0x1000;
+  const visMask = m => !isNum(m.x?.vis) ? ALL_TF : m.x.vis & VIS2 ? m.x.vis & ALL_TF : (m.x.vis & 0xFF) | (ALL_TF & ~0xFF);
+  const visOn = m => !isNum(m.x?.vis) || !!(visMask(m) & (1 << Math.max(0, TFS.findIndex(t => t.id === S.tf))));
   // آخرین ظاهرِ هر ابزار = پیش‌فرضِ شکلِ بعدی (مثلِ TradingView). متنِ هر شکل و مسیرِ قلم مالِ خودِ همان شکل‌اند.
   const TD_X = new Set(['el', 'er', 'st', 'ax', 'f', 'mid', 'm', 'dev', 'lb', 'rv', 'lv', 'fs', 'b', 'bg', 'fo', 'tl', 'lp', 'lpos', 'lvp', 'oc', 'lvl']);
   function styleFor(n) {
@@ -1505,7 +1527,19 @@
   }
 
   // ── رابط ──
-  const srcName = () => SOURCES.find(s => s.id === S.src)?.name || S.src;
+  const srcLabel = s => s ? (s.g ? tr(s.fa, s.name) : s.name) : '';
+  const srcName = (src = S.src) => srcLabel(SOURCES.find(s => s.id === src)) || src;
+  const gMeta = c => S.symMeta?.yahoo?.[c] || null;   // [دسته، نامِ انگلیسی، نامِ فارسی]
+  const gName = c => { const m = gMeta(c); return m ? tr(m[2], m[1]) : ''; };
+  const quoteOf = () => isG() ? '' : S.src === 'bybit' || S.src === 'mexc' || S.src === 'bingx' ? '/USDT' : '/USD';
+  // نشانِ نماد: کریپتو = لوگو؛ بازارهای جهانی = نشانِ دسته (Au، Ag، FX، …)
+  const G_BADGE = { GOLD: 'Au', SILVER: 'Ag', COPPER: 'Cu', PLATINUM: 'Pt', PALLADIUM: 'Pd', USOIL: 'WTI', UKOIL: 'BRN', NATGAS: 'NG', HEATOIL: 'HO', GASOLINE: 'RB',
+    US100: 'NQ', US500: 'ES', US30: 'YM', US10Y: '10Y', NI225: 'NKY', CAC40: 'CAC' };
+  function symLogo(c) {
+    if (!isG()) return typeof coinLogo === 'function' ? coinLogo(c) : '';
+    const cat = gMeta(c)?.[0] || (/^[A-Z]{6}$/.test(c) ? 'fx' : 'stock');
+    return `<div class="t-icon coin-ico ch-gico" data-k="${cat}">${esc(G_BADGE[c] || (cat === 'fx' ? c.slice(0, 3) : c.slice(0, 3)))}</div>`;
+  }
   function msg(text, kind) { const el = $('ch-msg'); if (!el) return; el.textContent = text || ''; el.className = 'ch-msg' + (kind ? ' ' + kind : ''); el.hidden = !text; }
   function hint(id, step) {
     const el = $('ch-hint'); if (!el) return;
@@ -1529,7 +1563,7 @@
   function paintHead() {
     const last = S.data[S.data.length - 1];
     const coinEl = $('ch-coinname'); if (coinEl) coinEl.textContent = S.coin;
-    const quote = $('ch-quote'); if (quote) quote.textContent = S.src === 'bybit' ? '/USDT' : '/USD';
+    const quote = $('ch-quote'); if (quote) quote.textContent = quoteOf();
     const lastEl = $('ch-last'), chg = $('ch-chg');
     if (lastEl) lastEl.textContent = last ? fmtP(last.close) : '—';
     if (chg) {
@@ -1539,11 +1573,14 @@
       chg.textContent = isNum(p) ? `${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(2)}% · 24h` : '';
       chg.className = 'ch-chg ' + (isNum(p) ? (p >= 0 ? 'up' : 'down') : '');
     }
-    document.querySelectorAll('#ch-srcs button').forEach(b => { const on = b.dataset.src === S.src; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-    document.querySelectorAll('#ch-tfs button').forEach(b => { const on = b.dataset.tf === S.tf; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    const sb = $('ch-srcb'); if (sb) { sb.innerHTML = `<span>${esc(srcName())}</span>${ICON.chev}`; sb.title = tr('منبعِ داده: ', 'Data source: ') + srcName(); }
+    paintTfs();
     const tl = $('ch-tfl'); if (tl) tl.textContent = tfOf(S.tf).l;
-    const cs = $('ch-csrc'); if (cs) cs.textContent = srcName();
-    const info = $('ch-srcinfo'); if (info) info.textContent = tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''} · Tehran time`);
+    const cs = $('ch-csrc'); if (cs) cs.textContent = isG() ? (gName(S.coin) || srcName()) : srcName();
+    const logo = $('ch-logo'); if (logo) logo.innerHTML = symLogo(S.coin);
+    const info = $('ch-srcinfo'); if (info) info.textContent = isG()
+      ? tr('داده: Yahoo Finance (آتی‌ها و شاخص‌ها ممکن است چند دقیقه تأخیر داشته باشند) · زمانِ تهران', 'Data: Yahoo Finance (futures and indices may be delayed) · Tehran time')
+      : tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''} · زمانِ تهران`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''} · Tehran time`);
   }
   const groupTool = g => { const last = S.store?.prefs?.gl?.[g.id]; return g.tools.includes(last) ? last : g.tools[0]; };
   const btn = (cls, title, onclick, inner, extra = '') => `<button type="button" class="ch-tool${cls}" title="${esc(title)}" aria-label="${esc(title)}" onclick="${onclick}"${extra}>${inner}</button>`;
@@ -1568,12 +1605,39 @@
     h += btn(S.hidden ? ' on' : '', S.hidden ? tr('نمایشِ شکل‌ها', 'Show all drawings') : tr('پنهان کردنِ همه‌ی شکل‌ها', 'Hide all drawings'), 'SCCHART.hide()', S.hidden ? ICON.eyeOff : ICON.eye, ` data-t="hide" aria-pressed="${S.hidden}"`);
     if (!ro) {
       h += btn('', tr('پاک کردنِ همه‌ی شکل‌های این نماد', 'Remove all drawings'), 'SCCHART.clear()', ICON.trash, ` data-t="clear"${S.recs.size ? '' : ' disabled'}`);
-      h += '<span class="ch-sep"></span>';
-      h += btn('', tr('برگرداندن (Ctrl+Z)', 'Undo (Ctrl+Z)'), 'SCCHART.undo()', ICON.undo, ` data-t="undo"${S.hist.length ? '' : ' disabled'}`);
-      h += btn('', tr('دوباره انجام دادن (Ctrl+Y)', 'Redo (Ctrl+Y)'), 'SCCHART.redo()', ICON.redo, ` data-t="redo"${S.redo.length ? '' : ' disabled'}`);
     }
     h += btn($('ch-tree') && !$('ch-tree').hidden ? ' on' : '', tr('فهرستِ شکل‌ها', 'Object tree'), 'SCCHART.tree()', ICON.tree, ' data-t="tree"');
     box.innerHTML = h;
+    paintUR();
+  }
+  // v26.50: برگرداندن / دوباره‌انجام در نوارِ بالا، مثلِ TradingView (پیش‌تر ته نوارِ ابزار بود و دیده نمی‌شد)
+  function paintUR() {
+    const set = (id, on, t) => { const b = $(id); if (!b) return; b.disabled = !on; b.title = t; b.setAttribute('aria-label', t); };
+    set('ch-undo', S.hist.length > 0, tr('برگرداندن (Ctrl+Z)', 'Undo (Ctrl+Z)'));
+    set('ch-redo', S.redo.length > 0, tr('دوباره انجام دادن (Ctrl+Y)', 'Redo (Ctrl+Y)'));
+  }
+  // ── تایم‌فریم‌ها: «محبوب‌ها» در نوار (ستاره در فهرست، مثلِ TradingView) + تایم‌فریمِ فعلی اگر محبوب نیست + ▾ = فهرستِ کامل ──
+  const tfFavs = () => { const f = S.store?.prefs?.tff; return Array.isArray(f) && f.length && f.every(id => TFS.some(t => t.id === id)) ? f : TF_FAV; };
+  function paintTfs() {
+    const box = $('ch-tfs'); if (!box) return;
+    const fav = tfFavs(), ids = TF_VIEW.map(t => t.id).filter(id => fav.includes(id) || id === S.tf);
+    box.innerHTML = ids.map(id => { const t = tfOf(id), on = id === S.tf; return `<button type="button" data-tf="${id}" class="${on ? 'on' : ''}${fav.includes(id) ? '' : ' ch-tfx'}" aria-pressed="${on}" title="${esc(tfName(t))}" onclick="SCCHART.tf('${id}')">${t.l}</button>`; }).join('')
+      + `<button type="button" class="ch-tfm" id="ch-tfmore" onclick="SCCHART.tfMenu(this)" aria-haspopup="true" title="${tr('همه‌ی تایم‌فریم‌ها', 'All time intervals')}" aria-label="${tr('همه‌ی تایم‌فریم‌ها', 'All time intervals')}">${ICON.chev}</button>`;
+  }
+  function tfFav(id) {
+    if (!TFS.some(t => t.id === id) || !S.store) return;
+    const f = new Set(tfFavs()); if (f.has(id)) { if (f.size > 1) f.delete(id); } else f.add(id);
+    const list = TF_VIEW.map(t => t.id).filter(x => f.has(x));
+    if (JSON.stringify(list) === JSON.stringify(TF_FAV)) delete S.store.prefs.tff; else S.store.prefs.tff = list;
+    scheduleSave(); paintTfs();
+    const m = $('ch-pop'); if (m && S.pop === 'tf') m.querySelectorAll('[data-fav]').forEach(b => { const on = list.includes(b.dataset.fav); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.textContent = on ? '★' : '☆'; });
+  }
+  // ── منبع (مثلِ انتخابِ صرافی در TradingView): کریپتو و بازارهای جهانی ──
+  function srcMenu(el) {
+    const row = s => `<button type="button" class="ch-popi${s.id === S.src ? ' on' : ''}" data-src="${s.id}" onclick="SCCHART.src('${s.id}');SCCHART.closePop()"><i></i><span><b>${esc(srcLabel(s))}</b>`
+      + (s.g ? `<small>${tr('فارکس، طلا، نقره، نفت، شاخص‌ها، سهام', 'Forex, gold, silver, oil, indices, stocks')}</small>` : s.id === 'bybit' ? `<small>${tr('به‌جای بایننس', 'Binance stand-in')}</small>` : '') + '</span></button>';
+    openPop('src', el, `<div class="ch-poph">${tr('صرافی‌های کریپتو', 'Crypto exchanges')}</div>` + SOURCES.filter(s => !s.g).map(row).join('')
+      + `<div class="ch-poph">${tr('بازارهای جهانی', 'Global markets')}</div>` + SOURCES.filter(s => s.g).map(row).join(''));
   }
   // گروهِ ابزار: دسکتاپ = آخرین ابزارِ گروه فعال می‌شود، فلش = فهرست؛ گوشی = همیشه فهرست (مثلِ اپِ TradingView)
   function gclick(gid, el) {
@@ -1774,7 +1838,7 @@
           + `<input class="fi chs-in" dir="ltr" inputmode="decimal" data-pt="${i}" value="${v}" aria-label="${tr('قیمت', 'Price')}"></div>`; }).join('');
     }
     function visPanel() {
-      const mask = isNum(m.x.vis) ? m.x.vis : ALL_TF;
+      const mask = visMask(m);
       return `<div class="chs-hint">${tr('این شکل روی کدام تایم‌فریم‌ها دیده شود؟', 'Show this drawing on which time intervals?')}</div><div class="chs-vis">`
         + TF_VIEW.map(t => { const i = TFS.indexOf(t); return `<label class="chs-ck"><input type="checkbox" data-vis="${i}"${mask & (1 << i) ? ' checked' : ''}><span dir="ltr">${t.l}</span></label>`; }).join('') + '</div>';
     }
@@ -1856,7 +1920,7 @@
       if (t.dataset.lvon != null) { rows[+t.dataset.lvon][1] = t.checked ? 1 : 0; lvTouched = true; live(); return; }
       if (t.dataset.vis != null) {
         let mask = 0; box.querySelectorAll('[data-vis]').forEach(e => { if (e.checked) mask |= 1 << +e.dataset.vis; });
-        if (mask === ALL_TF) delete m.x.vis; else m.x.vis = mask;
+        if (mask === ALL_TF) delete m.x.vis; else m.x.vis = mask | VIS2;
         live(); return;
       }
       if (key === 'dev') { const v = +t.value; if (v === 2) delete m.x.dev; else m.x.dev = v; live(); return; }
@@ -1915,17 +1979,18 @@
     const d = dirOf();
     return `<div class="ch-wrap" dir="${d}" data-theme="${S.theme === 'light' ? 'light' : 'dark'}">
       <div class="ch-head">
-        <button type="button" class="ch-coin" id="ch-coinb" onclick="SCCHART.pick()" aria-label="${tr('انتخابِ نماد و منبع', 'Symbol search')}"><span id="ch-logo">${typeof coinLogo === 'function' ? coinLogo(S.coin) : ''}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
+        <button type="button" class="ch-coin" id="ch-coinb" onclick="SCCHART.pick()" aria-label="${tr('انتخابِ نماد و منبع', 'Symbol search')}"><span id="ch-logo">${symLogo(S.coin)}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
         <div class="ch-px" dir="ltr"><b id="ch-last">—</b><span id="ch-chg" class="ch-chg"></span></div>
-        <div class="ch-srcs" id="ch-srcs" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" data-src="${s.id}" onclick="SCCHART.src('${s.id}')">${s.name}</button>`).join('')}</div>
+        <div class="ch-srcs" id="ch-srcs" role="group" aria-label="${tr('منبعِ داده', 'Data source')}"><button type="button" class="on ch-srcb" id="ch-srcb" onclick="SCCHART.srcMenu(this)" aria-haspopup="true">${esc(srcName())}</button></div>
         <div class="ch-lang" id="ch-lang" role="group" aria-label="${tr('زبانِ نمودار', 'Chart language')}"><button type="button" data-l="fa" lang="fa" onclick="SCCHART.lang('fa')">فا</button><button type="button" data-l="en" lang="en" onclick="SCCHART.lang('en')">EN</button></div>
         <button type="button" class="ch-thm" id="ch-thm" onclick="SCCHART.theme()" aria-pressed="false"></button>
       </div>
       <div class="ch-bar">
-        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr">${TF_VIEW.map(t => `<button type="button" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}')">${t.l}</button>`).join('')}</div>
+        <div class="ch-tfs" id="ch-tfs" role="group" aria-label="${tr('تایم‌فریم', 'Time interval')}" dir="ltr"></div>
         <button type="button" class="ch-tfb" id="ch-tfb" onclick="SCCHART.tfMenu(this)" aria-haspopup="true"><b id="ch-tfl" dir="ltr">${tfOf(S.tf).l}</b>${ICON.chev}</button>
         <button type="button" class="ch-fullb ch-bb" id="ch-ctb" onclick="SCCHART.ctMenu(this)" aria-haspopup="true">${CT_IC[S.ct] || CT_IC.candle}</button>
         <button type="button" class="ch-indb" onclick="SCCHART.indMenu()" aria-haspopup="true">${ICON.ind}<span id="ch-indl">${tr('اندیکاتور', 'Indicators')}</span></button>
+        <div class="ch-ur" id="ch-ur"${readOnly() ? ' hidden' : ''}><button type="button" class="ch-fullb ch-bb" id="ch-undo" onclick="SCCHART.undo()" disabled>${ICON.undo}</button><button type="button" class="ch-fullb ch-bb" id="ch-redo" onclick="SCCHART.redo()" disabled>${ICON.redo}</button></div>
         <button type="button" class="ch-fullb ch-bb" id="ch-cset" onclick="SCCHART.chartSettings()">${ICON.gear}</button>
         <button type="button" class="ch-fullb ch-bb" id="ch-shot" onclick="SCCHART.snapshot()">${ICON.camera}</button>
         <button type="button" class="ch-fullb" id="ch-full" onclick="SCCHART.max()" aria-pressed="false">${ICON.full}</button>
@@ -2361,25 +2426,37 @@
     if (S.symbols[src]) return S.symbols[src];
     const r = await apiFetch('/api/chart/symbols?src=' + src, {}, { retries: 1 });
     const d = r && r.ok ? await r.json().catch(() => ({})) : {};
+    if (d.meta && typeof d.meta === 'object') { S.symMeta = S.symMeta || {}; S.symMeta[src] = d.meta; }
     return (S.symbols[src] = Array.isArray(d.symbols) ? d.symbols : []);
   }
   async function pick() {
-    const recent = (S.store?.recent || []).filter(c => c !== S.coin).slice(0, 8);
-    const chip = c => `<button type="button" class="ch-pchip" onclick="SCCHART.coin('${jsArg(c)}')">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<span dir="ltr">${esc(c)}</span></button>`;
+    const g = isG();
+    if (g && !S.symMeta?.yahoo) await symbolsOf('yahoo');
+    const inKind = c => g ? !!gMeta(c) : !gMeta(c);
+    const recent = (S.store?.recent || []).filter(c => c !== S.coin && inKind(c)).slice(0, 8);
+    const chip = c => `<button type="button" class="ch-pchip" onclick="SCCHART.coin('${jsArg(c)}')">${symLogo(c)}<span dir="ltr">${esc(c)}</span></button>`;
+    const grow = c => `<button type="button" class="ch-prow" onclick="SCCHART.coin('${jsArg(c)}')">${symLogo(c)}<b dir="ltr">${esc(c)}</b><span>${esc(gName(c))}</span><small>${esc(tr((GCATS.find(x => x[0] === gMeta(c)?.[0]) || [])[1] || '', (GCATS.find(x => x[0] === gMeta(c)?.[0]) || [])[2] || ''))}</small></button>`;
+    const srcBtn = s => `<button type="button" class="${s.id === S.src ? 'on' : ''}" aria-pressed="${s.id === S.src}" onclick="SCCHART.src('${s.id}');SCCHART.pick()">${esc(srcLabel(s))}</button>`;
+    S.pcat = S.pcat || 'all';
     $('det-content').innerHTML = `<div class="ch-pick" dir="${dirOf()}"><h3>${tr('انتخابِ نماد و منبع', 'Symbol search')}</h3>
-      <div class="ch-psrc" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" class="${s.id === S.src ? 'on' : ''}" aria-pressed="${s.id === S.src}" onclick="SCCHART.src('${s.id}');SCCHART.pick()">${s.name}</button>`).join('')}</div>
-      <input id="ch-psearch" class="fi" dir="ltr" placeholder="${tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      <div class="ch-psrc" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.filter(s => !s.g).map(srcBtn).join('')}<span class="ch-psep"></span>${SOURCES.filter(s => s.g).map(srcBtn).join('')}</div>
+      <input id="ch-psearch" class="fi" dir="${g ? 'auto' : 'ltr'}" placeholder="${g ? tr('جست‌وجو: طلا، EURUSD، نفت، AAPL…', 'Search: gold, EURUSD, oil, AAPL…') : tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      ${g ? `<div class="ch-pcats" role="tablist">${[['all', 'همه', 'All'], ...GCATS].map(([k, f, e]) => `<button type="button" role="tab" data-pcat="${k}" class="${S.pcat === k ? 'on' : ''}" aria-selected="${S.pcat === k}">${tr(f, e)}</button>`).join('')}</div>` : ''}
       ${recent.length ? `<div class="ch-plab">${tr('اخیر', 'Recent')}</div><div class="ch-pchips">${recent.map(chip).join('')}</div>` : ''}
-      <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips">${POPULAR.map(chip).join('')}</div>
-      <div class="ch-plab" id="ch-plabel">${tr('همه‌ی نمادها', 'All symbols')}</div><div class="ch-plist" id="ch-plist"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div></div>`;
+      <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips">${popular().map(chip).join('')}</div>
+      <div class="ch-plab" id="ch-plabel">${tr('همه‌ی نمادها', 'All symbols')}</div><div class="ch-plist${g ? ' ch-prows' : ''}" id="ch-plist"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div></div>`;
     document.getElementById('det-sheet').classList.add('open');
     const all = await symbolsOf(S.src), list = $('ch-plist'), input = $('ch-psearch');
+    if (!list || !input) return;
     const draw = () => {
-      const q = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-      let items = all.filter(s => !q || s.includes(q)).slice(0, 120);
-      if (q && !items.includes(q) && /^[A-Z0-9]{1,15}$/.test(q)) items = [q, ...items];
-      list.innerHTML = items.length ? items.map(chip).join('') : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
+      const raw = String(input.value || '').trim(), q = raw.toUpperCase().replace(/[^A-Z0-9]/g, ''), ql = raw.toLowerCase();
+      let items = all.filter(s => (!g || S.pcat === 'all' || gMeta(s)?.[0] === S.pcat)
+        && (!raw || s.includes(q) && q || (g && (gName(s).toLowerCase().includes(ql) || String(gMeta(s)?.[1] || '').toLowerCase().includes(ql))))).slice(0, 160);
+      if (q && !items.includes(q) && /^[A-Z0-9]{1,15}$/.test(q) && /^[\x00-\x7F]*$/.test(raw)) items = [q, ...items];
+      list.innerHTML = items.length ? items.map(g ? grow : chip).join('') : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
     };
+    const box = $('det-content').querySelector('.ch-pick');
+    if (box) box.onclick = ev => { const b = ev.target.closest('[data-pcat]'); if (!b) return; S.pcat = b.dataset.pcat; box.querySelectorAll('[data-pcat]').forEach(x => { const on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-selected', on); }); draw(); };
     input.oninput = draw; draw();
     input.onkeydown = ev => { if (ev.key === 'Enter') { const q = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (q) setCoin(q); } };
   }
@@ -2389,10 +2466,20 @@
     if (c === S.coin) return;
     cancelDrawing(); S.coin = c; S.hist = []; S.redo = [];
     paintWL();
-    remember(); const logo = $('ch-logo'); if (logo && typeof coinLogo === 'function') logo.innerHTML = coinLogo(c);
+    remember(); const logo = $('ch-logo'); if (logo) logo.innerHTML = symLogo(c);
     loadSeries();
   }
-  function setSrc(src) { if (!SOURCES.some(s => s.id === src) || src === S.src) return; cancelDrawing(); S.src = src; remember(); loadSeries(); S.q = {}; paintWL(); wlPoll(); }
+  function setSrc(src) {
+    if (!SOURCES.some(s => s.id === src) || src === S.src) return;
+    cancelDrawing();
+    if (isG(src) !== isG() && S.store) {   // BTC در بازارهای جهانی معنا ندارد و GOLD در صرافیِ کریپتو: هر طرف آخرین نمادِ خودش
+      const lk = S.store.prefs.lastk = { ...(S.store.prefs.lastk || {}) };
+      lk[isG() ? 'g' : 'c'] = S.coin;
+      const nx = lk[isG(src) ? 'g' : 'c']; S.coin = /^[A-Z0-9]{1,15}$/.test(nx || '') ? nx : isG(src) ? 'GOLD' : 'BTC';
+      S.hist = []; S.redo = []; S.prec = null;
+    }
+    S.src = src; remember(); loadSeries(); S.q = {}; if (wlOpen()) { S.wlMenu = false; paintWL(); } wlPoll();
+  }
   function setTf(tf) { if (!TFS.some(t => t.id === tf) || tf === S.tf) return; cancelDrawing(); S.tf = tf; remember(); loadSeries(); }
   function remember() { if (!S.store) return; S.store.last = { src: S.src, coin: S.coin, tf: S.tf }; if (!readOnly()) { L.s(cacheKey(), S.store); clearTimeout(S.saveTimer); S.saveTimer = setTimeout(save, 2500); } }
 
@@ -2501,7 +2588,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}.ch-ur{display:flex;gap:4px;flex:0 0 auto}.ch-ur[hidden]{display:none}.ch-ur .ch-fullb:disabled{opacity:.38;cursor:default}.ch-tfm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer;min-height:34px;width:28px;padding:0}.ch-tfm svg{width:14px;height:14px}.ch-tfs button.ch-tfx{border-style:dashed}.ch-tfr{display:flex;align-items:center;gap:2px}.ch-tfr .ch-popi{flex:1;min-width:0}.ch-tfr .ch-popi small{margin-inline-start:auto;color:var(--muted);font-size:11px}.ch-tfst{flex:none;width:32px;height:32px;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}.ch-tfst.on{color:var(--gold)}.ch-tfst:hover{background:rgba(127,127,127,.12)}.ch-srcb{display:flex;align-items:center;gap:4px}.ch-srcb svg{width:13px;height:13px}.ch-psep{flex:0 0 1px;align-self:stretch;background:var(--border);margin:4px 2px}.ch-pcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px}.ch-pcats button{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);color:var(--text2);font:600 12px var(--f-body);padding:6px 11px;border-radius:99px;cursor:pointer}.ch-pcats button.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}.ch-prows{display:grid;gap:2px}.ch-prow{display:grid;grid-template-columns:24px 78px minmax(0,1fr) auto;align-items:center;gap:8px;background:none;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 4px;cursor:pointer;text-align:start}.ch-prow:hover{background:rgba(127,127,127,.08)}.ch-prow b{font:700 12.5px var(--f-mono)}.ch-prow span{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-prow small{font-size:10.5px;color:var(--muted)}.ch-prow .t-icon{width:22px;height:22px}.ch-gico{display:flex;align-items:center;justify-content:center;font:800 8.5px/1 var(--f-mono);letter-spacing:-.2px;color:#fff;background:#5d606b}.ch-gico[data-k=fx]{background:#2962ff}.ch-gico[data-k=metal]{background:#b8860b}.ch-gico[data-k=energy]{background:#3a3f4b}.ch-gico[data-k=index]{background:#7e57c2}.ch-gico[data-k=stock]{background:#089981}.ch-gico[data-k=agri]{background:#6d8b2f}@media(max-width:600px){.ch-bar{gap:5px}.ch-bar .ch-fullb{width:32px}.ch-ur{gap:3px}}@media(max-width:380px){.ch-bar{gap:3px}.ch-ur{gap:3px}.ch-bar .ch-fullb{width:28px}.ch-bar .ch-indb{padding:6px 6px}.ch-tfb{padding:6px 5px;gap:2px}}.ch-pop{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -2567,7 +2654,7 @@
     const g = cv.getContext('2d'); g.fillStyle = t.bg; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, pad);
     g.textBaseline = 'middle'; g.direction = 'ltr';
     g.fillStyle = t.txt; g.font = `700 ${Math.round(14 * k)}px ${MONO}`; g.textAlign = 'left';
-    g.fillText(`${S.coin}${S.src === 'bybit' ? '/USDT' : '/USD'} · ${tfOf(S.tf).l} · ${srcName()}`, Math.round(12 * k), pad / 2);
+    g.fillText(`${S.coin}${quoteOf()} · ${tfOf(S.tf).l} · ${isG() ? 'Yahoo Finance' : srcName()}`, Math.round(12 * k), pad / 2);
     g.fillStyle = t.icon; g.font = `500 ${Math.round(11 * k)}px ${MONO}`; g.textAlign = 'right';
     g.fillText(`${fmtDate(Date.now())} (Tehran) · SamadiCapital Journal`, cv.width - Math.round(12 * k), pad / 2);
     const name = `${S.coin}_${tfOf(S.tf).l}_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.png`;
@@ -2584,7 +2671,10 @@
   }
   // ── تایم‌فریم در گوشی: فهرستِ کشویی (مثلِ اپِ TradingView) ──
   function tfMenu(el) {
-    openPop('tf', el, `<div class="ch-poph">${tr('تایم‌فریم', 'Time interval')}</div>` + TF_VIEW.map(t => `<button type="button" class="ch-popi${t.id === S.tf ? ' on' : ''}" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}');SCCHART.closePop()"><i></i><span><b>${tfName(t)}</b></span><small dir="ltr">${t.l}</small></button>`).join(''));
+    // مثلِ TradingView: دسته‌ی دقیقه/ساعت/روز و ستاره برای «محبوب‌ها» (همان‌ها در نوارِ بالا)
+    const fav = tfFavs(), star = t => `<button type="button" class="ch-tfst${fav.includes(t.id) ? ' on' : ''}" data-fav="${t.id}" aria-pressed="${fav.includes(t.id)}" title="${tr('محبوب (در نوارِ بالا)', 'Favorite (top bar)')}" aria-label="${tr('محبوب: ', 'Favorite: ') + esc(tfName(t))}" onclick="SCCHART.tfFav('${t.id}')">${fav.includes(t.id) ? '★' : '☆'}</button>`;
+    const grp = (lab, ids) => `<div class="ch-poph">${lab}</div>` + TF_VIEW.filter(t => ids.includes(t.id)).map(t => `<div class="ch-tfr"><button type="button" class="ch-popi${t.id === S.tf ? ' on' : ''}" data-tf="${t.id}" onclick="SCCHART.tf('${t.id}');SCCHART.closePop()"><i></i><span><b>${tfName(t)}</b></span><small dir="ltr">${t.l}</small></button>${star(t)}</div>`).join('');
+    openPop('tf', el, grp(tr('دقیقه', 'Minutes'), ['1m', '3m', '5m', '15m', '30m']) + grp(tr('ساعت', 'Hours'), ['1h', '2h', '4h', '12h']) + grp(tr('روز، هفته، ماه', 'Days'), ['1d', '1w', '1M']));
   }
   // ── کپی/چسباندنِ شکل (Ctrl+C / Ctrl+V، مثلِ TradingView) ──
   function copySel() {
@@ -2727,6 +2817,7 @@
   }
   function paintBar() {
     const tl = $('ch-tfl'); if (tl) tl.textContent = tfOf(S.tf).l;
+    paintTfs(); paintUR();
     const set = (id, t, extra) => { const b = $(id); if (!b) return; b.title = t; b.setAttribute('aria-label', t); if (extra) extra(b); };
     set('ch-tfb', tr('تایم‌فریم: ', 'Time interval: ') + tfName(tfOf(S.tf)));
     set('ch-ctb', tr('نوعِ نمودار: ', 'Chart type: ') + ctName(S.ct || 'candle'), b => { b.innerHTML = CT_IC[S.ct || 'candle']; });
@@ -2741,13 +2832,14 @@
   //    افزودن/حذف/جابه‌جایی با کشیدن/مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ قبلی/بعدی. همه در prefs.wl (روی همه‌ی دستگاه‌ها).
   const WL_MAX_LISTS = 10, WL_MAX_ITEMS = 100;
   function wlData() {
-    const fresh = () => ({ lists: [{ id: 'w1', name: '', items: POPULAR.slice() }], cur: 'w1' });
+    const g = isG(), key = g ? 'wlg' : 'wl';
+    const fresh = () => ({ lists: [{ id: g ? 'g1' : 'w1', name: '', items: (g ? POPULAR_G : POPULAR).slice() }], cur: g ? 'g1' : 'w1' });
     const p = S.store?.prefs; if (!p) return fresh();
-    if (!p.wl || !Array.isArray(p.wl.lists) || !p.wl.lists.length) p.wl = fresh();
-    return p.wl;
+    if (!p[key] || !Array.isArray(p[key].lists) || !p[key].lists.length) p[key] = fresh();
+    return p[key];
   }
   const wlCur = () => { const w = wlData(); return w.lists.find(l => l.id === w.cur) || w.lists[0]; };
-  const wlName = l => l.name || tr('واچ‌لیست', 'Watchlist');
+  const wlName = l => l.name || (isG() ? tr('بازارهای جهانی', 'Global markets') : tr('واچ‌لیست', 'Watchlist'));
   function wlItems(l = wlCur()) {
     const it = (l.items || []).slice(), so = l.sort; if (!so) return it;
     const k = so.replace('-', ''), dir = so[0] === '-' ? -1 : 1, val = c => k === 'sym' ? c : k === 'p' ? S.q?.[c]?.p : S.q?.[c]?.c;
@@ -2777,7 +2869,7 @@
       const q = S.q?.[c], on = c === S.coin;
       return `<div class="ch-wlr${on ? ' on' : ''}" role="listitem" data-c="${esc(c)}" aria-current="${on}">`
         + (ro || so ? '' : `<span class="ch-wlg" data-drag="${esc(c)}" title="${tr('برای جابه‌جایی بکش', 'Drag to reorder')}">${ICON.grip}</span>`)
-        + `<span class="ch-wls">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<b dir="ltr">${esc(c)}</b></span>`
+        + `<span class="ch-wls">${symLogo(c)}<b dir="ltr">${esc(c)}</b></span>`
         + `<span class="ch-wlp" dir="ltr">${fmtQ(q?.p)}</span><span class="ch-wlch ${chgCls(q?.c)}" dir="ltr">${fmtC(q?.c)}</span>`
         + (ro ? '<span></span>' : `<button type="button" class="ch-wlrm" data-rm="${esc(c)}" title="${tr('حذف از لیست', 'Remove from watchlist')}" aria-label="${tr('حذفِ ', 'Remove ') + esc(c)}">${ICON.close}</button>`) + '</div>';
     };
@@ -2901,9 +2993,9 @@
   // افزودن: همان برگه‌ی انتخابِ نماد، با تیک برای نمادهای داخلِ لیست؛ چند نماد پشتِ هم، بعد «تمام»
   async function wlPickAdd() {
     const l = wlCur(), has = c => (l.items || []).includes(c);
-    const chip = c => `<button type="button" class="ch-pchip${has(c) ? ' on' : ''}" data-wadd="${esc(c)}" aria-pressed="${has(c)}">${typeof coinLogo === 'function' ? coinLogo(c) : ''}<span dir="ltr">${esc(c)}</span><i aria-hidden="true">${has(c) ? '✓' : '+'}</i></button>`;
+    const chip = c => `<button type="button" class="ch-pchip${has(c) ? ' on' : ''}" data-wadd="${esc(c)}" aria-pressed="${has(c)}"${isG() && gName(c) ? ` title="${esc(gName(c))}"` : ''}>${symLogo(c)}<span dir="ltr">${esc(c)}</span><i aria-hidden="true">${has(c) ? '✓' : '+'}</i></button>`;
     $('det-content').innerHTML = `<div class="ch-pick" dir="${dirOf()}"><h3>${tr('افزودن به ', 'Add to ') + esc(wlName(l))}</h3>
-      <input id="ch-wsearch" class="fi" dir="ltr" placeholder="${tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      <input id="ch-wsearch" class="fi" dir="ltr" placeholder="${isG() ? tr('جست‌وجو: GOLD، EURUSD، SPX…', 'Search: GOLD, EURUSD, SPX…') : tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
       <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips" id="ch-wpop"></div>
       <div class="ch-plab">${tr('همه‌ی نمادهای ', 'All symbols on ') + srcName()}</div><div class="ch-plist ch-pchips" id="ch-wall"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div>
       <button type="button" class="btn btn-primary ch-wdone" id="ch-wdone">${tr('تمام', 'Done')}</button></div>`;
@@ -2914,7 +3006,7 @@
     const draw = () => {
       const q = norm(); let items = all.filter(s => !q || s.includes(q)).slice(0, 120);
       if (q && !items.includes(q) && /^[A-Z0-9]{1,15}$/.test(q)) items = [q, ...items];
-      $('ch-wpop').innerHTML = POPULAR.map(chip).join('');
+      $('ch-wpop').innerHTML = popular().map(chip).join('');
       $('ch-wall').innerHTML = items.length ? items.map(chip).join('') : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
     };
     box.onclick = ev => { const b = ev.target.closest('[data-wadd]'); if (b) { wlToggleItem(b.dataset.wadd); draw(); return; } if (ev.target.id === 'ch-wdone' && typeof closeSheet === 'function') closeSheet(); };
@@ -3001,7 +3093,7 @@
     src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, watchlist: on => toggleWL(on), _wlPoll: wlPoll, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator, indSet: openIndSettings, indFind: q => { S.indQ = String(q || '').slice(0, 40); paintInd(true); },
-    tfMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
+    tfMenu, tfFav, srcMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
     _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _cdText: cdText, _styles: stylesFor,
