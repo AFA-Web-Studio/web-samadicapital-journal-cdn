@@ -66,13 +66,18 @@
    v26.54 (مالک: «همه را» — اولی: بازپخشِ بازار): Bar Replay مثلِ TradingView — انتخابِ کندلِ شروع با خطِ قرمز (یا تصادفی)، پخش/مکث،
    یک کندل جلو (Shift+→)، سرعتِ ۰٫۵ تا ۱۰ کندل در ثانیه، تغییرِ تایم‌فریم همان لحظه را نگه می‌دارد؛ معامله‌ی تمرینی (خرید/فروش/بستن،
    ۱٬۰۰۰ دلار، سود و زیانِ زنده، تعداد/درصدِ برد/جمع) با نشانه روی نمودار. خروج = برگشت به داده‌ی زنده.
+   v26.55 (مالک: «همه را» — دومی): بازارهای سهام و کالای خودِ Hyperliquid (HIP-3، trade.xyz؛ طلا، نقره، نفت، مس، یورو/ین، S&P 500، نزدک،
+   سهام) به‌عنوانِ منبعِ «سهام و کالا (HL)» — ۲۴ساعته، واچ‌لیست و آخرین نمادِ جدا (prefs.wlx، lastk.x، rx)؛ و «مقایسه‌ی نماد» مثلِ TradingView:
+   تا ۳ نماد از هر منبع به‌صورتِ خطِ رنگی روی نمودار، مقیاسِ درصدیِ خودکار و هم‌مبدأ از اولین کندلِ دیده‌شده (prefs.cmp).
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
   'use strict';
   const SOURCES = [{ id: 'hl', name: 'Hyperliquid' }, { id: 'sodex', name: 'SoDEX' }, { id: 'bybit', name: 'Bybit' }, { id: 'mexc', name: 'MEXC' }, { id: 'bingx', name: 'BingX' },
-    { id: 'yahoo', name: 'Global markets', fa: 'بازارهای جهانی', g: true }];
-  const isG = (src = S.src) => src === 'yahoo';   // بازارهای جهانی (فارکس، فلزات، …) — بقیه کریپتو
+    { id: 'yahoo', name: 'Global markets', fa: 'بازارهای جهانی', g: true }, { id: 'hlx', name: 'Stocks & commodities (HL)', fa: 'سهام و کالا (HL)', g: true }];
+  const isG = (src = S.src) => src === 'yahoo' || src === 'hlx';   // غیرِ کریپتو (فارکس، فلزات، سهام…) — بقیه کریپتو
+  const isY = (src = S.src) => src === 'yahoo';   // Yahoo: ساعتِ بازار دارد (تعطیلی ⇒ کندلِ زنده نیست)؛ HIP-3 ۲۴ساعته است
+  const kindOf = (src = S.src) => src === 'yahoo' ? 'g' : src === 'hlx' ? 'x' : 'c';   // واچ‌لیست/آخرین نماد/اخیر جدا برای هر نوع
   // ترتیبِ TFS ثابت است (بیتِ x.vis)؛ تایم‌فریمِ تازه فقط آخرِ فهرست
   const TFS = [
     { id: '1m', l: '1m', ms: 6e4, poll: 4000 }, { id: '5m', l: '5m', ms: 3e5, poll: 5000 }, { id: '15m', l: '15m', ms: 9e5, poll: 8000 },
@@ -93,7 +98,9 @@
   const PALETTE = ['#FFFFFF', '#D1D4DC', '#9598A1', '#5D606B', C.red, C.orange, C.yellow, C.lime, C.green, C.cyan, C.blue, C.violet, C.purple, C.pink, GOLD, UP];
   const POPULAR = ['BTC', 'ETH', 'SOL', 'HYPE', 'XRP', 'BNB', 'DOGE', 'SUI', 'LINK', 'AVAX'];
   const POPULAR_G = ['GOLD', 'SILVER', 'USOIL', 'UKOIL', 'EURUSD', 'GBPUSD', 'USDJPY', 'DXY', 'SPX', 'NDX', 'US100', 'COPPER'];
-  const popular = () => isG() ? POPULAR_G : POPULAR;
+  const POPULAR_X = ['GOLD', 'SILVER', 'CL', 'BRENTOIL', 'SP500', 'XYZ100', 'NVDA', 'TSLA', 'EUR', 'JPY', 'COPPER', 'NATGAS'];
+  const popularOf = src => src === 'hlx' ? POPULAR_X : isG(src) ? POPULAR_G : POPULAR;
+  const popular = () => popularOf(S.src);
   // دسته‌های بازارهای جهانی (مثلِ زبانه‌های جست‌وجوی TradingView)
   const GCATS = [['fx', 'فارکس', 'Forex'], ['metal', 'فلزات', 'Metals'], ['energy', 'انرژی', 'Energy'], ['index', 'شاخص‌ها', 'Indices'], ['stock', 'سهام و ETF', 'Stocks & ETFs'], ['agri', 'کشاورزی', 'Agriculture']];
   const MAX_DRAWINGS = 200, BARS = 400, MAX_PATH = 400;
@@ -106,7 +113,7 @@
     tool: 'cursor', recs: new Map(), selected: null, drawingId: null, hidden: false, mag: 1, magLast: 1, stay: false, lockAll: false,
     hist: [], redo: [], store: null, rev: null, loadedStore: false, saveTimer: null, saving: false, saveAgain: false, panes: {}, symbols: {}, gen: 0,
     quiet: false, ctrl: false, lastPtr: null, measureId: null, fly: null, pop: null, touch: false, tol: 6, magTol: 16, stroke: null,
-    debug: false, lastFigs: new Map(), lastHandles: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false, tz: 'Asia/Tehran', alerts: null
+    debug: false, lastFigs: new Map(), lastHandles: new Map(), figErr: [], lang: 'fa', saveState: null, hintArgs: null, max: false, tz: 'Asia/Tehran', alerts: null, cmp: []
   };
   const readOnly = () => !!SESSION?.isViewOnly;
   const storeKey = () => 'sc_chart_' + (SESSION?.uid || 'guest');
@@ -128,7 +135,7 @@
   function precisionOf(p) { p = Math.abs(+p) || 0; return p >= 1000 ? 1 : p >= 100 ? 2 : p >= 1 ? 3 : p >= 0.1 ? 4 : p >= 0.01 ? 5 : p >= 0.0001 ? 6 : 8; }
   const prec = () => S.chart?.getPriceVolumePrecision?.()?.price ?? 2;
   const fmt = (v, p = prec()) => isNum(v) ? v.toLocaleString('en-US', { minimumFractionDigits: p, maximumFractionDigits: p }) : '—';
-  const fmtP = v => { if (!isNum(v)) return '—'; const d = isG() ? (isNum(S.prec) ? S.prec : 6) : precisionOf(v); return v.toLocaleString('en-US', { minimumFractionDigits: Math.min(d, 2), maximumFractionDigits: d }); };
+  const fmtP = v => { if (!isNum(v)) return '—'; const d = isG() ? (isNum(S.prec) ? S.prec : precisionOf(v)) : precisionOf(v); return v.toLocaleString('en-US', { minimumFractionDigits: Math.min(d, 2), maximumFractionDigits: d }); };
   const sgn = v => v > 0 ? '+' : v < 0 ? '−' : '';
   const fmtS = v => sgn(v) + fmt(Math.abs(v));
   const pct = (a, b) => (b - a) / a * 100;
@@ -838,6 +845,7 @@
     trash: svg('<path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/>'),
     undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
     bell: svg('<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    cmp: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/>'),
     replay: svg('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4.5v4h4"/><path d="M10.5 9.2l4.5 2.8-4.5 2.8z" fill="currentColor"/>'),
     play: svg('<path d="M8 5.5l11 6.5-11 6.5z" fill="currentColor"/>'), pause: svg('<path d="M8 5v14M16 5v14" stroke-width="3"/>'),
     stepF: svg('<path d="M6 5.5l9 6.5-9 6.5z" fill="currentColor"/><path d="M18 5v14" stroke-width="2.4"/>'),
@@ -870,7 +878,7 @@
   function registerOverlays() {
     if (registered) return; registered = true;
     const kc = window.klinecharts;
-    registerRSI(kc); registerSpecs(kc);
+    registerRSI(kc); registerSpecs(kc); registerCompare(kc);
     for (const [name, fn] of [['scRpMark', a => rpMarkFigs(a)], ['scRpPos', a => rpPosFigs(a)]])
       kc.registerOverlay({ name, totalStep: 2, needDefaultPointFigure: false, needDefaultXAxisFigure: false, needDefaultYAxisFigure: false, createPointFigures: arg => { try { return fn(arg); } catch (_) { return []; } } });
     kc.registerOverlay({ name: 'scAlertLine', totalStep: 2, needDefaultPointFigure: false, needDefaultXAxisFigure: false, needDefaultYAxisFigure: false,
@@ -989,7 +997,7 @@
   function cdLabel() {
     if (!cdOn()) return '';
     const L = S.chart.getDataList?.() || [], k = L[L.length - 1];
-    if (k && isG() && tfMs() < 28 * 864e5 && Date.now() >= k.timestamp + tfMs()) return '';   // بازارِ بسته: کندلِ زنده‌ای نیست
+    if (k && isY() && tfMs() < 28 * 864e5 && Date.now() >= k.timestamp + tfMs()) return '';   // بازارِ بسته: کندلِ زنده‌ای نیست
     if (rpOn()) return '';   // بازپخش: کندلِ «زنده» نیست
     return k ? cdText(k.timestamp) : '';
   }
@@ -1275,8 +1283,9 @@
     return out;
   }
   const viewData = list => S.ct === 'ha' ? toHA(list) : list;
-  async function fetchCandles({ before = 0, limit = BARS } = {}) {
-    const q = `src=${S.src}&coin=${encodeURIComponent(S.coin)}&tf=${S.tf}&limit=${limit}` + (before ? `&before=${before}` : '');
+  const fetchCandles = (o = {}) => fetchSeries(S.src, S.coin, S.tf, o);
+  async function fetchSeries(src, coin, tf, { before = 0, limit = BARS } = {}) {
+    const q = `src=${src}&coin=${encodeURIComponent(coin)}&tf=${tf}&limit=${limit}` + (before ? `&before=${before}` : '');
     const r = await apiFetch('/api/chart/candles?' + q, {}, { retries: 1 });
     if (!r) return { ok: false, err: 'offline' };
     const d = await r.json().catch(() => ({}));
@@ -1296,9 +1305,9 @@
       paintHead(); return;
     }
     S.data = res.list; S.more = res.more;
-    if (S.store) S.store.recent = [S.coin, ...(S.store.recent || []).filter(x => x !== S.coin)].slice(0, 10);
+    if (S.store) { const rk = recentKey(); S.store[rk] = [S.coin, ...(S.store[rk] || []).filter(x => x !== S.coin)].slice(0, 10); }
     const last = S.data[S.data.length - 1];
-    if (isG() && !S.symMeta?.yahoo) symbolsOf('yahoo').then(() => { paintHead(); paintWL(); });
+    if (isG() && !S.symMeta?.[S.src]) { const src = S.src; symbolsOf(src).then(() => { if (S.src === src) { paintHead(); paintWL(); } }); }
     S.prec = isNum(res.prec) ? res.prec : null;   // بازارهای جهانی: رقمِ اعشارِ خودِ بازار (EURUSD پنج رقم، ین سه رقم)
     S.chart.setPriceVolumePrecision(isNum(S.prec) ? S.prec : precisionOf(last?.close), 2);
     for (const n of ['MACD', 'ATR']) if (S.panes[n]) { const p = specPrec(n); try { S.chart.overrideIndicator({ name: n, precision: p }, S.panes[n]); } catch (_) {} }
@@ -1319,6 +1328,7 @@
     }
     paintHead();
     if (!rpOn()) startPoll();
+    if (S.cmp.length) cmpRefresh();
   }
   function onLoadData({ type, data, callback }) {
     if (type !== 'forward' || !data) { callback([], false); return; }
@@ -1327,6 +1337,7 @@
       if (gen !== S.gen) { callback([], false); return; }
       if (!res.ok) { callback([], true); return; }
       S.data = res.list.concat(S.data); if (S.rp?.all) { S.rp.all = res.list.concat(S.rp.all); S.rp.idx += res.list.length; } callback(S.ct === 'ha' ? toHA(S.data).slice(0, res.list.length) : res.list, res.more && res.list.length > 0);
+      if (S.cmp.length) setTimeout(cmpOlder, 0);
     });
   }
   function startPoll() {
@@ -1343,7 +1354,7 @@
           if (k.timestamp === S.data[S.data.length - 1].timestamp) S.data[S.data.length - 1] = k; else S.data.push(k);
           S.chart.updateData(S.ct === 'ha' ? toHA(S.data.slice(-300)).pop() : k);
         }
-        paintHead(); updRT();
+        paintHead(); updRT(); cmpPoll();
       } finally { S.pollBusy = false; }
     }, tfOf(S.tf).poll);
   }
@@ -1705,15 +1716,17 @@
   // ── رابط ──
   const srcLabel = s => s ? (s.g ? tr(s.fa, s.name) : s.name) : '';
   const srcName = (src = S.src) => srcLabel(SOURCES.find(s => s.id === src)) || src;
-  const gMeta = c => S.symMeta?.yahoo?.[c] || null;   // [دسته، نامِ انگلیسی، نامِ فارسی]
+  const gMeta = (c, src = S.src) => S.symMeta?.[isG(src) ? src : 'yahoo']?.[c] || null;   // [دسته، نامِ انگلیسی، نامِ فارسی]
+  const recentKey = () => kindOf() === 'x' ? 'rx' : 'recent';
   const gName = c => { const m = gMeta(c); return m ? tr(m[2], m[1]) : ''; };
   const quoteOf = () => isG() ? '' : S.src === 'bybit' || S.src === 'mexc' || S.src === 'bingx' ? '/USDT' : '/USD';
   // نشانِ نماد: کریپتو = لوگو؛ بازارهای جهانی = نشانِ دسته (Au، Ag، FX، …)
   const G_BADGE = { GOLD: 'Au', SILVER: 'Ag', COPPER: 'Cu', PLATINUM: 'Pt', PALLADIUM: 'Pd', USOIL: 'WTI', UKOIL: 'BRN', NATGAS: 'NG', HEATOIL: 'HO', GASOLINE: 'RB',
-    US100: 'NQ', US500: 'ES', US30: 'YM', US10Y: '10Y', NI225: 'NKY', CAC40: 'CAC' };
-  function symLogo(c) {
-    if (!isG()) return typeof coinLogo === 'function' ? coinLogo(c) : '';
-    const cat = gMeta(c)?.[0] || (/^[A-Z]{6}$/.test(c) ? 'fx' : 'stock');
+    US100: 'NQ', US500: 'ES', US30: 'YM', US10Y: '10Y', NI225: 'NKY', CAC40: 'CAC', CL: 'WTI', BRENTOIL: 'BRN', HO: 'HO', SP500: 'SPX', XYZ100: 'NDX',
+    JP225: 'NKY', KR200: 'KS2', NIFTY: 'NIF' };
+  function symLogo(c, src = S.src) {
+    if (!isG(src)) return typeof coinLogo === 'function' ? coinLogo(c) : '';
+    const cat = gMeta(c, src)?.[0] || (/^[A-Z]{6}$/.test(c) ? 'fx' : 'stock');
     return `<div class="t-icon coin-ico ch-gico" data-k="${cat}">${esc(G_BADGE[c] || (cat === 'fx' ? c.slice(0, 3) : c.slice(0, 3)))}</div>`;
   }
   function msg(text, kind) { const el = $('ch-msg'); if (!el) return; el.textContent = text || ''; el.className = 'ch-msg' + (kind ? ' ' + kind : ''); el.hidden = !text; }
@@ -1754,10 +1767,12 @@
     const tl = $('ch-tfl'); if (tl) tl.textContent = tfOf(S.tf).l;
     const cs = $('ch-csrc'); if (cs) cs.textContent = isG() ? (gName(S.coin) || srcName()) : srcName();
     const logo = $('ch-logo'); if (logo) logo.innerHTML = symLogo(S.coin);
-    const info = $('ch-srcinfo'); if (info) info.textContent = isG()
-      ? tr('داده: Yahoo Finance (آتی‌ها و شاخص‌ها ممکن است چند دقیقه تأخیر داشته باشند)', 'Data: Yahoo Finance (futures and indices may be delayed)')
+    const info = $('ch-srcinfo'); if (info) info.textContent = S.src === 'hlx'
+      ? tr('داده: Hyperliquid، بازارهای HIP-3 (trade.xyz) — ۲۴ساعته؛ بیرون از ساعتِ بورس قیمت از اوراکل', 'Data: Hyperliquid HIP-3 markets (trade.xyz) — 24/7; oracle-priced outside exchange hours')
+      : isG() ? tr('داده: Yahoo Finance (آتی‌ها و شاخص‌ها ممکن است چند دقیقه تأخیر داشته باشند)', 'Data: Yahoo Finance (futures and indices may be delayed)')
       : tr(`داده: ${srcName()}${S.src === 'bybit' ? ' (به‌جای بایننس)' : ''}`, `Data: ${srcName()}${S.src === 'bybit' ? ' (Binance stand-in)' : ''}`);
     paintClock();
+    const cb = $('ch-cmpb'); if (cb) { cb.classList.toggle('on', S.cmp.length > 0); cb.setAttribute('aria-pressed', S.cmp.length > 0); cb.title = tr('مقایسه‌ی نماد', 'Compare symbol'); cb.setAttribute('aria-label', cb.title); }
     const ab = $('ch-alertb'); if (ab) { ab.disabled = isG(); ab.title = isG() ? tr('هشدار فقط برای رمزارزها', 'Alerts: crypto symbols only') : tr('افزودنِ هشدار (Alt+A)', 'Create alert (Alt+A)'); ab.setAttribute('aria-label', ab.title); }
 
   }
@@ -1816,7 +1831,8 @@
   // ── منبع (مثلِ انتخابِ صرافی در TradingView): کریپتو و بازارهای جهانی ──
   function srcMenu(el) {
     const row = s => `<button type="button" class="ch-popi${s.id === S.src ? ' on' : ''}" data-src="${s.id}" onclick="SCCHART.src('${s.id}');SCCHART.closePop()"><i></i><span><b>${esc(srcLabel(s))}</b>`
-      + (s.g ? `<small>${tr('فارکس، طلا، نقره، نفت، شاخص‌ها، سهام', 'Forex, gold, silver, oil, indices, stocks')}</small>` : s.id === 'bybit' ? `<small>${tr('به‌جای بایننس', 'Binance stand-in')}</small>` : '') + '</span></button>';
+      + (s.id === 'hlx' ? `<small>${tr('طلا، نفت، شاخص‌ها و سهام روی Hyperliquid — ۲۴ساعته', 'Gold, oil, indices and stocks on Hyperliquid — 24/7')}</small>`
+        : s.g ? `<small>${tr('فارکس، طلا، نقره، نفت، شاخص‌ها، سهام', 'Forex, gold, silver, oil, indices, stocks')}</small>` : s.id === 'bybit' ? `<small>${tr('به‌جای بایننس', 'Binance stand-in')}</small>` : '') + '</span></button>';
     openPop('src', el, `<div class="ch-poph">${tr('صرافی‌های کریپتو', 'Crypto exchanges')}</div>` + SOURCES.filter(s => !s.g).map(row).join('')
       + `<div class="ch-poph">${tr('بازارهای جهانی', 'Global markets')}</div>` + SOURCES.filter(s => s.g).map(row).join(''));
   }
@@ -2167,6 +2183,7 @@
     return `<div class="ch-wrap" dir="${d}" data-theme="${S.theme === 'light' ? 'light' : 'dark'}">
       <div class="ch-head">
         <button type="button" class="ch-coin" id="ch-coinb" onclick="SCCHART.pick()" aria-label="${tr('انتخابِ نماد و منبع', 'Symbol search')}"><span id="ch-logo">${symLogo(S.coin)}</span><span class="ch-cname"><span class="ch-cl" dir="ltr"><b id="ch-coinname">${esc(S.coin)}</b><small id="ch-quote"></small></span><small class="ch-csrc" id="ch-csrc"></small></span>${ICON.chev}</button>
+        <button type="button" class="ch-cmpb" id="ch-cmpb" onclick="SCCHART.compare()" title="${tr('مقایسه‌ی نماد', 'Compare symbol')}" aria-label="${tr('مقایسه‌ی نماد', 'Compare symbol')}" aria-pressed="false">${ICON.cmp}</button>
         <div class="ch-px" dir="ltr"><b id="ch-last">—</b><span id="ch-chg" class="ch-chg"></span></div>
         <div class="ch-srcs" id="ch-srcs" role="group" aria-label="${tr('منبعِ داده', 'Data source')}"><button type="button" class="on ch-srcb" id="ch-srcb" onclick="SCCHART.srcMenu(this)" aria-haspopup="true">${esc(srcName())}</button></div>
         <div class="ch-lang" id="ch-lang" role="group" aria-label="${tr('زبانِ نمودار', 'Chart language')}"><button type="button" data-l="fa" lang="fa" onclick="SCCHART.lang('fa')">فا</button><button type="button" data-l="en" lang="en" onclick="SCCHART.lang('en')">EN</button></div>
@@ -2983,6 +3000,7 @@
         + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
     if (listOnly && $('ch-indlist')) { $('ch-indlist').innerHTML = rows; return; }
     box.innerHTML = `<input class="fi ch-inds" id="ch-inds" type="search" dir="auto" autocomplete="off" value="${esc(S.indQ || '')}" placeholder="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" aria-label="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" oninput="SCCHART.indFind(this.value)">`
+      + `<button type="button" class="ch-cmpi" onclick="SCCHART.compare()">${ICON.cmp}<span>${tr('مقایسه با نمادِ دیگر…', 'Compare symbol…')}</span><small dir="ltr">${S.cmp.length}/${CMP_MAX}</small></button>`
       + `<div class="ch-indlist" id="ch-indlist">${rows}</div>`;
   }
 
@@ -2997,17 +3015,19 @@
   }
   async function pick() {
     const g = isG();
-    if (g && !S.symMeta?.yahoo) await symbolsOf('yahoo');
+    if (g && !S.symMeta?.[S.src]) await symbolsOf(S.src);
     const inKind = c => g ? !!gMeta(c) : !gMeta(c);
-    const recent = (S.store?.recent || []).filter(c => c !== S.coin && inKind(c)).slice(0, 8);
+    const recent = (S.store?.[recentKey()] || []).filter(c => c !== S.coin && inKind(c)).slice(0, 8);
+    const cats = g ? GCATS.filter(([k]) => Object.values(S.symMeta?.[S.src] || {}).some(m => m?.[0] === k)) : [];
+    if (g && S.pcat && S.pcat !== 'all' && !cats.some(x => x[0] === S.pcat)) S.pcat = 'all';
     const chip = c => `<button type="button" class="ch-pchip" onclick="SCCHART.coin('${jsArg(c)}')">${symLogo(c)}<span dir="ltr">${esc(c)}</span></button>`;
     const grow = c => `<button type="button" class="ch-prow" onclick="SCCHART.coin('${jsArg(c)}')">${symLogo(c)}<b dir="ltr">${esc(c)}</b><span>${esc(gName(c))}</span><small>${esc(tr((GCATS.find(x => x[0] === gMeta(c)?.[0]) || [])[1] || '', (GCATS.find(x => x[0] === gMeta(c)?.[0]) || [])[2] || ''))}</small></button>`;
     const srcBtn = s => `<button type="button" class="${s.id === S.src ? 'on' : ''}" aria-pressed="${s.id === S.src}" onclick="SCCHART.src('${s.id}');SCCHART.pick()">${esc(srcLabel(s))}</button>`;
     S.pcat = S.pcat || 'all';
     $('det-content').innerHTML = `<div class="ch-pick" dir="${dirOf()}"><h3>${tr('انتخابِ نماد و منبع', 'Symbol search')}</h3>
       <div class="ch-psrc" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.filter(s => !s.g).map(srcBtn).join('')}<span class="ch-psep"></span>${SOURCES.filter(s => s.g).map(srcBtn).join('')}</div>
-      <input id="ch-psearch" class="fi" dir="${g ? 'auto' : 'ltr'}" placeholder="${g ? tr('جست‌وجو: طلا، EURUSD، نفت، AAPL…', 'Search: gold, EURUSD, oil, AAPL…') : tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
-      ${g ? `<div class="ch-pcats" role="tablist">${[['all', 'همه', 'All'], ...GCATS].map(([k, f, e]) => `<button type="button" role="tab" data-pcat="${k}" class="${S.pcat === k ? 'on' : ''}" aria-selected="${S.pcat === k}">${tr(f, e)}</button>`).join('')}</div>` : ''}
+      <input id="ch-psearch" class="fi" dir="${g ? 'auto' : 'ltr'}" placeholder="${S.src === 'hlx' ? tr('جست‌وجو: طلا، نفت، NVDA، SP500…', 'Search: gold, oil, NVDA, SP500…') : g ? tr('جست‌وجو: طلا، EURUSD، نفت، AAPL…', 'Search: gold, EURUSD, oil, AAPL…') : tr('جست‌وجو: BTC، ETH، SOL…', 'Search: BTC, ETH, SOL…')}" autocomplete="off" autocapitalize="characters">
+      ${g ? `<div class="ch-pcats" role="tablist">${[['all', 'همه', 'All'], ...cats].map(([k, f, e]) => `<button type="button" role="tab" data-pcat="${k}" class="${S.pcat === k ? 'on' : ''}" aria-selected="${S.pcat === k}">${tr(f, e)}</button>`).join('')}</div>` : ''}
       ${recent.length ? `<div class="ch-plab">${tr('اخیر', 'Recent')}</div><div class="ch-pchips">${recent.map(chip).join('')}</div>` : ''}
       <div class="ch-plab">${tr('پرطرفدار', 'Popular')}</div><div class="ch-pchips">${popular().map(chip).join('')}</div>
       <div class="ch-plab" id="ch-plabel">${tr('همه‌ی نمادها', 'All symbols')}</div><div class="ch-plist${g ? ' ch-prows' : ''}" id="ch-plist"><div class="ch-pempty">${tr('در حالِ بارگذاری…', 'Loading…')}</div></div></div>`;
@@ -3040,10 +3060,10 @@
     if (!SOURCES.some(s => s.id === src) || src === S.src) return;
     if (rpOn()) rpExit(true, true);
     cancelDrawing();
-    if (isG(src) !== isG() && S.store) {   // BTC در بازارهای جهانی معنا ندارد و GOLD در صرافیِ کریپتو: هر طرف آخرین نمادِ خودش
+    if (kindOf(src) !== kindOf() && S.store) {   // BTC در بازارهای جهانی معنا ندارد و GOLD در صرافیِ کریپتو: هر نوع آخرین نمادِ خودش
       const lk = S.store.prefs.lastk = { ...(S.store.prefs.lastk || {}) };
-      lk[isG() ? 'g' : 'c'] = S.coin;
-      const nx = lk[isG(src) ? 'g' : 'c']; S.coin = /^[A-Z0-9]{1,15}$/.test(nx || '') ? nx : isG(src) ? 'GOLD' : 'BTC';
+      lk[kindOf()] = S.coin;
+      const nx = lk[kindOf(src)]; S.coin = /^[A-Z0-9]{1,15}$/.test(nx || '') ? nx : isG(src) ? 'GOLD' : 'BTC';
       S.hist = []; S.redo = []; S.prec = null;
     }
     S.src = src; remember(); loadSeries(); S.q = {}; if (wlOpen()) { S.wlMenu = false; paintWL(); } wlPoll(); paintTools(); paintAlerts();
@@ -3111,12 +3131,14 @@
     clearInterval(S.alTimer); S.alTimer = setInterval(() => { if (alertOk() && !document.hidden && $('screen-chart')?.classList.contains('active')) alertsLoad(); }, 60000);
     alertsLoad();
     S.chart.setOffsetRightDistance(48);
-    applyIndicators();
+    applyIndicators(); cmpFromPrefs(); cmpApply();
     S.chart.subscribeAction('onZoom', saveZoomSoon);
+    S.chart.subscribeAction('onVisibleRangeChange', cmpRescale);
     for (const a of ['onZoom', 'onScroll', 'onVisibleRangeChange']) S.chart.subscribeAction(a, updRTSoon);
     S.chart.subscribeAction('onPaneDrag', () => setTimeout(savePaneHeights, 50));
     S.chart.subscribeAction('onTooltipIconClick', d => {
       if (!d?.indicatorName || readOnly()) return;
+      const cm = /^CMP(\d)$/.exec(d.indicatorName); if (cm) { if (d.iconId === 'del') cmpRemove(+cm[1]); else cmpDialog(); return; }
       if (d.iconId === 'set') openIndSettings(d.indicatorName);
       else if (d.iconId === 'del' && (S.store.prefs.ind || []).includes(d.indicatorName)) toggleIndicator(d.indicatorName);
     });
@@ -3177,7 +3199,7 @@
   }
   // ظاهرِ تازه‌ی نمودار (v26.39–40: دکمه‌ی زبان، قلمِ انگلیسی، تمام‌صفحه، گوشیِ باریک، تنظیماتِ اندیکاتور) همراهِ خودِ
   // chart.js می‌آید و فقط با باز شدنِ نمودار بار می‌شود، نه با کلِ اپ (اپِ اصلی روی اینترنتِ ایران سبک بماند).
-  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}.ch-ur{display:flex;gap:4px;flex:0 0 auto}.ch-ur[hidden]{display:none}.ch-ur .ch-fullb:disabled{opacity:.38;cursor:default}.ch-tfm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer;min-height:34px;width:28px;padding:0}.ch-tfm svg{width:14px;height:14px}.ch-tfs button.ch-tfx{border-style:dashed}.ch-tfr{display:flex;align-items:center;gap:2px}.ch-tfr .ch-popi{flex:1;min-width:0}.ch-tfr .ch-popi small{margin-inline-start:auto;color:var(--muted);font-size:11px}.ch-tfst{flex:none;width:32px;height:32px;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}.ch-tfst.on{color:var(--gold)}.ch-tfst:hover{background:rgba(127,127,127,.12)}.ch-srcb{display:flex;align-items:center;gap:4px}.ch-srcb svg{width:13px;height:13px}.ch-psep{flex:0 0 1px;align-self:stretch;background:var(--border);margin:4px 2px}.ch-pcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px}.ch-pcats button{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);color:var(--text2);font:600 12px var(--f-body);padding:6px 11px;border-radius:99px;cursor:pointer}.ch-pcats button.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}.ch-prows{display:grid;gap:2px}.ch-prow{display:grid;grid-template-columns:24px 78px minmax(0,1fr) auto;align-items:center;gap:8px;background:none;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 4px;cursor:pointer;text-align:start}.ch-prow:hover{background:rgba(127,127,127,.08)}.ch-prow b{font:700 12.5px var(--f-mono)}.ch-prow span{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-prow small{font-size:10.5px;color:var(--muted)}.ch-prow .t-icon{width:22px;height:22px}.ch-gico{display:flex;align-items:center;justify-content:center;font:800 8.5px/1 var(--f-mono);letter-spacing:-.2px;color:#fff;background:#5d606b}.ch-gico[data-k=fx]{background:#2962ff}.ch-gico[data-k=metal]{background:#b8860b}.ch-gico[data-k=energy]{background:#3a3f4b}.ch-gico[data-k=index]{background:#7e57c2}.ch-gico[data-k=stock]{background:#089981}.ch-gico[data-k=agri]{background:#6d8b2f}@media(max-width:600px){.ch-bar{gap:5px}.ch-bar .ch-fullb{width:32px}.ch-ur{gap:3px}}@media(max-width:380px){.ch-bar{gap:3px}.ch-ur{gap:3px}.ch-bar .ch-fullb{width:28px}.ch-bar .ch-indb{padding:6px 6px}.ch-tfb{padding:6px 5px;gap:2px}}.ch-pop{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}.ch-fly{scroll-padding-top:52px}.ch-clock{background:none;border:0;color:var(--muted);font:600 11px var(--f-mono);cursor:pointer;padding:2px 4px;border-radius:6px;margin-inline-start:auto;direction:ltr}.ch-clock:hover{color:var(--text);background:rgba(127,127,127,.12)}.ch-alertb svg{width:16px;height:16px}.ch-alertb:disabled{opacity:.4;cursor:default}@media(max-width:600px){.ch-alertb{display:none}}.ch-almod .chs-seg{flex-wrap:wrap}.ch-almod .chs-seg button{padding:0 9px}.chs-rw{flex-wrap:wrap}.chs-rw .chs-seg,.chs-rw .chs-c{max-width:100%}.ch-alnote{background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.35);border-radius:10px;padding:10px;font-size:12.5px;line-height:1.9;color:var(--text)}.ch-alnote .btn{width:auto;margin:6px 0 0;padding:6px 12px;font-size:12px}.ch-ctxi:disabled{opacity:.5;cursor:default}.ch-tool[data-t=alert]:disabled{opacity:.35}.ch-rp{position:absolute;left:8px;right:8px;margin-inline:auto;width:max-content;bottom:34px;z-index:7;display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px);background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:5px 6px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6)}.ch-rp[hidden]{display:none}.ch-rpbtn{display:flex;align-items:center;justify-content:center;gap:4px;min-width:34px;height:32px;padding:0 7px;border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:8px;cursor:pointer;font:600 12px var(--f-body)}.ch-rpbtn svg{width:16px;height:16px}.ch-rpbtn:hover:not(:disabled){color:var(--text);border-color:var(--border2)}.ch-rpbtn:disabled{opacity:.4;cursor:default}.ch-rpbtn.main{background:var(--gold);color:#0e0d0c;border-color:var(--gold)}.ch-rpbtn.buy{color:#fff;background:#089981;border-color:#089981}.ch-rpbtn.sell{color:#fff;background:#F23645;border-color:#F23645}.ch-rpbtn.x{border-color:transparent;background:none}.ch-rpspd{height:32px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;font:600 12px var(--f-mono);padding:0 4px}.ch-rpsep{width:1px;align-self:stretch;background:var(--border);margin:2px 2px}.ch-rpst{font:600 11.5px var(--f-mono);color:var(--muted);padding:0 4px;white-space:nowrap}.ch-rpst .up{color:var(--green)}.ch-rpst .down{color:var(--red)}.ch-rphint{font-size:12px;color:var(--text2);padding:0 6px}.ch-rpline{position:absolute;top:0;bottom:30px;width:0;border-left:2px solid #F23645;z-index:7;pointer-events:none}.ch-rpline[hidden]{display:none}.ch-rpline span{position:absolute;top:6px;left:6px;white-space:nowrap;background:#F23645;color:#fff;font:600 11px var(--f-body);padding:2px 6px;border-radius:5px}.ch-stage.rp-sel #ch-canvas{cursor:col-resize}.ch-rpb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}@media(max-width:600px){.ch-rpb{display:none}.ch-rp{bottom:40px;gap:3px}.ch-rpbtn{min-width:30px;height:30px;padding:0 6px}.ch-rpst{text-align:center;padding:0 2px}.ch-rp .ch-rpbtn.x{min-width:30px}}@media(min-width:601px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{min-width:36px;padding:6px 8px}}`;
+  const CHART_CSS = `.ch-lang{flex:0 0 auto;display:flex;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px}.ch-lang button{background:none;border:0;color:var(--text2);font:600 12px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;min-height:34px;min-width:34px}.ch-lang button[lang=en]{font-family:var(--f-mono);letter-spacing:.3px}.ch-lang button.on{background:var(--gold);color:#0e0d0c}.ch-wrap[dir=ltr],.ch-pick[dir=ltr]{--f-body:-apple-system,BlinkMacSystemFont,'Trebuchet MS',Roboto,Ubuntu,'Segoe UI',sans-serif;font-family:var(--f-body)}.ch-fullb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:36px;min-height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer}.ch-fullb svg{width:17px;height:17px}.ch-fullb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}html.ch-max,html.ch-max body{overflow:hidden}html.ch-max .chart-screen.active{position:fixed;inset:0;z-index:150;height:100dvh;max-width:none;margin:0;background:var(--bg);padding:calc(var(--safe-top,0px) + 8px) max(8px,env(safe-area-inset-right)) calc(var(--safe-bottom,0px) + 2px) max(8px,env(safe-area-inset-left))}html.ch-max .chart-screen .mkt-tabs{display:none}@media(orientation:landscape) and (max-height:520px){html.ch-max .ch-main{flex-direction:row}html.ch-max .ch-tb{order:0;flex-direction:column;align-items:center;width:46px;gap:2px;overflow-y:auto;overflow-x:hidden;padding:2px 0;-webkit-mask-image:none;mask-image:none}html.ch-max .ch-tool{width:40px;height:34px;background:none;border-color:transparent;border-radius:8px}html.ch-max .ch-sep{flex:0 0 1px;align-self:stretch;height:1px;margin:3px 7px}html.ch-max .ch-foot{display:none}html.ch-max .ch-wrap{gap:5px}}@media(min-width:900px){html.ch-max .chart-screen.active{padding:10px 14px 4px}}@media(max-width:600px){.ch-lang button{padding:4px 6px;min-width:32px}}@media(max-width:380px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{font-size:11px;padding:6px 1px}}.ch-indr{display:flex;align-items:center;gap:2px}.ch-indr .ch-indi{flex:1;min-width:0}.ch-indi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted);padding-inline-start:10px}.ch-indg{flex:0 0 auto;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:9px;color:var(--muted);cursor:pointer}.ch-indg:hover,.ch-indg:focus-visible{color:var(--text);background:rgba(255,255,255,.05)}.ch-indg svg{width:17px;height:17px}.ch-sdef{margin-inline-end:auto}.ch-merr{color:var(--red);font-size:12px;margin-top:6px}.ch-merr[hidden]{display:none}.ch-thm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:38px;height:38px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:11px;cursor:pointer}.ch-thm svg{width:18px;height:18px}.ch-thm:hover{color:var(--text)}@media(max-width:600px){.ch-coin{min-width:0;flex:0 1 auto;overflow:hidden}.ch-cname{min-width:0}.ch-cl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-thm{width:34px;height:34px}}.ch-indi i{display:flex;align-items:center;justify-content:center;font:800 11px/1 system-ui,sans-serif;color:#0e0d0c}.ch-indi.on i::after{content:'✓'}.chs{width:min(470px,100%);padding:0;gap:0;display:flex;flex-direction:column;max-height:calc(100% - 8px);overflow:hidden;overflow:clip}.ch-stage{overflow:clip}.chs-top,.chs-tabs,.chs-foot{flex:none}.chs-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px 6px}.chs-top b{font:700 14.5px var(--f-body);color:var(--text)}.chs-x{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--muted);cursor:pointer}.chs-x:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-x svg{width:16px;height:16px}.chs-tabs{display:flex;gap:2px;padding:0 10px;border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}.chs-tabs button{flex:0 0 auto;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);font:600 12.5px var(--f-body);padding:9px 10px;cursor:pointer;margin-bottom:-1px}.chs-tabs button.on{color:var(--text);border-bottom-color:var(--gold)}.chs-body{position:relative;overflow:auto;padding:12px 14px;flex:1;min-height:0;overscroll-behavior:contain}.chs-p{display:grid;gap:8px}.chs-r{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:34px;font-size:12.5px;color:var(--text2)}.chs-l{display:flex;flex-direction:column;line-height:1.5}.chs-l small{font:500 10.5px var(--f-mono);color:var(--muted)}.chs-c{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}.chs-ck{display:flex;align-items:center;gap:9px;cursor:pointer;color:var(--text2);font-size:12.5px;line-height:1.6}.chs-ck input,.chs-lv input[type=checkbox]{width:17px;height:17px;margin:0;accent-color:var(--gold);flex:none}.chs-sw{width:32px;height:28px;border-radius:7px;border:1px solid var(--border2);background:linear-gradient(var(--c),var(--c)) center/18px 14px no-repeat,var(--surface);cursor:pointer;padding:0;flex:none}.chs-sw.sm{width:28px;height:26px;background-size:14px 12px}.chs-seg{display:flex;border:1px solid var(--border2);border-radius:8px;overflow:hidden}.chs-seg button{background:var(--surface);border:0;color:var(--text2);min-width:34px;height:28px;padding:0 8px;cursor:pointer;display:flex;align-items:center;justify-content:center;font:600 11.5px var(--f-body)}.chs-seg button+button{border-inline-start:1px solid var(--border2)}.chs-seg button.on{background:rgba(200,168,75,.2);color:var(--gold-light)}.chs-wl{display:block;width:18px;height:var(--w);background:currentColor;border-radius:1px}.chs-sl{display:block;width:20px;border-top:2px solid currentColor}.chs-sl.s1{border-top-style:dashed}.chs-sl.s2{border-top-style:dotted}.chs-op{gap:8px}.chs-op input{width:110px;accent-color:var(--gold)}.chs-op b{font:600 11px var(--f-mono);color:var(--muted);min-width:36px;text-align:end}.chs-h{font:700 12px var(--f-body);color:var(--text);margin-top:6px}.chs-lvs{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}.chs-lv{display:flex;align-items:center;gap:6px;min-width:0}.chs-lvv{width:100%;min-width:0;height:28px;background:var(--surface);border:1px solid var(--border2);border-radius:7px;color:var(--text);font:600 12px var(--f-mono);padding:0 7px}.chs-lvv.bad,.chs-in.bad{border-color:var(--red)!important}.chs-in{width:min(200px,55%);margin:0;flex:none;padding:7px 10px;font-size:13px}.chs-ta{margin:0;font-size:13px}.chs-hint{font-size:11.5px;color:var(--muted);line-height:1.8}.chs-vis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.chs-pal{position:absolute;z-index:3;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:6px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);width:min(250px,calc(100% - 8px))}.chs-pal .ch-pal{grid-template-columns:repeat(auto-fill,26px)}.chs-foot{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--border)}.chs-foot .btn{width:auto;margin:0;padding:8px 14px;font-size:12.5px;border-radius:9px;box-shadow:none}.chs-tpl{position:relative;margin-inline-end:auto}.chs-tm{position:absolute;bottom:calc(100% + 6px);inset-inline-start:0;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:4px;display:grid;min-width:200px;box-shadow:0 14px 34px -10px rgba(0,0,0,.55);z-index:4}.chs-tm button{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.chs-tm button:hover{background:rgba(127,127,127,.14);color:var(--text)}.chs-p[hidden],.chs-pal[hidden],.chs-tm[hidden]{display:none}@media(max-width:600px){.chs-foot .btn{padding:8px 10px}.chs-lvs{gap:6px 10px}}.ch-wrap[data-theme=light]{--surface:#fff;--surface2:#f0f3fa;--card:#fff;--border:#e0e3eb;--border2:#d1d4dc;--text:#131722;--text2:#434651;--muted:#787b86;--gold:#a07a26;--gold-light:#8a6618;--gold-dim:#c9ad6b;--green:#089981;--red:#f23645;background:#fff;color:#131722;border-radius:14px;padding:8px;color-scheme:light}.ch-wrap[data-theme=light] .ch-stage{background:#fff;border-color:#e0e3eb}.ch-wrap[data-theme=light] .ch-msg{background:rgba(255,255,255,.82)}.ch-wrap[data-theme=light] .ch-hint{background:rgba(255,255,255,.98);box-shadow:0 4px 14px rgba(19,23,34,.14)}.ch-wrap[data-theme=light] .ch-fly,.ch-wrap[data-theme=light] .ch-pop,.ch-wrap[data-theme=light] .ch-ctx,.ch-wrap[data-theme=light] .ch-tree,.ch-wrap[data-theme=light] .ch-indm,.ch-wrap[data-theme=light] .ch-sel{background:#fff;box-shadow:0 10px 30px -8px rgba(19,23,34,.25)}.ch-wrap[data-theme=light] .ch-flyh{background:#fff}.ch-wrap[data-theme=light] .ch-modal{background:rgba(19,23,34,.32)}.ch-wrap[data-theme=light] .ch-mcard,.ch-wrap[data-theme=light] .chs-pal,.ch-wrap[data-theme=light] .chs-tm{box-shadow:0 18px 44px -12px rgba(19,23,34,.35)}.ch-wrap[data-theme=light] .ch-flyi:hover,.ch-wrap[data-theme=light] .ch-popi:hover,.ch-wrap[data-theme=light] .ch-selb:hover,.ch-wrap[data-theme=light] .ch-ctxi:hover,.ch-wrap[data-theme=light] .ch-indg:hover,.ch-wrap[data-theme=light] .ch-tool:not(:disabled):not(.on):hover{background:rgba(19,23,34,.06)}.ch-wrap[data-theme=light] .ch-tool.on,.ch-wrap[data-theme=light] .ch-flyi.on,.ch-wrap[data-theme=light] .ch-selb.on,.ch-wrap[data-theme=light] .ch-tri.on,.ch-wrap[data-theme=light] .chs-seg button.on{background:rgba(160,122,38,.13)}.ch-wrap[data-theme=light] .ch-tfs button.on{background:rgba(160,122,38,.1)}.ch-wrap[data-theme=light] .ch-srcs button.on,.ch-wrap[data-theme=light] .ch-lang button.on{background:#131722;color:#fff}.ch-wrap[data-theme=light] .ch-dot{border-color:rgba(19,23,34,.12)}.ch-wrap[data-theme=light] .ch-dot.on{border-color:#131722;box-shadow:0 0 0 2px rgba(19,23,34,.15)}.ch-wrap[data-theme=light] .btn-ghost:hover{background:rgba(19,23,34,.05)}.ch-wrap[data-theme=light] .ch-indi i{border-color:#b2b5be}html.ch-max .chart-screen.active:has(.ch-wrap[data-theme=light]){background:#fff}html.ch-max .ch-wrap[data-theme=light]{border-radius:0;padding:0}.ch-auto{position:absolute;right:4px;bottom:3px;z-index:2;min-width:24px;height:20px;padding:0 5px;border-radius:5px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font:700 11px var(--f-mono);cursor:pointer;line-height:1}.ch-auto.on{color:var(--gold-light);border-color:var(--gold-dim)}@media(max-width:600px){.ch-auto{height:24px;min-width:28px}}.ch-tfb{display:none;flex:0 0 auto;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:700 12.5px var(--f-mono);padding:6px 10px;border-radius:9px;cursor:pointer;min-height:34px}.ch-tfb svg{width:14px;height:14px;color:var(--muted)}.ch-bb svg{width:18px;height:18px}.ch-auto{min-width:20px;height:18px;font-size:10.5px;padding:0 4px}#ch-log{right:27px}#ch-pct{right:50px}.ch-rt{position:absolute;bottom:30px;right:74px;z-index:2;width:30px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.35)}.ch-rt[hidden]{display:none}.ch-rt svg{width:15px;height:15px}.ch-rt:hover{color:var(--text)}.ch-cti svg{width:20px;height:20px;flex:none}.ch-inds{margin:0 0 4px;padding:8px 10px;font-size:12.5px}.ch-indm{max-height:calc(100% - 16px);grid-template-rows:auto minmax(0,1fr)}.ch-indlist{display:grid;align-content:start;gap:2px;min-height:0;overflow:auto;overscroll-behavior:contain}@media(max-width:600px){.ch-tfs{display:none}.ch-tfb{display:flex}.ch-auto{height:24px;min-width:26px;font-size:11px}#ch-log{right:33px}#ch-pct{right:62px}.ch-rt{right:64px;bottom:34px;width:34px;height:30px}}@media(max-width:380px){.ch-indb span{display:none}.ch-bar{gap:5px}}.ch-main{position:relative}.ch-wl{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--border);border-radius:13px;overflow:hidden;min-height:0;color:var(--text)}.ch-wl[hidden]{display:none}@media(min-width:900px){.ch-wl{flex:0 0 280px;width:280px}}@media(max-width:899px){.ch-wl{position:absolute;inset:0;z-index:11;box-shadow:0 18px 44px -12px rgba(0,0,0,.6)}}.ch-wlh{display:flex;align-items:center;gap:2px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlsel{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--text);font:700 13px var(--f-body);padding:6px 8px;border-radius:8px;cursor:pointer;text-align:start}.ch-wlsel:hover{background:rgba(127,127,127,.1)}.ch-wlsel b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlsel small{color:var(--muted);font:500 11px var(--f-mono)}.ch-wlsel svg{width:14px;height:14px;color:var(--muted);flex:none}.ch-wlbtn{flex:none;width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:8px;color:var(--text2);cursor:pointer;padding:0}.ch-wlbtn svg{width:18px;height:18px}.ch-wlbtn:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlbtn.on{color:var(--gold-light);background:rgba(200,168,75,.14)}.ch-wlm{display:grid;padding:4px;border-bottom:1px solid var(--border);gap:1px;flex:none;max-height:45%;overflow:auto}.ch-wlm hr{border:0;border-top:1px solid var(--border);margin:4px 2px}.ch-wlm .ch-popi small{margin-inline-start:auto;font:500 10.5px var(--f-mono);color:var(--muted)}.ch-wlmi{background:none;border:0;color:var(--text2);text-align:start;padding:9px 10px;border-radius:7px;cursor:pointer;font:600 12.5px var(--f-body)}.ch-wlmi:hover{background:rgba(127,127,127,.12);color:var(--text)}.ch-wlmi.del{color:var(--red)}.ch-wlin{display:flex;align-items:center;gap:6px;padding:6px;border-bottom:1px solid var(--border);flex:none}.ch-wlin .fi{margin:0;padding:7px 10px;font-size:13px;min-width:0}.ch-wlin .btn{width:auto;margin:0;padding:7px 12px;font-size:12.5px;box-shadow:none;flex:none}.ch-wlcols,.ch-wlr{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) 64px 22px;align-items:center;gap:4px}.ch-wlcols{padding:3px 8px;border-bottom:1px solid var(--border);flex:none}.ch-wlcols button{background:none;border:0;color:var(--muted);font:600 11px var(--f-body);text-align:start;padding:5px 2px;cursor:pointer;white-space:nowrap}.ch-wlcols button:hover{color:var(--text)}.ch-wlcols button:nth-child(2),.ch-wlcols button:nth-child(3){text-align:end}.ch-wll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px 0}.ch-wlr{position:relative;padding:7px 8px;cursor:pointer;border-inline-start:2px solid transparent;min-height:38px}.ch-wlr:hover{background:rgba(127,127,127,.08)}.ch-wlr.on{background:rgba(200,168,75,.12);border-inline-start-color:var(--gold)}.ch-wlr.drag{opacity:.75;background:rgba(200,168,75,.2);z-index:1}.ch-wls{display:flex;align-items:center;gap:7px;min-width:0}.ch-wls .t-icon{width:20px;height:20px;border-radius:6px;flex:none}.ch-wls b{font:700 12.5px var(--f-mono);color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-wlp{font:600 12px var(--f-mono);color:var(--text);text-align:end;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:4px;padding:1px 2px}.ch-wlch{font:600 11.5px var(--f-mono);text-align:end;color:var(--muted);white-space:nowrap}.ch-wlch.up{color:var(--green)}.ch-wlch.down{color:var(--red)}.ch-wlp.fu{animation:chfu .9s}.ch-wlp.fd{animation:chfd .9s}@keyframes chfu{0%{background:rgba(8,153,129,.38)}100%{background:transparent}}@keyframes chfd{0%{background:rgba(242,54,69,.38)}100%{background:transparent}}.ch-wlrm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:none;border:0;border-radius:6px;color:var(--muted);cursor:pointer;visibility:hidden;padding:0}.ch-wlrm svg{width:13px;height:13px}.ch-wlrm:hover{color:var(--red);background:rgba(242,54,69,.1)}.ch-wl.edit .ch-wlrm{visibility:visible}.ch-wlg{position:absolute;inset-inline-start:0;top:0;bottom:0;width:16px;display:none;align-items:center;justify-content:center;color:var(--muted);cursor:grab;touch-action:none}.ch-wlg svg{width:12px;height:12px}.ch-wl.edit .ch-wlg{display:flex}.ch-wl.edit .ch-wlr{padding-inline-start:18px}@media(hover:hover){.ch-wlr:hover .ch-wlrm{visibility:visible}.ch-wlr:hover .ch-wlg{display:flex}}.ch-wlf{flex:none;padding:6px 10px;border-top:1px solid var(--border);font-size:10.5px;color:var(--muted)}.ch-pchip.on{border-color:var(--gold-dim);background:rgba(200,168,75,.12)}.ch-pchip i{font-style:normal;margin-inline-start:4px;color:var(--muted);font-weight:700}.ch-pchip.on i{color:var(--gold-light)}.ch-wdone{margin-top:12px}@media(max-width:420px){.ch-indb span{display:none}}.ch-hintx{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;margin-inline-start:8px;vertical-align:middle;border:0;border-radius:50%;background:rgba(127,127,127,.2);color:inherit;cursor:pointer;padding:0}.ch-hintx svg{width:12px;height:12px}.ch-hintx:hover{background:rgba(242,54,69,.2);color:var(--red)}@media(pointer:coarse){.ch-hintx{width:28px;height:28px;margin-inline-start:6px}.ch-hintx svg{width:14px;height:14px}}.chs-bv{width:58px;flex:none}.chs-in:disabled{opacity:.45}.chs-rng{width:96px;accent-color:var(--gold)}.chs-pv{font:600 11px var(--f-mono);color:var(--muted);min-width:34px;text-align:end}@media(max-width:420px){.chs-rng{width:72px}.chs-bv{width:52px}}.ch-ur{display:flex;gap:4px;flex:0 0 auto}.ch-ur[hidden]{display:none}.ch-ur .ch-fullb:disabled{opacity:.38;cursor:default}.ch-tfm{flex:0 0 auto;display:flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:9px;cursor:pointer;min-height:34px;width:28px;padding:0}.ch-tfm svg{width:14px;height:14px}.ch-tfs button.ch-tfx{border-style:dashed}.ch-tfr{display:flex;align-items:center;gap:2px}.ch-tfr .ch-popi{flex:1;min-width:0}.ch-tfr .ch-popi small{margin-inline-start:auto;color:var(--muted);font-size:11px}.ch-tfst{flex:none;width:32px;height:32px;border:0;background:none;color:var(--muted);font-size:16px;cursor:pointer;border-radius:8px}.ch-tfst.on{color:var(--gold)}.ch-tfst:hover{background:rgba(127,127,127,.12)}.ch-srcb{display:flex;align-items:center;gap:4px}.ch-srcb svg{width:13px;height:13px}.ch-psep{flex:0 0 1px;align-self:stretch;background:var(--border);margin:4px 2px}.ch-pcats{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:8px 0 2px}.ch-pcats button{flex:0 0 auto;background:var(--surface);border:1px solid var(--border);color:var(--text2);font:600 12px var(--f-body);padding:6px 11px;border-radius:99px;cursor:pointer}.ch-pcats button.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}.ch-prows{display:grid;gap:2px}.ch-prow{display:grid;grid-template-columns:24px 78px minmax(0,1fr) auto;align-items:center;gap:8px;background:none;border:0;border-bottom:1px solid var(--border);color:var(--text);padding:8px 4px;cursor:pointer;text-align:start}.ch-prow:hover{background:rgba(127,127,127,.08)}.ch-prow b{font:700 12.5px var(--f-mono)}.ch-prow span{font-size:12.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ch-prow small{font-size:10.5px;color:var(--muted)}.ch-prow .t-icon{width:22px;height:22px}.ch-gico{display:flex;align-items:center;justify-content:center;font:800 8.5px/1 var(--f-mono);letter-spacing:-.2px;color:#fff;background:#5d606b}.ch-gico[data-k=fx]{background:#2962ff}.ch-gico[data-k=metal]{background:#b8860b}.ch-gico[data-k=energy]{background:#3a3f4b}.ch-gico[data-k=index]{background:#7e57c2}.ch-gico[data-k=stock]{background:#089981}.ch-gico[data-k=agri]{background:#6d8b2f}@media(max-width:600px){.ch-bar{gap:5px}.ch-bar .ch-fullb{width:32px}.ch-ur{gap:3px}}@media(max-width:380px){.ch-bar{gap:3px}.ch-ur{gap:3px}.ch-bar .ch-fullb{width:28px}.ch-bar .ch-indb{padding:6px 6px}.ch-tfb{padding:6px 5px;gap:2px}}.ch-pop{max-height:calc(100% - 8px);overflow-y:auto;overscroll-behavior:contain}.ch-fly{scroll-padding-top:52px}.ch-clock{background:none;border:0;color:var(--muted);font:600 11px var(--f-mono);cursor:pointer;padding:2px 4px;border-radius:6px;margin-inline-start:auto;direction:ltr}.ch-clock:hover{color:var(--text);background:rgba(127,127,127,.12)}.ch-alertb svg{width:16px;height:16px}.ch-alertb:disabled{opacity:.4;cursor:default}@media(max-width:600px){.ch-alertb{display:none}}.ch-almod .chs-seg{flex-wrap:wrap}.ch-almod .chs-seg button{padding:0 9px}.chs-rw{flex-wrap:wrap}.chs-rw .chs-seg,.chs-rw .chs-c{max-width:100%}.ch-alnote{background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.35);border-radius:10px;padding:10px;font-size:12.5px;line-height:1.9;color:var(--text)}.ch-alnote .btn{width:auto;margin:6px 0 0;padding:6px 12px;font-size:12px}.ch-ctxi:disabled{opacity:.5;cursor:default}.ch-tool[data-t=alert]:disabled{opacity:.35}.ch-rp{position:absolute;left:8px;right:8px;margin-inline:auto;width:max-content;bottom:34px;z-index:7;display:flex;align-items:center;gap:4px;flex-wrap:wrap;justify-content:center;max-width:calc(100% - 16px);background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:5px 6px;box-shadow:0 12px 30px -10px rgba(0,0,0,.6)}.ch-rp[hidden]{display:none}.ch-rpbtn{display:flex;align-items:center;justify-content:center;gap:4px;min-width:34px;height:32px;padding:0 7px;border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:8px;cursor:pointer;font:600 12px var(--f-body)}.ch-rpbtn svg{width:16px;height:16px}.ch-rpbtn:hover:not(:disabled){color:var(--text);border-color:var(--border2)}.ch-rpbtn:disabled{opacity:.4;cursor:default}.ch-rpbtn.main{background:var(--gold);color:#0e0d0c;border-color:var(--gold)}.ch-rpbtn.buy{color:#fff;background:#089981;border-color:#089981}.ch-rpbtn.sell{color:#fff;background:#F23645;border-color:#F23645}.ch-rpbtn.x{border-color:transparent;background:none}.ch-rpspd{height:32px;border:1px solid var(--border);background:var(--surface);color:var(--text);border-radius:8px;font:600 12px var(--f-mono);padding:0 4px}.ch-rpsep{width:1px;align-self:stretch;background:var(--border);margin:2px 2px}.ch-rpst{font:600 11.5px var(--f-mono);color:var(--muted);padding:0 4px;white-space:nowrap}.ch-rpst .up{color:var(--green)}.ch-rpst .down{color:var(--red)}.ch-rphint{font-size:12px;color:var(--text2);padding:0 6px}.ch-rpline{position:absolute;top:0;bottom:30px;width:0;border-left:2px solid #F23645;z-index:7;pointer-events:none}.ch-rpline[hidden]{display:none}.ch-rpline span{position:absolute;top:6px;left:6px;white-space:nowrap;background:#F23645;color:#fff;font:600 11px var(--f-body);padding:2px 6px;border-radius:5px}.ch-stage.rp-sel #ch-canvas{cursor:col-resize}.ch-rpb.on{border-color:var(--gold-dim);color:var(--gold);background:rgba(200,168,75,.1)}@media(max-width:600px){.ch-rpb{display:none}.ch-rp{bottom:40px;gap:3px}.ch-rpbtn{min-width:30px;height:30px;padding:0 6px}.ch-rpst{text-align:center;padding:0 2px}.ch-rp .ch-rpbtn.x{min-width:30px}}@media(min-width:601px){.ch-bar{gap:6px}.ch-tfs{gap:3px}.ch-tfs button{min-width:36px;padding:6px 8px}}.ch-cmpb{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;background:var(--surface);border:1px solid var(--border);color:var(--text2);border-radius:50%;cursor:pointer}.ch-cmpb svg{width:18px;height:18px}.ch-cmpb:hover{color:var(--text)}.ch-cmpb.on{color:var(--gold);border-color:var(--gold-dim);background:rgba(200,168,75,.1)}@media(max-width:600px){.ch-cmpb{display:none}}.ch-indm{grid-template-rows:auto auto minmax(0,1fr)}.ch-cmpi{display:flex;align-items:center;gap:8px;width:100%;background:none;border:0;border-bottom:1px solid var(--border);color:var(--gold-light);font:600 12.5px var(--f-body);padding:10px 8px;margin:0 0 4px;cursor:pointer;text-align:start;min-height:40px}.ch-cmpi svg{width:17px;height:17px;flex:none}.ch-cmpi small{margin-inline-start:auto;color:var(--muted);font:500 10.5px var(--f-mono)}.ch-cmpi:hover{background:rgba(127,127,127,.08)}.ch-cmpm{width:min(460px,100%)}.ch-cmpcur{display:grid;gap:4px;margin-bottom:10px}.ch-cmpr{display:flex;align-items:center;gap:8px;padding:5px 6px 5px 8px;border:1px solid var(--border);border-radius:9px;min-height:38px}.ch-cmpr i{width:14px;height:4px;border-radius:2px;flex:none}.ch-cmpr .t-icon{width:20px;height:20px;flex:none}.ch-cmpr b{font:700 12.5px var(--f-mono);color:var(--text)}.ch-cmpr small{color:var(--muted);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.ch-cmpr .chs-x{margin-inline-start:auto;flex:none}.ch-cmpsrc{flex-wrap:wrap}.ch-cmpsrc button{flex:1 1 auto;min-height:34px;padding:6px 8px;font-size:12px}.ch-cmpl{margin-top:8px;max-height:200px;overflow:auto;align-content:flex-start}.ch-pchip:disabled{opacity:.4;cursor:default}.ch-cmpm .chs-hint{margin-top:10px}.ch-psrc{flex-wrap:wrap}.ch-psrc button{flex:1 1 auto}`;
   function injectCss() { if (document.getElementById('ch-css')) return; const st = document.createElement('style'); st.id = 'ch-css'; st.textContent = CHART_CSS; document.head.appendChild(st); }
   // ── مقیاسِ خودکارِ قیمت (A) ──
   const candleAxis = () => { try { return S.chart?.getDrawPaneById?.('candle_pane')?.getAxisComponent?.() || null; } catch (_) { return null; } };
@@ -3243,7 +3265,7 @@
     const g = cv.getContext('2d'); g.fillStyle = t.bg; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, pad);
     g.textBaseline = 'middle'; g.direction = 'ltr';
     g.fillStyle = t.txt; g.font = `700 ${Math.round(14 * k)}px ${MONO}`; g.textAlign = 'left';
-    g.fillText(`${S.coin}${quoteOf()} · ${tfOf(S.tf).l} · ${isG() ? 'Yahoo Finance' : srcName()}`, Math.round(12 * k), pad / 2);
+    g.fillText(`${S.coin}${quoteOf()} · ${tfOf(S.tf).l} · ${isY() ? 'Yahoo Finance' : S.src === 'hlx' ? 'Hyperliquid HIP-3' : srcName()}`, Math.round(12 * k), pad / 2);
     g.fillStyle = t.icon; g.font = `500 ${Math.round(11 * k)}px ${MONO}`; g.textAlign = 'right';
     g.fillText(`${fmtDate(Date.now())} (Tehran) · SamadiCapital Journal`, cv.width - Math.round(12 * k), pad / 2);
     const name = `${S.coin}_${tfOf(S.tf).l}_${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.png`;
@@ -3278,6 +3300,209 @@
     const nid = makeOverlay({ id: newId(), n: c.n, p: c.p.map(q => q.slice()), c: c.c, w: c.w, s: c.s, x: JSON.parse(JSON.stringify(c.x)) }, false);
     commit(); if (nid) selectId(nid); return true;
   }
+  // ── v26.55: مقایسه‌ی نماد (Compare، مثلِ TradingView) ──
+  //    تا ۳ نماد از هر منبعی به‌صورتِ خط روی نمودارِ اصلی. مقیاس خودکار «درصدی» می‌شود و هر خط از اولین کندلِ دیده‌شده با نمودار
+  //    هم‌مبدأ است ⇒ درصدِ محور برای هر خط همان تغییرِ خودِ آن نماد است؛ با پیمایش مبدأ تازه می‌شود (KLineChart درصد را از همان کندل
+  //    می‌گیرد، پس مقدارها همان‌جا در onVisibleRangeChange بازمقیاس می‌شوند — پیش از محاسبه‌ی محور).
+  //    هم‌ترازیِ زمان: هر کندلِ اصلی = آخرین کندلِ نمادِ مقایسه که پیش از پایانِ آن کندل شروع شده (سهامِ تعطیل = قیمتِ آخر).
+  const CMP_MAX = 3, CMP_COLORS = ['#FF9800', '#2962FF', '#E91E63'], CMPB = [];
+  const cmpName = k => 'CMP' + k;
+  const srcEn = src => SOURCES.find(s => s.id === src)?.name || src;   // روی خودِ نمودار همیشه انگلیسی
+  let cmpSeq = 0;
+  function cmpFromPrefs() {
+    const L0 = Array.isArray(S.store?.prefs?.cmp) ? S.store.prefs.cmp : [];
+    S.cmp = L0.filter(x => x && SOURCES.some(s => s.id === x.s) && /^[A-Z0-9]{1,15}$/.test(x.c || '')).slice(0, CMP_MAX)
+      .map((x, i) => ({ s: x.s, c: x.c, col: /^#[0-9A-Fa-f]{6}$/.test(x.col || '') ? x.col : CMP_COLORS[i], raw: null, tf: null }));
+  }
+  function cmpSave() {
+    if (!S.store) return;
+    if (S.cmp.length) S.store.prefs.cmp = S.cmp.map(x => ({ s: x.s, c: x.c, col: x.col })); else delete S.store.prefs.cmp;
+    scheduleSave();
+  }
+  function registerCompare(kc) {
+    for (let k = 0; k < CMP_MAX; k++) kc.registerIndicator({
+      name: cmpName(k), shortName: 'Compare', precision: 10, calcParams: [0], figures: [{ key: 'v', type: 'line' }],
+      calc: list => cmpCalcOne(k, list), draw: arg => cmpDraw(k, arg),
+      createTooltipDataSource: ({ indicator, crosshair }) => cmpTip(k, indicator, crosshair)
+    });
+  }
+  function cmpCalcOne(k, list) {
+    const it = S.cmp[k], out = list.map(() => ({}));
+    if (!it?.raw?.length || it.tf !== S.tf) return out;
+    const R = it.raw, ms = tfMs(); let j = 0, last = null;
+    for (let i = 0; i < list.length; i++) {
+      const end = i + 1 < list.length ? list[i + 1].timestamp : list[i].timestamp + ms;
+      while (j < R.length && R[j].t < end) { last = R[j].c; j++; }
+      if (last != null) out[i].a = last;
+    }
+    cmpScaleInto(k, out, list, S.chart?.getVisibleRange?.()?.from ?? 0);
+    return out;
+  }
+  // مبدأ = اولین کندلِ دیده‌شده که مقدارِ مقایسه دارد: v = a × (بسته‌شدنِ اصلی ÷ مقدارِ مقایسه) در همان کندل
+  function cmpScaleInto(k, out, list, from) {
+    let b = clamp(from | 0, 0, Math.max(0, out.length - 1)); while (b < out.length && !isNum(out[b]?.a)) b++;
+    const f = b < out.length && list[b] && out[b].a ? list[b].close / out[b].a : null; CMPB[k] = f == null ? -1 : b;
+    for (const r of out) if (r) { if (f != null && isNum(r.a)) r.v = r.a * f; else delete r.v; }
+  }
+  function cmpRescale(range) {
+    if (!S.cmp.length || !S.chart || !range) return;
+    const list = S.chart.getDataList();
+    S.cmp.forEach((_, k) => { const ind = S.chart.getIndicatorByPaneId('candle_pane', cmpName(k)); if (ind?.result?.length === list.length) cmpScaleInto(k, ind.result, list, range.from); });
+  }
+  function cmpDraw(k, { ctx, indicator, visibleRange, bounding, xAxis, yAxis }) {
+    const it = S.cmp[k], r = indicator.result || []; if (!it || !r.length) return true;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, bounding.width, bounding.height); ctx.clip();
+    ctx.strokeStyle = it.col; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; ctx.setLineDash([]); ctx.beginPath();
+    let on = false, lx = null, ly = null;
+    for (let i = Math.max(0, visibleRange.from - 1); i < Math.min(r.length, visibleRange.to + 1); i++) {
+      const v = r[i]?.v; if (!isNum(v)) { on = false; continue; }
+      const x = xAxis.convertToPixel(i), y = yAxis.convertToPixel(v);
+      if (on) ctx.lineTo(x, y); else { ctx.moveTo(x, y); on = true; }
+      lx = x; ly = y;
+    }
+    ctx.stroke();
+    if (lx != null && lx < bounding.width - 4) {   // نامِ نماد کنارِ آخرین نقطه
+      ctx.font = `600 10.5px ${MONO}`; const t = it.c, w = Math.ceil(ctx.measureText(t).width) + 8;
+      const x0 = Math.min(lx + 5, bounding.width - w - 2), y0 = clamp(ly - 8, 1, bounding.height - 17);
+      ctx.fillStyle = it.col; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x0, y0, w, 16, 3); else ctx.rect(x0, y0, w, 16); ctx.fill();
+      ctx.fillStyle = ink(it.col); ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(t, x0 + 4, y0 + 8.5);
+    }
+    ctx.restore(); return true;
+  }
+  const fmtCmp = v => { const d = precisionOf(v); return v.toLocaleString('en-US', { minimumFractionDigits: Math.min(d, 2), maximumFractionDigits: d }); };
+  function cmpTip(k, indicator, crosshair) {
+    const it = S.cmp[k]; if (!it) return { name: '', calcParamsText: '', values: [] };
+    const r = indicator.result || [], i = isNum(crosshair?.dataIndex) ? Math.min(crosshair.dataIndex, r.length - 1) : r.length - 1;
+    const a = r[i]?.a, b = r[CMPB[k]]?.a, p = isNum(a) && isNum(b) && b ? (a / b - 1) * 100 : null;
+    const txt = isNum(a) ? fmtCmp(a) + (isNum(p) ? `  ${p >= 0 ? '+' : '−'}${Math.abs(p).toFixed(2)}%` : '')
+      : it.err === 'nf' ? 'not found' : it.err ? 'unavailable' : it.raw ? '∅' : 'loading…';
+    return { name: it.c, calcParamsText: it.s !== S.src ? ' · ' + srcEn(it.s) : '', values: [{ title: '', value: { text: txt, color: it.col } }] };
+  }
+  // نشانگرها همیشه CMP0..CMP2 به ترتیبِ S.cmp ساخته می‌شوند (حذفِ وسطی ⇒ همه از نو)
+  function cmpApply() {
+    if (!S.chart) return;
+    for (let k = 0; k < CMP_MAX; k++) { try { S.chart.removeIndicator('candle_pane', cmpName(k)); } catch (_) {} }
+    S.cmp.forEach((_, k) => { try { S.chart.createIndicator({ name: cmpName(k), calcParams: [++cmpSeq] }, true, { id: 'candle_pane' }); } catch (_) {} });
+  }
+  function cmpCalc() { S.cmp.forEach((_, k) => { try { S.chart.overrideIndicator({ name: cmpName(k), calcParams: [++cmpSeq] }, 'candle_pane'); } catch (_) {} }); }
+  // داده‌ی هر نماد: همان تایم‌فریم، تا قدیمی‌ترین کندلِ نمودار (حداکثر ۴ درخواست)
+  async function cmpLoad(it, gen) {
+    const tf = S.tf, first = S.data[0]?.timestamp; if (!isNum(first)) return;
+    let rows = [], before = 0, more = true;
+    for (let n = 0; n < 4 && more; n++) {
+      const res = await fetchSeries(it.s, it.c, tf, { before, limit: 500 });
+      if (gen !== S.gen || !S.cmp.includes(it)) return;
+      if (!res.ok) { if (!rows.length) { it.err = res.status === 404 ? 'nf' : 'down'; it.raw = null; return; } break; }
+      rows = res.list.concat(rows); more = res.more && res.list.length > 0;
+      if (!rows.length || rows[0].timestamp <= first) break;
+      before = rows[0].timestamp;
+    }
+    it.raw = rows.map(k => ({ t: k.timestamp, c: k.close })); it.tf = tf; it.err = null; it.more = more;
+  }
+  async function cmpRefresh(only) {
+    if (!S.chart || !S.data.length) return;
+    const gen = S.gen, list = only ? [only] : S.cmp.slice();
+    await Promise.all(list.map(it => cmpLoad(it, gen)));
+    if (gen !== S.gen) return;
+    for (const it of list) if (it.err && !it.warned && S.cmp.includes(it)) {
+      it.warned = true;
+      showToast(it.err === 'nf' ? tr(`${it.c} در ${srcName(it.s)} پیدا نشد`, `${it.c} was not found on ${srcName(it.s)}`) : tr(`${srcName(it.s)} الان پاسخ نمی‌دهد`, `${srcName(it.s)} is not responding`));
+    }
+    cmpCalc();
+  }
+  async function cmpOlder() {
+    const first = S.data[0]?.timestamp, gen = S.gen; let ch = false;
+    await Promise.all(S.cmp.map(async it => {
+      if (!it.raw?.length || !it.more || it.raw[0].t <= first || it.tf !== S.tf) return;
+      const res = await fetchSeries(it.s, it.c, S.tf, { before: it.raw[0].t, limit: 500 }); if (gen !== S.gen || !res.ok) return;
+      it.raw = res.list.map(k => ({ t: k.timestamp, c: k.close })).concat(it.raw); it.more = res.more && res.list.length > 0; ch = true;
+    }));
+    if (ch && gen === S.gen) cmpCalc();
+  }
+  // پایشِ زنده: کندل‌های آخرِ هر نماد، حداکثر هر ۸ ثانیه
+  async function cmpPoll() {
+    if (!S.cmp.length || Date.now() - (S.cmpPollT || 0) < Math.max(8000, tfOf(S.tf).poll)) return;
+    S.cmpPollT = Date.now(); const gen = S.gen; let ch = false;
+    await Promise.all(S.cmp.map(async it => {
+      if (!it.raw || it.tf !== S.tf) return;
+      const res = await fetchSeries(it.s, it.c, S.tf, { limit: 3 }); if (gen !== S.gen || !res.ok) return;
+      for (const k of res.list) {
+        const R = it.raw, L = R[R.length - 1];
+        if (!L || k.timestamp > L.t) { R.push({ t: k.timestamp, c: k.close }); ch = true; } else if (k.timestamp === L.t && k.close !== L.c) { L.c = k.close; ch = true; }
+      }
+    }));
+    if (ch && gen === S.gen) cmpCalc();
+  }
+  function cmpAdd(src, coin) {
+    coin = String(coin || '').toUpperCase();
+    if (!S.chart || !SOURCES.some(s => s.id === src) || !/^[A-Z0-9]{1,15}$/.test(coin)) return false;
+    if (S.cmp.length >= CMP_MAX) { showToast(tr(`حداکثر ${fa(CMP_MAX)} نماد برای مقایسه`, `Up to ${CMP_MAX} compare symbols`)); return false; }
+    if (S.cmp.some(x => x.s === src && x.c === coin) || (src === S.src && coin === S.coin)) return false;
+    const it = { s: src, c: coin, col: CMP_COLORS.find(c => !S.cmp.some(x => x.col === c)) || CMP_COLORS[0], raw: null, tf: null };
+    S.cmp.push(it);
+    if (S.ys !== 'pct' && S.store) { S.store.prefs.cmpYs = S.ys || 'n'; setScale('pct'); }   // مثلِ TradingView: مقایسه ⇒ مقیاسِ درصدی
+    cmpApply(); cmpSave(); paintHead();
+    cmpRefresh(it).then(() => { if (it.err === 'nf') cmpRemove(S.cmp.indexOf(it)); S.cmpDlg?.(); });
+    return true;
+  }
+  function cmpRemove(k) {
+    if (!(k >= 0 && k < S.cmp.length)) return;
+    S.cmp.splice(k, 1); cmpApply();
+    if (!S.cmp.length && S.store?.prefs?.cmpYs) {   // آخرین مقایسه رفت ⇒ مقیاسِ قبلی
+      const p = S.store.prefs.cmpYs; delete S.store.prefs.cmpYs;
+      if (S.ys === 'pct' && p !== 'pct') setScale(p === 'log' ? 'log' : 'pct');
+    }
+    cmpSave(); paintHead(); S.cmpDlg?.();
+  }
+  function cmpDialog() {
+    const box = $('ch-modal'); if (!box || !S.chart) return;
+    closePop(); closeCtx(); closeFly(); const im = $('ch-indm'); if (im) im.hidden = true;
+    let src = SOURCES.some(s => s.id === S.cmpSrc) ? S.cmpSrc : S.src;
+    const close = () => { box.hidden = true; box.innerHTML = ''; box.onclick = box.onkeydown = null; S.cmpDlg = null; };
+    box.innerHTML = `<div class="ch-mcard chs ch-cmpm" role="dialog" aria-label="${esc(tr('مقایسه‌ی نماد', 'Compare symbol'))}" dir="${dirOf()}">`
+      + `<div class="chs-top"><b>${tr('مقایسه‌ی نماد', 'Compare symbol')}</b><button type="button" class="chs-x" id="ch-cmpx" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+      + `<div class="chs-body"><div class="ch-cmpcur" id="ch-cmpcur"></div>`
+      + `<div class="ch-psrc ch-cmpsrc" role="group" aria-label="${tr('منبعِ داده', 'Data source')}">${SOURCES.map(s => `<button type="button" data-cmpsrc="${s.id}">${esc(srcLabel(s))}</button>`).join('')}</div>`
+      + `<input id="ch-cmpq" class="fi" dir="ltr" autocomplete="off" autocapitalize="characters" aria-label="${tr('جست‌وجوی نماد', 'Symbol search')}">`
+      + `<div class="ch-pchips ch-cmpl" id="ch-cmpl"></div>`
+      + `<div class="chs-hint">${tr('هر نماد یک خطِ رنگی روی همین نمودار است؛ مقیاس درصدی می‌شود و همه از اولین کندلِ دیده‌شده هم‌مبدأند (با پیمایش، مبدأ هم جابه‌جا می‌شود). حداکثر ۳ نماد.', 'Each symbol is drawn as a coloured line on this chart. The scale switches to percent and every line starts from the first visible bar (scrolling moves the start). Up to 3 symbols.')}</div></div></div>`;
+    box.hidden = false;
+    const input = $('ch-cmpq');
+    const paintCur = () => {
+      const el = $('ch-cmpcur'); if (!el) return;
+      el.innerHTML = S.cmp.length ? S.cmp.map((it, k) => `<div class="ch-cmpr"><i style="background:${it.col}"></i>${symLogo(it.c, it.s)}<b dir="ltr">${esc(it.c)}</b><small>${esc(srcName(it.s))}</small>`
+        + `<button type="button" class="chs-x" data-cmprm="${k}" aria-label="${esc(tr('حذفِ ', 'Remove ') + it.c)}">${ICON.close}</button></div>`).join('')
+        : `<div class="ch-pempty">${tr('هنوز نمادی اضافه نشده — از فهرستِ زیر انتخاب کن.', 'No symbols yet — pick one below.')}</div>`;
+    };
+    let seq = 0;
+    const paintList = async () => {
+      const my = ++seq;
+      box.querySelectorAll('[data-cmpsrc]').forEach(b => { const on = b.dataset.cmpsrc === src; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+      input.placeholder = src === 'hlx' ? tr('جست‌وجو: GOLD، CL، NVDA…', 'Search: GOLD, CL, NVDA…') : isG(src) ? tr('جست‌وجو: GOLD، EURUSD، SPX…', 'Search: GOLD, EURUSD, SPX…') : tr('جست‌وجو: ETH، SOL…', 'Search: ETH, SOL…');
+      const all = await symbolsOf(src); if (my !== seq || box.hidden || !$('ch-cmpl')) return;
+      const qq = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      let items = qq ? all.filter(c => c.includes(qq)).slice(0, 60) : popularOf(src).filter(c => !all.length || all.includes(c));
+      if (qq && !items.includes(qq) && /^[A-Z0-9]{1,15}$/.test(qq)) items = [qq, ...items];
+      const used = new Set(S.cmp.map(x => x.s + ':' + x.c)), full = S.cmp.length >= CMP_MAX;
+      $('ch-cmpl').innerHTML = items.length ? items.map(c => { const dis = full || used.has(src + ':' + c) || (src === S.src && c === S.coin);
+        return `<button type="button" class="ch-pchip" data-cmpadd="${esc(c)}"${dis ? ' disabled' : ''}>${symLogo(c, src)}<span dir="ltr">${esc(c)}</span></button>`; }).join('')
+        : `<div class="ch-pempty">${tr('نمادی پیدا نشد', 'No symbols found')}</div>`;
+    };
+    const add = c => { if (cmpAdd(src, c)) { input.value = ''; paintCur(); paintList(); } };
+    box.onclick = ev => {
+      const t = ev.target.closest('button'); if (!t || !box.contains(t)) return;
+      if (t.id === 'ch-cmpx') { close(); return; }
+      if (t.dataset.cmpsrc) { src = S.cmpSrc = t.dataset.cmpsrc; input.value = ''; paintList(); return; }
+      if (t.dataset.cmprm != null) { cmpRemove(+t.dataset.cmprm); return; }
+      if (t.dataset.cmpadd && !t.disabled) add(t.dataset.cmpadd);
+    };
+    input.oninput = () => paintList();
+    input.onkeydown = ev => { if (ev.key === 'Enter') { const qq = String(input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); if (qq) add(qq); } };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(); } };
+    S.cmpDlg = () => { if (!box.hidden && $('ch-cmpcur')) { paintCur(); paintList(); } };
+    paintCur(); paintList(); if (!S.touch) setTimeout(() => input.focus(), 30);
+  }
+
   // ── v26.54: بازپخشِ بازار (Bar Replay، مثلِ TradingView) + معامله‌ی تمرینی ──
   //    دکمه‌ی بازپخش ⇒ خطِ قرمزِ عمودی دنبالِ نشانگر ⇒ کلیک روی کندلِ شروع (یا «تصادفی») ⇒ کندل‌های بعدی پنهان؛
   //    پخش/مکث، یک کندل جلو (Shift+→)، سرعت، تغییرِ تایم‌فریم همان لحظه را نگه می‌دارد؛ خرید/فروش/بستن با سود و زیانِ دلاری.
@@ -3803,14 +4028,14 @@
   //    افزودن/حذف/جابه‌جایی با کشیدن/مرتب‌سازیِ ستون‌ها، ↑↓ برای نمادِ قبلی/بعدی. همه در prefs.wl (روی همه‌ی دستگاه‌ها).
   const WL_MAX_LISTS = 10, WL_MAX_ITEMS = 100;
   function wlData() {
-    const g = isG(), key = g ? 'wlg' : 'wl';
-    const fresh = () => ({ lists: [{ id: g ? 'g1' : 'w1', name: '', items: (g ? POPULAR_G : POPULAR).slice() }], cur: g ? 'g1' : 'w1' });
+    const k = kindOf(), key = { c: 'wl', g: 'wlg', x: 'wlx' }[k], id0 = { c: 'w1', g: 'g1', x: 'x1' }[k];
+    const fresh = () => ({ lists: [{ id: id0, name: '', items: popular().slice() }], cur: id0 });
     const p = S.store?.prefs; if (!p) return fresh();
     if (!p[key] || !Array.isArray(p[key].lists) || !p[key].lists.length) p[key] = fresh();
     return p[key];
   }
   const wlCur = () => { const w = wlData(); return w.lists.find(l => l.id === w.cur) || w.lists[0]; };
-  const wlName = l => l.name || (isG() ? tr('بازارهای جهانی', 'Global markets') : tr('واچ‌لیست', 'Watchlist'));
+  const wlName = l => l.name || (S.src === 'hlx' ? tr('سهام و کالا (HL)', 'Stocks & commodities (HL)') : isG() ? tr('بازارهای جهانی', 'Global markets') : tr('واچ‌لیست', 'Watchlist'));
   function wlItems(l = wlCur()) {
     const it = (l.items || []).slice(), so = l.sort; if (!so) return it;
     const k = so.replace('-', ''), dir = so[0] === '-' ? -1 : 1, val = c => k === 'sym' ? c : k === 'p' ? S.q?.[c]?.p : S.q?.[c]?.c;
@@ -4064,7 +4289,7 @@
     src: setSrc, tf: setTf, coin: setCoin, pick, lang: setLang, watchlist: on => toggleWL(on), _wlPoll: wlPoll, theme: t => setTheme(t), auto: setAuto, _auto: isAuto, max: on => setMax(on), maxExit: () => setMax(false), isMax: () => S.max,
     indMenu: () => { const m = $('ch-indm'); if (!m) return; m.hidden = !m.hidden; paintInd(); },
     ind: toggleIndicator, indSet: openIndSettings, indFind: q => { S.indQ = String(q || '').slice(0, 40); paintInd(true); },
-    tfMenu, tfFav, srcMenu, setTz, tzMenu, replay: rpEnter, rpExit: () => rpExit(), _rpStart: i => rpStart(i), _rpStep: n => rpStep(n), _rpOpen: s => rpOpen(s), _rpClose: () => rpClose(), alert: () => alertDialog(null, lastClose()), alertLine: alertOnLine, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
+    tfMenu, tfFav, srcMenu, setTz, tzMenu, compare: () => cmpDialog(), _cmpAdd: (s, c) => cmpAdd(s, c), _cmpRemove: k => cmpRemove(k), replay: rpEnter, rpExit: () => rpExit(), _rpStart: i => rpStart(i), _rpStep: n => rpStep(n), _rpOpen: s => rpOpen(s), _rpClose: () => rpClose(), alert: () => alertDialog(null, lastClose()), alertLine: alertOnLine, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
     _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _specCfg: specCfg, _SPECS: SPECS, _alertsLoad: alertsLoad, _tzOffset: tzOffset, _fmtDate: t => fmtDate(t), _cdText: cdText, _styles: stylesFor,
