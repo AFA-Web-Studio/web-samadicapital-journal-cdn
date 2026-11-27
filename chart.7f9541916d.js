@@ -53,6 +53,9 @@
    «تایم‌فریم‌های محبوب» (ستاره، prefs.tff) و فهرستِ کامل؛ منبع‌ها: Hyperliquid، SoDEX، Bybit، MEXC، BingX و «بازارهای جهانی»
    (فارکس، فلزات، انرژی، شاخص‌ها، سهام، کشاورزی از Yahoo) با انتخابگرِ دسته‌دار، نامِ فارسی/انگلیسی، رقمِ اعشارِ درستِ هر بازار
    (EURUSD پنج رقم)، واچ‌لیستِ جدا (prefs.wlg) و آخرین نمادِ جدا برای کریپتو و بازارهای جهانی (prefs.lastk).
+   v26.51 (همان درخواست: «RSI، مکدی و … مثلِ TradingView، کامل‌تر و کاربرپسندتر»): چارچوبِ مشترکِ اندیکاتور (SPECS) — فرمولِ Pine، رنگ و سبکِ
+   پیش‌فرضِ TradingView، پنجره‌ی «ورودی‌ها / ظاهر» با پیش‌نمایشِ زنده برای MACD، حجم، MA، EMA، بولینگر و تازه‌ها: استوکاستیک، استوکاستیکِ RSI،
+   ATR، VWAP (نشست/هفته/ماه با باند)، سوپرترند و ابرِ ایچیموکو (دهانه‌ها ۲۵ کندل جلو تا آینده). prefs.ip[name] = فقط تفاوت با پیش‌فرض.
    نقطه‌ی بیرون از کندل‌ها (آینده/پیش از تاریخچه): patchTimeScale زمان را با طولِ تایم‌فریم امتداد می‌دهد.
    از index.html برمی‌دارد: apiFetch, esc, SESSION, L, showToast, uiConfirm, closeSheet, coinLogo, jsArg. */
 (function () {
@@ -711,7 +714,7 @@
   function registerOverlays() {
     if (registered) return; registered = true;
     const kc = window.klinecharts;
-    registerRSI(kc);
+    registerRSI(kc); registerSpecs(kc);
     kc.registerFigure({ name: 'scHit', draw: () => {}, checkEventOn: (p, a) => {
       const c = a.coordinates || [], tol = S.tol;
       if (a.area && c.length > 2 && inPoly(p, c)) return true;
@@ -1135,6 +1138,7 @@
     if (isG() && !S.symMeta?.yahoo) symbolsOf('yahoo').then(() => { paintHead(); paintWL(); });
     S.prec = isNum(res.prec) ? res.prec : null;   // بازارهای جهانی: رقمِ اعشارِ خودِ بازار (EURUSD پنج رقم، ین سه رقم)
     S.chart.setPriceVolumePrecision(isNum(S.prec) ? S.prec : precisionOf(last?.close), 2);
+    for (const n of ['MACD', 'ATR']) if (S.panes[n]) { const p = specPrec(n); try { S.chart.overrideIndicator({ name: n, precision: p }, S.panes[n]); } catch (_) {} }
     { const a = candleAxis(); if (a && !a.getAutoCalcTickFlag()) a.setAutoCalcTickFlag(true); }   // نماد/تایم‌فریمِ تازه = مقیاسِ خودکار
     S.chart.applyNewData(viewData(S.data), S.more);
     setTimeout(() => { paintAuto(); updRT(); }, 0);
@@ -2026,7 +2030,10 @@
     { id: 'VOL', t: 'حجم', en: 'Volume', main: false }, { id: 'MA', t: 'میانگینِ متحرک (MA)', en: 'Moving Average (MA)', main: true },
     { id: 'EMA', t: 'میانگینِ نمایی (EMA)', en: 'Exponential Moving Average (EMA)', main: true }, { id: 'BOLL', t: 'باندِ بولینگر', en: 'Bollinger Bands (BOLL)', main: true },
     { id: 'RSI', t: 'RSI', en: 'Relative Strength Index (RSI)', main: false }, { id: 'MACD', t: 'MACD', en: 'MACD', main: false },
-    { id: 'SAR', t: 'پارابولیک سار (SAR)', en: 'Parabolic SAR', main: true }, { id: 'KDJ', t: 'استوکاستیک (KDJ)', en: 'Stochastic (KDJ)', main: false },
+    { id: 'STOCH', t: 'استوکاستیک', en: 'Stochastic', main: false }, { id: 'STOCHRSI', t: 'استوکاستیکِ RSI', en: 'Stochastic RSI', main: false },
+    { id: 'VWAP', t: 'VWAP (میانگینِ وزنیِ حجمی)', en: 'VWAP', main: true }, { id: 'ST', t: 'سوپرترند', en: 'Supertrend', main: true },
+    { id: 'ICHI', t: 'ابرِ ایچیموکو', en: 'Ichimoku Cloud', main: true }, { id: 'ATR', t: 'ATR (میانگینِ دامنه‌ی واقعی)', en: 'Average True Range (ATR)', main: false },
+    { id: 'SAR', t: 'پارابولیک سار (SAR)', en: 'Parabolic SAR', main: true }, { id: 'KDJ', t: 'KDJ', en: 'KDJ', main: false },
     { id: 'CCI', t: 'CCI', en: 'Commodity Channel Index (CCI)', main: false }, { id: 'DMI', t: 'ADX / DMI', en: 'Directional Movement (DMI / ADX)', main: false },
     { id: 'OBV', t: 'OBV (حجمِ تعادلی)', en: 'On Balance Volume (OBV)', main: false }, { id: 'WR', t: 'ویلیامز %R', en: 'Williams %R', main: false },
     { id: 'AO', t: 'اسیلاتورِ شگفت‌انگیز (AO)', en: 'Awesome Oscillator (AO)', main: false }
@@ -2337,6 +2344,377 @@
     };
     box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
   }
+  // ── v26.51: اندیکاتورها عینِ TradingView با یک چارچوبِ مشترک (مثلِ RSI در v26.48): فرمولِ Pine، رنگ و سبکِ پیش‌فرضِ TradingView،
+  //    پنجره‌ی «ورودی‌ها / ظاهر» با پیش‌نمایشِ زنده، ذخیره‌ی فقط تفاوت با پیش‌فرض در prefs.ip[name] (آرایه‌ی قدیمی = دوره‌ها).
+  //    ردیف‌ها: int/num/src/sel/bool (ورودی)، line/band/fill/hist4/mline (ظاهر). همه را خودمان می‌کشیم (draw ⇒ true).
+  const TVC = { blue: '#2962FF', orange: '#FF6D00', red: '#F23645', green: '#089981', gray: '#787B86', pink: '#E91E63', purple: '#9C27B0', teal: '#26A69A', yellow: '#FFEB3B' };
+  const MA_T = [['SMA', 'SMA', 'SMA'], ['EMA', 'EMA', 'EMA'], ['RMA', 'SMMA (RMA)', 'SMMA (RMA)'], ['WMA', 'WMA', 'WMA'], ['VWMA', 'VWMA', 'VWMA']];
+  const srcSeries = (list, src) => list.map(RSI_PX[src] || RSI_PX.close);
+  // ابزارهای سری (null = هنوز نیست)
+  const hi = (v, i, n) => { let m = -Infinity; for (let j = i - n + 1; j <= i; j++) if (v[j] > m) m = v[j]; return m; };
+  const lo = (v, i, n) => { let m = Infinity; for (let j = i - n + 1; j <= i; j++) if (v[j] < m) m = v[j]; return m; };
+  function stdevAt(v, i, n, mean) { let q = 0; for (let j = i - n + 1; j <= i; j++) q += (v[j] - mean) ** 2; return Math.sqrt(q / n); }
+  function trueRange(list) { return list.map((k, i) => i ? Math.max(k.high - k.low, Math.abs(k.high - list[i - 1].close), Math.abs(k.low - list[i - 1].close)) : k.high - k.low); }
+  const line = (key, fa, en, c, w = 1) => ({ k: key, t: 'line', fa, en, def: { on: true, c, w } });
+  const band = (key, fa, en, v, a = 100, s = 1) => ({ k: key, t: 'band', fa, en, def: { on: true, c: TVC.gray, s, v, a } });
+  const fill = (key, fa, en, c, a) => ({ k: key, t: 'fill', fa, en, def: { on: true, c, a } });
+  const int = (k, fa, en, d, min = 1, max = 500) => ({ k, t: 'int', fa, en, d, min, max });
+  const SPECS = {
+    MACD: { sub: true, prec: 4,
+      inputs: [int('fast', 'طولِ سریع', 'Fast Length', 12), int('slow', 'طولِ کند', 'Slow Length', 26), { k: 'src', t: 'src', d: 'close' }, int('sig', 'هموارسازیِ سیگنال', 'Signal Smoothing', 9, 1, 50),
+        { k: 'omt', t: 'sel', fa: 'نوعِ میانگینِ اسیلاتور', en: 'Oscillator MA Type', d: 'EMA', opts: [['EMA', 'EMA', 'EMA'], ['SMA', 'SMA', 'SMA']] },
+        { k: 'smt', t: 'sel', fa: 'نوعِ میانگینِ سیگنال', en: 'Signal Line MA Type', d: 'EMA', opts: [['EMA', 'EMA', 'EMA'], ['SMA', 'SMA', 'SMA']] }],
+      style: [{ k: 'hist', t: 'hist4', fa: 'هیستوگرام', en: 'Histogram', def: { on: true, c1: '#26A69A', c2: '#B2DFDB', c3: '#FFCDD2', c4: '#FF5252' } },
+        line('macd', 'MACD', 'MACD', TVC.blue), line('signal', 'خطِ سیگنال', 'Signal line', TVC.orange), band('zero', 'خطِ صفر', 'Zero Line', 0, 50, 0)],
+      legacy: (a, c) => { [c.fast, c.slow, c.sig] = [a[0] ?? c.fast, a[1] ?? c.slow, a[2] ?? c.sig]; },
+      label: c => `${c.fast} ${c.slow} ${c.src} ${c.sig}`,
+      calc(list, c) {
+        const v = srcSeries(list, c.src), f = maOf(v, c.fast, c.omt), s = maOf(v, c.slow, c.omt);
+        const m = v.map((_, i) => f[i] != null && s[i] != null ? f[i] - s[i] : null), sg = maOf(m, c.sig, c.smt);
+        return v.map((_, i) => { const r = {}; if (m[i] != null) r.macd = m[i]; if (sg[i] != null) { r.signal = sg[i]; r.hist = m[i] - sg[i]; } if (c.zero.on) r.zero = 0; return r; });
+      },
+      draw(g, c) {
+        if (c.hist.on) g.hist('hist', (i, v) => { const p = g.r[i - 1]?.hist; return v >= 0 ? (p == null || p < v ? c.hist.c1 : c.hist.c2) : (p == null || p > v ? c.hist.c3 : c.hist.c4); });
+        g.band(c.zero); g.lineOf('macd', c.macd); g.lineOf('signal', c.signal);
+      },
+      tip: c => [['hist', c.hist.on && c.hist.c1], ['macd', c.macd.on && c.macd.c], ['signal', c.signal.on && c.signal.c]]
+    },
+    STOCH: { sub: true, prec: 2, t: ['استوکاستیک', 'Stochastic'],
+      inputs: [int('k', 'طولِ %K', '%K Length', 14), int('ks', 'هموارسازیِ %K', '%K Smoothing', 1, 1, 50), int('ds', 'هموارسازیِ %D', '%D Smoothing', 3, 1, 50)],
+      style: [line('pk', '%K', '%K', TVC.blue), line('pd', '%D', '%D', TVC.orange), band('up', 'باندِ بالا', 'Upper Band', 80), band('mid', 'باندِ میانی', 'Middle Band', 50, 50), band('lo', 'باندِ پایین', 'Lower Band', 20),
+        fill('bg', 'پس‌زمینه', 'Background', '#2196F3', 10)],
+      label: c => `${c.k} ${c.ks} ${c.ds}`,
+      calc(list, c) {
+        const H = list.map(k => k.high), L = list.map(k => k.low), raw = list.map((k, i) => { if (i < c.k - 1) return null; const h = hi(H, i, c.k), l = lo(L, i, c.k); return h > l ? 100 * (k.close - l) / (h - l) : 50; });
+        const K = maOf(raw, c.ks, 'SMA'), D = maOf(K, c.ds, 'SMA');
+        return list.map((_, i) => { const r = { up: c.up.v, lo: c.lo.v }; if (K[i] != null) r.pk = K[i]; if (D[i] != null) r.pd = D[i]; return r; });
+      },
+      draw(g, c) { if (c.bg.on) g.fillBand(c.up.v, c.lo.v, c.bg); g.band(c.up); g.band(c.mid); g.band(c.lo); g.lineOf('pd', c.pd); g.lineOf('pk', c.pk); },
+      tip: c => [['pk', c.pk.on && c.pk.c], ['pd', c.pd.on && c.pd.c]]
+    },
+    STOCHRSI: { sub: true, prec: 2, t: ['استوکاستیکِ RSI', 'Stochastic RSI'],
+      inputs: [int('k', 'K', 'K', 3, 1, 50), int('d', 'D', 'D', 3, 1, 50), int('rl', 'طولِ RSI', 'RSI Length', 14), int('sl', 'طولِ استوکاستیک', 'Stochastic Length', 14), { k: 'src', t: 'src', d: 'close' }],
+      style: [line('pk', 'K', 'K', TVC.blue), line('pd', 'D', 'D', TVC.orange), band('up', 'باندِ بالا', 'Upper Band', 80), band('mid', 'باندِ میانی', 'Middle Band', 50, 50), band('lo', 'باندِ پایین', 'Lower Band', 20),
+        fill('bg', 'پس‌زمینه', 'Background', '#2196F3', 10)],
+      label: c => `${c.k} ${c.d} ${c.rl} ${c.sl} ${c.src}`,
+      calc(list, c) {
+        const R = rsiOf(srcSeries(list, c.src), c.rl), f = R.findIndex(x => x != null);
+        const raw = R.map((x, i) => { if (x == null || f < 0 || i - f < c.sl - 1) return null; const h = hi(R, i, c.sl), l = lo(R, i, c.sl); return h > l ? 100 * (x - l) / (h - l) : 0; });
+        const K = maOf(raw, c.k, 'SMA'), D = maOf(K, c.d, 'SMA');
+        return list.map((_, i) => { const r = { up: c.up.v, lo: c.lo.v }; if (K[i] != null) r.pk = K[i]; if (D[i] != null) r.pd = D[i]; return r; });
+      },
+      draw(g, c) { SPECS.STOCH.draw(g, c); },
+      tip: c => [['pk', c.pk.on && c.pk.c], ['pd', c.pd.on && c.pd.c]]
+    },
+    ATR: { sub: true, prec: 4, t: ['میانگینِ دامنه‌ی واقعی (ATR)', 'Average True Range'],
+      inputs: [int('n', 'طول', 'Length', 14), { k: 'mt', t: 'sel', fa: 'هموارسازی', en: 'Smoothing', d: 'RMA', opts: [['RMA', 'RMA', 'RMA'], ['SMA', 'SMA', 'SMA'], ['EMA', 'EMA', 'EMA'], ['WMA', 'WMA', 'WMA']] }],
+      style: [line('atr', 'ATR', 'ATR', '#B71C1C')],
+      legacy: (a, c) => { if (a[0]) c.n = a[0]; },
+      label: c => `${c.n} ${c.mt}`,
+      calc(list, c) { const a = maOf(trueRange(list), c.n, c.mt); return a.map(x => x == null ? {} : { atr: x }); },
+      draw(g, c) { g.lineOf('atr', c.atr); },
+      tip: c => [['atr', c.atr.on && c.atr.c]]
+    },
+    VOL: { sub: true, prec: 0, big: true, t: ['حجم', 'Volume'],
+      inputs: [{ k: 'mal', t: 'int', fa: 'طولِ میانگینِ حجم', en: 'MA Length', d: 20, min: 1, max: 500 }],
+      style: [{ k: 'bar', t: 'hist4', fa: 'ستون‌ها (صعودی / نزولی)', en: 'Volume (growing / falling)', two: true, def: { on: true, c1: '#26A69A', c2: '#EF5350', a: 50 } }, Object.assign(line('ma', 'میانگینِ حجم', 'Volume MA', TVC.blue), { def: { on: false, c: TVC.blue, w: 1 } })],
+      legacy: (a, c) => { if (a[0]) { c.mal = a[0]; c.ma.on = true; } },
+      label: c => c.ma.on ? `MA ${c.mal}` : '',
+      calc(list, c) { const v = list.map(k => k.volume || 0), m = c.ma.on ? maOf(v, c.mal, 'SMA') : []; return list.map((k, i) => { const r = { vol: v[i], zero: 0 }; if (m[i] != null) r.ma = m[i]; return r; }); },
+      draw(g, c) { if (c.bar.on) g.hist('vol', i => { const k = g.list[i]; return k ? hexA(k.close >= k.open ? c.bar.c1 : c.bar.c2, (c.bar.a ?? 50) / 100) : null; }, 0.8); if (c.ma.on) g.lineOf('ma', c.ma); },
+      tip: c => [['vol', c.bar.on && (i => { const k = i.k; return k && k.close >= k.open ? c.bar.c1 : c.bar.c2; })], ['ma', c.ma.on && c.ma.c]]
+    },
+    BOLL: { main: true, prec: null, t: ['باندِ بولینگر', 'Bollinger Bands'],
+      inputs: [int('n', 'طول', 'Length', 20), { k: 'mt', t: 'sel', fa: 'نوعِ میانگینِ پایه', en: 'Basis MA Type', d: 'SMA', opts: MA_T }, { k: 'src', t: 'src', d: 'close' },
+        { k: 'mult', t: 'num', fa: 'ضریبِ انحرافِ معیار', en: 'StdDev', d: 2, min: 0.001, max: 50 }],
+      style: [line('basis', 'پایه', 'Basis', TVC.blue), line('upper', 'بالا', 'Upper', TVC.red), line('lower', 'پایین', 'Lower', TVC.green), fill('bg', 'پس‌زمینه', 'Background', '#2196F3', 5)],
+      legacy: (a, c) => { if (a[0]) c.n = a[0]; if (a[1]) c.mult = a[1]; },
+      label: c => `${c.n} ${c.mt} ${c.src} ${c.mult}`,
+      calc(list, c) {
+        const v = srcSeries(list, c.src), b = maOf(v, c.n, c.mt, list.map(k => k.volume));
+        return v.map((_, i) => { if (b[i] == null || i < c.n - 1) return {}; const sd = stdevAt(v, i, c.n, v.slice(i - c.n + 1, i + 1).reduce((x, y) => x + y, 0) / c.n) * c.mult; return { basis: b[i], upper: b[i] + sd, lower: b[i] - sd }; });
+      },
+      draw(g, c) { if (c.bg.on) g.fillBetween('upper', 'lower', c.bg); g.lineOf('basis', c.basis); g.lineOf('upper', c.upper); g.lineOf('lower', c.lower); },
+      tip: c => [['basis', c.basis.on && c.basis.c], ['upper', c.upper.on && c.upper.c], ['lower', c.lower.on && c.lower.c]]
+    },
+    VWAP: { main: true, prec: null, t: ['VWAP', 'VWAP'],
+      inputs: [{ k: 'anc', t: 'sel', fa: 'دوره‌ی لنگر', en: 'Anchor Period', d: 'D', opts: [['D', 'روزانه (نشست)', 'Session'], ['W', 'هفتگی', 'Week'], ['M', 'ماهانه', 'Month']] }, { k: 'src', t: 'src', d: 'hlc3' },
+        { k: 'm1', t: 'num', fa: 'ضریبِ باندِ ۱', en: 'Bands Multiplier #1', d: 1, min: 0.1, max: 10 }, { k: 'm2', t: 'num', fa: 'ضریبِ باندِ ۲', en: 'Bands Multiplier #2', d: 2, min: 0.1, max: 10 }, { k: 'm3', t: 'num', fa: 'ضریبِ باندِ ۳', en: 'Bands Multiplier #3', d: 3, min: 0.1, max: 10 }],
+      style: [line('vwap', 'VWAP', 'VWAP', TVC.blue), line('b1', 'باندِ ۱', 'Bands #1', '#4CAF50'), Object.assign(line('b2', 'باندِ ۲', 'Bands #2', '#808000'), { def: { on: false, c: '#808000', w: 1 } }),
+        Object.assign(line('b3', 'باندِ ۳', 'Bands #3', '#00897B'), { def: { on: false, c: '#00897B', w: 1 } }), fill('bf', 'پس‌زمینه‌ی باندها', 'Bands fill', '#4CAF50', 5)],
+      label: c => `${{ D: 'Session', W: 'Week', M: 'Month' }[c.anc]} ${c.src}`,
+      calc(list, c) {
+        const key = t => { const d = new Date(t); return c.anc === 'M' ? d.getUTCFullYear() * 12 + d.getUTCMonth() : c.anc === 'W' ? Math.floor((t / 864e5 + 3) / 7) : Math.floor(t / 864e5); };
+        const v = srcSeries(list, c.src); let pk = null, sv = 0, svp = 0, svp2 = 0;
+        return list.map((k, i) => {
+          const kk = key(k.timestamp); if (kk !== pk) { pk = kk; sv = 0; svp = 0; svp2 = 0; }
+          const vol = k.volume || 0; sv += vol; svp += v[i] * vol; svp2 += v[i] * v[i] * vol;
+          if (!(sv > 0)) return {};
+          const w = svp / sv, sd = Math.sqrt(Math.max(0, svp2 / sv - w * w)), r = { vwap: w };
+          if (c.b1.on) { r.b1u = w + sd * c.m1; r.b1l = w - sd * c.m1; } if (c.b2.on) { r.b2u = w + sd * c.m2; r.b2l = w - sd * c.m2; } if (c.b3.on) { r.b3u = w + sd * c.m3; r.b3l = w - sd * c.m3; }
+          r.anc = kk; return r;
+        });
+      },
+      draw(g, c) {
+        const brk = (i) => g.r[i]?.anc !== g.r[i - 1]?.anc;   // هر نشست خطِ جدا (مثلِ TradingView)
+        if (c.bf.on && c.b1.on) g.fillBetween('b1u', 'b1l', c.bf, brk);
+        for (const [k, o] of [['b3', c.b3], ['b2', c.b2], ['b1', c.b1]]) if (o.on) { g.lineOf(k + 'u', o, brk); g.lineOf(k + 'l', o, brk); }
+        g.lineOf('vwap', c.vwap, brk);
+      },
+      tip: c => [['vwap', c.vwap.on && c.vwap.c], ['b1u', c.b1.on && c.b1.c], ['b1l', c.b1.on && c.b1.c]]
+    },
+    ST: { main: true, prec: null, t: ['سوپرترند', 'Supertrend'],
+      inputs: [int('n', 'طولِ ATR', 'ATR Length', 10), { k: 'f', t: 'num', fa: 'ضریب', en: 'Factor', d: 3, min: 0.01, max: 100 }],
+      style: [line('up', 'روندِ صعودی', 'Up Trend', TVC.green), line('dn', 'روندِ نزولی', 'Down Trend', TVC.red), fill('bf', 'پس‌زمینه', 'Body Fill', '#089981', 10)],
+      label: c => `${c.n} ${c.f}`,
+      calc(list, c) {
+        const atr = maOf(trueRange(list), c.n, 'RMA'); let pl = null, pu = null, ps = null, dir = 1;
+        return list.map((k, i) => {
+          if (atr[i] == null) return {};
+          const m = (k.high + k.low) / 2; let up = m + c.f * atr[i], lw = m - c.f * atr[i];
+          const pc = list[i - 1]?.close;
+          if (pl != null) lw = lw > pl || pc < pl ? lw : pl;
+          if (pu != null) up = up < pu || pc > pu ? up : pu;
+          if (ps == null) dir = 1; else if (ps === pu) dir = k.close > up ? -1 : 1; else dir = k.close < lw ? 1 : -1;
+          const st = dir === -1 ? lw : up; pl = lw; pu = up; ps = st;
+          return dir === -1 ? { up: st, mid: m, d: -1 } : { dn: st, mid: m, d: 1 };
+        });
+      },
+      draw(g, c) {
+        if (c.bf.on) { g.fillBetween('up', 'mid', { c: c.up.c, a: c.bf.a }); g.fillBetween('dn', 'mid', { c: c.dn.c, a: c.bf.a }); }
+        g.lineOf('up', c.up); g.lineOf('dn', c.dn);
+      },
+      tip: c => [['up', c.up.on && c.up.c], ['dn', c.dn.on && c.dn.c]]
+    },
+    ICHI: { main: true, prec: null, t: ['ابرِ ایچیموکو', 'Ichimoku Cloud'],
+      inputs: [int('cl', 'طولِ خطِ تبدیل', 'Conversion Line Length', 9), int('bl', 'طولِ خطِ پایه', 'Base Line Length', 26), int('ll', 'طولِ دهانه‌ی B', 'Leading Span B Length', 52), int('dp', 'جابه‌جایی', 'Lagging Span', 26)],
+      style: [line('conv', 'خطِ تبدیل (تنکان)', 'Conversion Line', TVC.blue), line('base', 'خطِ پایه (کیجون)', 'Base Line', '#B71C1C'), line('lag', 'دهانه‌ی تأخیری (چیکو)', 'Lagging Span', '#43A047'),
+        line('la', 'دهانه‌ی A', 'Leading Span A', '#A5D6A7'), line('lb', 'دهانه‌ی B', 'Leading Span B', '#EF9A9A'), fill('cu', 'ابرِ صعودی', 'Cloud (bullish)', '#43A047', 10), fill('cd', 'ابرِ نزولی', 'Cloud (bearish)', '#F44336', 10)],
+      label: c => `${c.cl} ${c.bl} ${c.ll} ${c.dp}`,
+      calc(list, c) {
+        const H = list.map(k => k.high), L = list.map(k => k.low), dc = (i, n) => i >= n - 1 ? (hi(H, i, n) + lo(L, i, n)) / 2 : null;
+        return list.map((k, i) => { const cv = dc(i, c.cl), bs = dc(i, c.bl), r = { lag: k.close }; if (cv != null) r.conv = cv; if (bs != null) r.base = bs; if (cv != null && bs != null) r.la = (cv + bs) / 2; const b = dc(i, c.ll); if (b != null) r.lb = b; return r; });
+      },
+      draw(g, c) {
+        const sh = c.dp - 1;   // دهانه‌ها ۲۵ کندل جلو (تا آینده)، چیکو ۲۵ کندل عقب
+        if (c.cu.on || c.cd.on) g.cloud('la', 'lb', sh, c.cu.on && c.cu, c.cd.on && c.cd);
+        g.lineOf('la', c.la, null, sh); g.lineOf('lb', c.lb, null, sh);
+        g.lineOf('lag', c.lag, null, -sh); g.lineOf('base', c.base); g.lineOf('conv', c.conv);
+      },
+      tip: c => [['conv', c.conv.on && c.conv.c], ['base', c.base.on && c.base.c], ['la', c.la.on && c.la.c, c.dp - 1], ['lb', c.lb.on && c.lb.c, c.dp - 1]]
+    },
+    MA: { main: true, prec: null, t: ['میانگینِ متحرک (MA)', 'Moving Average'], multi: 'SMA',
+      inputs: [{ k: 'src', t: 'src', d: 'close' }],
+      style: [{ k: 'l1', t: 'mline', fa: 'خطِ ۱', en: 'MA #1', def: { on: true, n: 20, c: TVC.blue, w: 1 } }, { k: 'l2', t: 'mline', fa: 'خطِ ۲', en: 'MA #2', def: { on: true, n: 50, c: TVC.orange, w: 1 } },
+        { k: 'l3', t: 'mline', fa: 'خطِ ۳', en: 'MA #3', def: { on: true, n: 200, c: TVC.pink, w: 2 } }, { k: 'l4', t: 'mline', fa: 'خطِ ۴', en: 'MA #4', def: { on: false, n: 100, c: TVC.purple, w: 1 } }],
+      legacy: (a, c) => { ['l1', 'l2', 'l3', 'l4'].forEach((k, i) => { if (a[i]) { c[k].n = a[i]; c[k].on = true; } else c[k].on = false; }); },
+      label: c => ['l1', 'l2', 'l3', 'l4'].filter(k => c[k].on).map(k => c[k].n).join(' '),
+      calc(list, c) {
+        const v = srcSeries(list, c.src), s = ['l1', 'l2', 'l3', 'l4'].map(k => c[k].on ? maOf(v, c[k].n, this.multi, list.map(x => x.volume)) : null);
+        return v.map((_, i) => { const r = {}; s.forEach((a, j) => { if (a && a[i] != null) r['l' + (j + 1)] = a[i]; }); return r; });
+      },
+      draw(g, c) { for (const k of ['l4', 'l3', 'l2', 'l1']) g.lineOf(k, c[k]); },
+      tip: c => ['l1', 'l2', 'l3', 'l4'].map(k => [k, c[k].on && c[k].c])
+    }
+  };
+  SPECS.EMA = { ...SPECS.MA, t: ['میانگینِ نمایی (EMA)', 'Moving Average Exponential'], multi: 'EMA',
+    style: [{ k: 'l1', t: 'mline', fa: 'خطِ ۱', en: 'EMA #1', def: { on: true, n: 9, c: '#F7B924', w: 1 } }, { k: 'l2', t: 'mline', fa: 'خطِ ۲', en: 'EMA #2', def: { on: true, n: 21, c: TVC.blue, w: 1 } },
+      { k: 'l3', t: 'mline', fa: 'خطِ ۳', en: 'EMA #3', def: { on: true, n: 50, c: TVC.orange, w: 1 } }, { k: 'l4', t: 'mline', fa: 'خطِ ۴', en: 'EMA #4', def: { on: false, n: 200, c: TVC.pink, w: 2 } }] };
+  SPECS.EMA.calc = SPECS.MA.calc;
+  const specDefault = name => { const sp = SPECS[name], c = {}; for (const x of sp.inputs) c[x.k] = x.d; for (const x of sp.style) c[x.k] = JSON.parse(JSON.stringify(x.def)); return c; };
+  function specCfg(name, raw) {
+    const sp = SPECS[name], c = specDefault(name);
+    if (Array.isArray(raw)) { if (sp.legacy && raw.every(v => isNum(v) && v > 0 && v <= 500)) sp.legacy(raw, c); return c; }
+    if (!raw || typeof raw !== 'object') return c;
+    for (const x of sp.inputs) {
+      const v = raw[x.k]; if (v === undefined) continue;
+      if (x.t === 'int' && Number.isInteger(v) && v >= x.min && v <= x.max) c[x.k] = v;
+      else if (x.t === 'num' && isNum(v) && v >= x.min && v <= x.max) c[x.k] = v;
+      else if (x.t === 'src' && RSI_SRC.includes(v)) c[x.k] = v;
+      else if (x.t === 'sel' && x.opts.some(o => o[0] === v)) c[x.k] = v;
+      else if (x.t === 'bool' && typeof v === 'boolean') c[x.k] = v;
+    }
+    for (const x of sp.style) {
+      const a = c[x.k], b = raw[x.k]; if (!b || typeof b !== 'object') continue;
+      if (typeof b.on === 'boolean') a.on = b.on;
+      for (const f of ['c', 'c1', 'c2', 'c3', 'c4']) if (f in a && /^#[0-9A-Fa-f]{6}$/.test(b[f] || '')) a[f] = b[f];
+      if ('w' in a && [1, 2, 3, 4].includes(b.w)) a.w = b.w;
+      if ('s' in a && [0, 1, 2].includes(b.s)) a.s = b.s;
+      if ('v' in a && isNum(b.v) && Math.abs(b.v) <= 1e6) a.v = b.v;
+      if ('a' in a && Number.isInteger(b.a) && b.a >= 0 && b.a <= 100) a.a = b.a;
+      if ('n' in a && Number.isInteger(b.n) && b.n >= 1 && b.n <= 500) a.n = b.n;
+    }
+    return c;
+  }
+  function specDiff(name, c) {
+    const d = specDefault(name), out = {};
+    for (const k of Object.keys(d)) {
+      if (typeof d[k] !== 'object') { if (c[k] !== d[k]) out[k] = c[k]; continue; }
+      const o = {}; for (const f of Object.keys(d[k])) if (c[k][f] !== d[k][f]) o[f] = c[k][f];
+      if (Object.keys(o).length) out[k] = o;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  const pricePrec = () => { const L = S.data || [], v = L[L.length - 1]?.close; return isNum(S.prec) ? S.prec : isNum(v) ? precisionOf(v) : 2; };
+  const specPrec = name => name === 'MACD' || name === 'ATR' ? clamp(pricePrec() + 1, 2, 8) : null;   // MACDِ یورو/دلار ۰٫۰۰۰۱۲ است، نه ۰٫۰۰
+  const specCreate = name => { const c = specCfg(name, S.store?.prefs?.ip?.[name]), p = specPrec(name); return { name, calcParams: [1], extendData: c, ...(p != null ? { precision: p } : {}) }; };
+  // ابزارِ کشیدنِ هر اندیکاتور روی بومِ پنلِ خودش
+  function specPainter({ ctx, indicator, kLineDataList, visibleRange, bounding, barSpace, xAxis, yAxis }) {
+    const r = indicator.result || [], W = bounding.width, H = bounding.height, X = i => xAxis.convertToPixel(i), Y = v => yAxis.convertToPixel(v);
+    const a = Math.max(0, Math.floor(visibleRange.from) - 1), b = Math.min(r.length - 1, Math.ceil(visibleRange.to) + 1);
+    const dash = s => s === 1 ? [4, 4] : s === 2 ? [1, 3] : [];
+    const runs = (key, fn, brk, sh = 0) => { let s0 = -1; const from = Math.max(0, a - Math.max(0, sh)), to = Math.min(r.length - 1, b - Math.min(0, sh));
+      for (let i = from; i <= to + 1; i++) { const ok = i <= to && r[i]?.[key] != null && !(s0 >= 0 && brk && brk(i)); if (ok && s0 < 0) s0 = i; else if (!ok && s0 >= 0) { fn(s0, i - 1); s0 = r[i]?.[key] != null && i <= to ? i : -1; } } };
+    const g = {
+      r, list: kLineDataList,
+      lineOf(key, o, brk, sh = 0) {
+        if (!o || !o.on) return;
+        ctx.strokeStyle = o.c; ctx.lineWidth = o.w || 1; ctx.setLineDash([]); ctx.lineJoin = 'round'; ctx.beginPath();
+        runs(key, (s0, e) => { ctx.moveTo(X(s0 + sh), Y(r[s0][key])); for (let i = s0 + 1; i <= e; i++) ctx.lineTo(X(i + sh), Y(r[i][key])); }, brk, sh);
+        ctx.stroke();
+      },
+      band(o) { if (!o || !o.on) return; const y = Math.round(Y(o.v)) + 0.5; ctx.strokeStyle = hexA(o.c, (o.a ?? 100) / 100); ctx.lineWidth = 1; ctx.setLineDash(dash(o.s)); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.setLineDash([]); },
+      fillBand(v1, v2, o) { const y1 = Y(v1), y2 = Y(v2); ctx.fillStyle = hexA(o.c, (o.a ?? 10) / 100); ctx.fillRect(0, Math.min(y1, y2), W, Math.abs(y2 - y1)); },
+      fillBetween(k1, k2, o, brk) {
+        ctx.fillStyle = hexA(o.c, (o.a ?? 10) / 100); ctx.beginPath();
+        runs(k1, (s0, e) => { let ok = true; for (let i = s0; i <= e; i++) if (r[i][k2] == null) ok = false; if (!ok) return; ctx.moveTo(X(s0), Y(r[s0][k1])); for (let i = s0 + 1; i <= e; i++) ctx.lineTo(X(i), Y(r[i][k1])); for (let i = e; i >= s0; i--) ctx.lineTo(X(i), Y(r[i][k2])); ctx.closePath(); }, brk);
+        ctx.fill();
+      },
+      hist(key, colorOf, wk = 0.7) {
+        const y0 = Y(0), w = Math.max(1, (barSpace?.bar || 6) * wk);
+        for (let i = a; i <= b; i++) { const v = r[i]?.[key]; if (v == null) continue; const col = colorOf(i, v); if (!col) continue; const y = Y(v); ctx.fillStyle = col; ctx.fillRect(Math.round(X(i) - w / 2), Math.min(y, y0), Math.round(w), Math.max(1, Math.abs(y0 - y))); }
+      },
+      cloud(ka, kb, sh, up, dn) {   // ابرِ ایچیموکو: جابه‌جا به جلو، رنگ بسته به A>B
+        for (let i = Math.max(1, a - sh); i <= Math.min(r.length - 1, b); i++) {
+          const p = r[i - 1], q = r[i]; if (p?.[ka] == null || p?.[kb] == null || q?.[ka] == null || q?.[kb] == null) continue;
+          const o = q[ka] >= q[kb] ? up : dn; if (!o) continue;
+          ctx.fillStyle = hexA(o.c, (o.a ?? 10) / 100); ctx.beginPath();
+          ctx.moveTo(X(i - 1 + sh), Y(p[ka])); ctx.lineTo(X(i + sh), Y(q[ka])); ctx.lineTo(X(i + sh), Y(q[kb])); ctx.lineTo(X(i - 1 + sh), Y(p[kb])); ctx.closePath(); ctx.fill();
+        }
+      }
+    };
+    return g;
+  }
+  function registerSpecs(kc) {
+    for (const [name, sp] of Object.entries(SPECS)) {
+      const keys = new Set(); for (const x of sp.style) { keys.add(x.k); if (x.k === 'hist') keys.add('hist'); }
+      ['up', 'lo', 'zero', 'vol', 'b1u', 'b1l', 'b2u', 'b2l', 'b3u', 'b3l', 'vwap', 'basis', 'upper', 'lower', 'mid'].forEach(k => keys.add(k));
+      kc.registerIndicator({
+        name, shortName: name === 'ST' ? 'Supertrend' : name === 'ICHI' ? 'Ichimoku' : name === 'STOCH' ? 'Stoch' : name === 'STOCHRSI' ? 'Stoch RSI' : name, precision: sp.main ? 10 : sp.prec ?? 2, calcParams: [1],
+        shouldFormatBigNumber: !!sp.big, figures: [...keys].map(key => ({ key, type: 'line' })),
+        calc: (list, ind) => sp.calc.call(sp, list, ind.extendData || specDefault(name)),
+        draw: arg => { const c = arg.indicator.extendData || specDefault(name); arg.ctx.save(); arg.ctx.beginPath(); arg.ctx.rect(0, 0, arg.bounding.width, arg.bounding.height); arg.ctx.clip(); try { sp.draw(specPainter(arg), c); } finally { arg.ctx.restore(); } return true; },
+        createTooltipDataSource: ({ indicator, crosshair, kLineDataList }) => {
+          const c = indicator.extendData || specDefault(name), r = indicator.result || [], i = isNum(crosshair?.dataIndex) ? crosshair.dataIndex : r.length - 1, d = r[i] || {}, vals = [];
+          for (const [k, col, sh] of sp.tip(c)) {
+            if (!col) continue;
+            const v = sh ? r[i - sh]?.[k] : d[k];   // روی نمودارِ اصلی: قیمت با قالبِ همان نماد (نه دقتِ اندیکاتور)
+            vals.push({ title: '', value: { text: isNum(v) ? (sp.main ? fmtP(v) : v) : '∅', color: typeof col === 'function' ? col({ k: kLineDataList?.[i] }) : col } });
+          }
+          const lab = sp.label(c);
+          return { name: name === 'ST' ? 'Supertrend' : name === 'ICHI' ? 'Ichimoku' : name === 'STOCH' ? 'Stoch' : name === 'STOCHRSI' ? 'Stoch RSI' : name === 'VOL' ? 'Volume' : name, calcParamsText: lab ? ' ' + lab : '', values: vals };
+        }
+      });
+    }
+  }
+  // پنجره‌ی تنظیماتِ هر اندیکاتور (مثلِ RSI): «ورودی‌ها / ظاهر»، پیش‌نمایشِ زنده، انصراف = برگشت
+  function openSpecSettings(name) {
+    const sp = SPECS[name], box = $('ch-modal'); if (!sp || !box || readOnly()) return;
+    $('ch-indm').hidden = true; closePop(); closeCtx();
+    const orig = specCfg(name, S.store.prefs.ip?.[name]), bad = new Set();
+    let c = specCfg(name, S.store.prefs.ip?.[name]), cur = 'in', palFor = null;
+    const PAL = [...new Set([...PALETTE, '#7E57C2', '#787B86', '#FF5252', '#26A69A', '#B2DFDB', '#FFCDD2', '#2962FF', '#FF6D00', '#F7B924', '#B71C1C', '#43A047', '#A5D6A7', '#EF9A9A'].map(x => x.toUpperCase()))];
+    const paneOf = () => sp.main ? 'candle_pane' : S.panes[name];
+    const apply = cfg => { const id = paneOf(); if (id && S.chart && S.panes[name]) S.chart.overrideIndicator({ name, calcParams: [1], extendData: JSON.parse(JSON.stringify(cfg)) }, id); };
+    const sw = (key, f = 'c') => `<button type="button" class="chs-sw" data-sw="${key}.${f}" style="--c:${c[key][f]}" title="${tr('رنگ', 'Color')}" aria-label="${tr('رنگ', 'Color')}"></button>`;
+    const seg = (key, f, vals) => `<div class="chs-seg" role="group" data-seg="${key}.${f}">${vals.map(([v, inner, t]) => `<button type="button" data-v="${v}" class="${v === c[key][f] ? 'on' : ''}" title="${esc(t)}" aria-label="${esc(t)}" aria-pressed="${v === c[key][f]}">${inner}</button>`).join('')}</div>`;
+    const wSeg = key => seg(key, 'w', [1, 2, 3, 4].map(w => [w, WIDTH_IC(w), w + 'px']));
+    const sSeg = key => seg(key, 's', [[0, STYLE_IC(0), tr('پیوسته', 'Solid')], [1, STYLE_IC(1), tr('خط‌چین', 'Dashed')], [2, STYLE_IC(2), tr('نقطه‌چین', 'Dotted')]]);
+    const op = key => `<input class="chs-rng" type="range" dir="ltr" min="0" max="100" step="1" value="${c[key].a}" data-a="${key}" aria-label="${tr('شفافیت', 'Opacity')}"><b class="chs-pv" dir="ltr" data-av="${key}">${c[key].a}%</b>`;
+    const nIn = (k, v, lab, cls = 'fi chs-in') => `<input class="${cls}" dir="ltr" inputmode="decimal" data-n="${k}" value="${v}" aria-label="${esc(lab)}">`;
+    const row = (lab, ctl) => `<div class="chs-r"><span class="chs-l">${lab}</span>${ctl}</div>`;
+    const ck = (key, lab, extra = '') => `<div class="chs-r chs-rc"><label class="chs-ck"><input type="checkbox" data-on="${key}"${c[key].on ? ' checked' : ''}><span>${lab}</span></label><div class="chs-c">${extra}</div></div>`;
+    const inPanel = () => sp.inputs.map(x => {
+      const lab = x.t === 'src' ? tr('منبع', 'Source') : tr(x.fa, x.en);
+      if (x.t === 'int' || x.t === 'num') return row(lab, nIn(x.k, c[x.k], lab));
+      if (x.t === 'src') return row(lab, `<select class="fi chs-in" data-sel="${x.k}" aria-label="${esc(lab)}">${RSI_SRC.map(v => `<option value="${v}"${v === c[x.k] ? ' selected' : ''}>${v}</option>`).join('')}</select>`);
+      if (x.t === 'sel') return row(lab, `<select class="fi chs-in" data-sel="${x.k}" aria-label="${esc(lab)}">${x.opts.map(o => `<option value="${o[0]}"${o[0] === c[x.k] ? ' selected' : ''}>${esc(tr(o[1], o[2]))}</option>`).join('')}</select>`);
+      return '';
+    }).join('') + sp.style.filter(x => x.t === 'mline').map(x => ck(x.k, tr(x.fa, x.en), nIn(x.k + '.n', c[x.k].n, tr('طول', 'Length'), 'chs-lvv chs-bv') + sw(x.k) + wSeg(x.k))).join('');
+    const stPanel = () => sp.style.map(x => {
+      const lab = tr(x.fa, x.en);
+      if (x.t === 'line') return ck(x.k, lab, sw(x.k) + wSeg(x.k));
+      if (x.t === 'band') return ck(x.k, lab, sw(x.k) + sSeg(x.k) + nIn(x.k + '.v', c[x.k].v, tr('مقدار', 'Value'), 'chs-lvv chs-bv'));
+      if (x.t === 'fill') return ck(x.k, lab, sw(x.k) + op(x.k));
+      if (x.t === 'hist4') return ck(x.k, lab, (x.two ? ['c1', 'c2'] : ['c1', 'c2', 'c3', 'c4']).map(f => sw(x.k, f)).join('') + (x.two ? op(x.k) : ''));
+      if (x.t === 'mline') return ck(x.k, lab + ` <small dir="ltr">(${c[x.k].n})</small>`, sw(x.k) + wSeg(x.k));
+      return '';
+    }).join('');
+    const title = tr((sp.t || [name, name])[0], (sp.t || [name, name])[1]);
+    const TABS = [['in', tr('ورودی‌ها', 'Inputs')], ['st', tr('ظاهر', 'Style')]];
+    function render() {
+      bad.clear();
+      box.innerHTML = `<div class="ch-mcard ch-set chs" role="dialog" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + title)}">`
+        + `<div class="chs-top"><b>${esc(title)}</b><button type="button" class="chs-x" id="chs-x" aria-label="${tr('بستن', 'Close')}">${ICON.close}</button></div>`
+        + `<div class="chs-tabs" role="tablist">${TABS.map(([k, t]) => `<button type="button" role="tab" data-tab="${k}" class="${k === cur ? 'on' : ''}" aria-selected="${k === cur}">${t}</button>`).join('')}</div>`
+        + `<div class="chs-body"><div class="chs-p" data-p="in"${cur === 'in' ? '' : ' hidden'}>${inPanel() || `<div class="chs-hint">${tr('این اندیکاتور ورودیِ دیگری ندارد.', 'No inputs.')}</div>`}</div><div class="chs-p" data-p="st"${cur === 'st' ? '' : ' hidden'}>${stPanel()}</div>`
+        + `<div class="ch-merr" id="ch-ierr" hidden></div><div class="chs-pal" id="chs-pal" hidden></div></div>`
+        + `<div class="chs-foot"><button type="button" class="btn btn-ghost ch-sdef" id="ch-idef">${tr('بازگشت به پیش‌فرض', 'Reset to default')}</button>`
+        + `<button type="button" class="btn btn-ghost" id="ch-ino">${tr('انصراف', 'Cancel')}</button><button type="button" class="btn btn-primary" id="ch-iok">${tr('ثبت', 'Ok')}</button></div></div>`;
+      box.hidden = false; palFor = null;
+    }
+    const showTab = k => { cur = k; box.querySelectorAll('[data-tab]').forEach(b => { const on = b.dataset.tab === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); }); box.querySelectorAll('[data-p]').forEach(p => { p.hidden = p.dataset.p !== k; }); const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; };
+    function openPal(key, el) {
+      const pal = $('chs-pal'), body = box.querySelector('.chs-body'); if (!pal || !body) return;
+      if (palFor === key && !pal.hidden) { pal.hidden = true; palFor = null; return; }
+      palFor = key; const [k, f] = key.split('.'), now = String(c[k][f]).toUpperCase();
+      pal.innerHTML = `<div class="ch-pal">${PAL.map(x => `<button type="button" class="ch-dot${x === now ? ' on' : ''}" style="--c:${x}" data-pc="${x}" aria-label="${tr('رنگ', 'Color')} ${x}"></button>`).join('')}</div>`;
+      pal.hidden = false;
+      const br = body.getBoundingClientRect(), er = el.getBoundingClientRect();
+      pal.style.top = (er.bottom - br.top + body.scrollTop + 4) + 'px';
+      pal.style.left = clamp(er.left - br.left, 4, Math.max(4, br.width - pal.offsetWidth - 4)) + 'px';
+    }
+    const close = ok => {
+      if (ok) { const d = specDiff(name, c), all = { ...(S.store.prefs.ip || {}) }; if (d) all[name] = d; else delete all[name]; S.store.prefs.ip = all; apply(c); scheduleSave(); }
+      else apply(orig);
+      box.hidden = true; box.innerHTML = ''; box.onclick = box.oninput = box.onchange = box.onkeydown = null;
+    };
+    render();
+    box.onclick = ev => {
+      const t = ev.target;
+      if (t === box) { close(false); return; }
+      const tabB = t.closest('[data-tab]'); if (tabB) { showTab(tabB.dataset.tab); return; }
+      const swB = t.closest('[data-sw]'); if (swB) { openPal(swB.dataset.sw, swB); return; }
+      const pc = t.closest('[data-pc]');
+      if (pc && palFor) { const [k, f] = palFor.split('.'); c[k][f] = pc.dataset.pc; box.querySelector(`[data-sw="${palFor}"]`)?.style.setProperty('--c', pc.dataset.pc); $('chs-pal').hidden = true; palFor = null; apply(c); return; }
+      if (!t.closest('#chs-pal')) { const p = $('chs-pal'); if (p) p.hidden = true; palFor = null; }
+      const sg = t.closest('.chs-seg button');
+      if (sg) { const [key, f] = sg.parentElement.dataset.seg.split('.'); c[key][f] = +sg.dataset.v; sg.parentElement.querySelectorAll('button').forEach(b => { const on = b === sg; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); }); apply(c); return; }
+      if (t.id === 'ch-idef') { c = specDefault(name); render(); apply(c); return; }
+      if (t.id === 'ch-iok') {
+        if (bad.size) { const e = $('ch-ierr'); e.textContent = tr('عددِ نادرست — مقدارِ قرمز را درست کن.', 'Invalid value — fix the field in red.'); e.hidden = false; const first = box.querySelector('.bad'), p = first?.closest('[data-p]'); if (p && p.dataset.p !== cur) showTab(p.dataset.p); first?.focus(); return; }
+        close(true); return;
+      }
+      if (t.id === 'ch-ino' || t.closest('#chs-x')) { close(false); return; }
+    };
+    box.oninput = ev => {
+      const t = ev.target;
+      if (t.dataset.a) { const k = t.dataset.a, v = +t.value; c[k].a = v; const b = box.querySelector(`[data-av="${k}"]`); if (b) b.textContent = v + '%'; apply(c); return; }
+      if (!t.dataset.n) return;
+      const key = t.dataset.n, v = numIn(t.value); let okv = false;
+      if (key.endsWith('.v')) { okv = isNum(v) && Math.abs(v) <= 1e6; if (okv) c[key.slice(0, -2)].v = v; }
+      else if (key.endsWith('.n')) { okv = Number.isInteger(v) && v >= 1 && v <= 500; if (okv) c[key.slice(0, -2)].n = v; }
+      else { const x = sp.inputs.find(i => i.k === key); okv = !!x && isNum(v) && v >= x.min && v <= x.max && (x.t !== 'int' || Number.isInteger(v)); if (okv) c[key] = v; }
+      t.classList.toggle('bad', !okv); if (okv) bad.delete(key); else bad.add(key);
+      if (okv) { if (!bad.size) $('ch-ierr').hidden = true; apply(c); }
+    };
+    box.onchange = ev => {
+      const t = ev.target;
+      if (t.dataset.on) { c[t.dataset.on].on = t.checked; apply(c); return; }
+      if (t.dataset.sel) { c[t.dataset.sel] = t.value; apply(c); }
+    };
+    box.onkeydown = ev => { if (ev.key === 'Escape') { ev.stopPropagation(); close(false); } };
+  }
   function applyIndicators() {
     for (const [name, pane] of Object.entries(S.panes)) S.chart.removeIndicator(pane, name);
     S.panes = {};
@@ -2346,7 +2724,7 @@
     const cap = subs ? Math.max(20, Math.floor(($('ch-canvas')?.clientHeight || 520) * 0.5 / subs)) : 400;
     for (const name of S.store.prefs.ind || []) {
       const def = INDICATORS.find(x => x.id === name); if (!def) continue;
-      const p = name === 'RSI' ? null : indParams(name), v = name === 'RSI' ? rsiCreate() : p ? { name, calcParams: p } : name;
+      const p = name === 'RSI' || SPECS[name] ? null : indParams(name), v = name === 'RSI' ? rsiCreate() : SPECS[name] ? specCreate(name) : p ? { name, calcParams: p } : name;
       const h = clamp(Math.min(+ph[name] || 90, cap), 20, 400);
       const pane = def.main ? S.chart.createIndicator(v, true, { id: 'candle_pane' }) : S.chart.createIndicator(v, false, { height: h, minHeight: 20 });
       S.panes[name] = def.main ? 'candle_pane' : pane;
@@ -2367,6 +2745,7 @@
   }
   function openIndSettings(name) {
     if (name === 'RSI') { openRSISettings(); return; }
+    if (SPECS[name]) { openSpecSettings(name); return; }
     const box = $('ch-modal'), d = IND_DEF[name]; if (!box || !d || readOnly()) return;
     $('ch-indm').hidden = true;
     const cur = indParams(name) || d;
@@ -2413,7 +2792,7 @@
     const on = new Set(S.store.prefs.ind || []), ro = readOnly(), q = String(S.indQ || '').trim().toLowerCase();
     const list = INDICATORS.filter(x => !q || [x.id, x.t, x.en].some(v => String(v).toLowerCase().includes(q)));
     const rows = (list.length ? '' : `<div class="ch-pempty">${tr('اندیکاتوری پیدا نشد', 'No indicators found')}</div>`)
-      + list.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${x.id === 'RSI' ? esc(rsiSum()) : (indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
+      + list.map(x => `<div class="ch-indr"><button type="button" class="ch-indi${on.has(x.id) ? ' on' : ''}" onclick="SCCHART.ind('${x.id}')" aria-pressed="${on.has(x.id)}"><i></i>${esc(tr(x.t, x.en))}<small dir="ltr">${x.id === 'RSI' ? esc(rsiSum()) : SPECS[x.id] ? esc(SPECS[x.id].label(specCfg(x.id, S.store?.prefs?.ip?.[x.id]))) : (indParams(x.id) || IND_DEF[x.id]).join(', ')}</small></button>`
         + (ro ? '' : `<button type="button" class="ch-indg" data-ind="${x.id}" title="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" aria-label="${esc(tr('تنظیماتِ ', 'Settings · ') + x.id)}" onclick="SCCHART.indSet('${x.id}')">${ICON.gear}</button>`) + '</div>').join('');
     if (listOnly && $('ch-indlist')) { $('ch-indlist').innerHTML = rows; return; }
     box.innerHTML = `<input class="fi ch-inds" id="ch-inds" type="search" dir="auto" autocomplete="off" value="${esc(S.indQ || '')}" placeholder="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" aria-label="${tr('جست‌وجوی اندیکاتور', 'Search indicators')}" oninput="SCCHART.indFind(this.value)">`
@@ -3096,7 +3475,7 @@
     tfMenu, tfFav, srcMenu, ctMenu, chartType: setChartType, scale: setScale, realtime: toRealtime, snapshot, chartSettings: openChartSettings, closePop,
     _copy: copySel, _paste: pasteClip, _updRT: updRT,
     // برای تست
-    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _cdText: cdText, _styles: stylesFor,
+    _s: S, _T: T, _merge: merge, _migrate: migrate, _precisionOf: precisionOf, _select: selectId, _magnetize: magnetize, _rdp: rdp, _applyInd: applyIndicators, _rsiCfg: rsiCfg, _specCfg: specCfg, _SPECS: SPECS, _cdText: cdText, _styles: stylesFor,
     // نقطه‌ای روی خودِ شکل که کلیک/کشیدن را می‌گیرد (از شکل‌های آخرین رسم؛ S.debug باید روشن باشد)
     _hitPoint: id => {
       const f = S.lastFigs.get(id) || [], cen = c => ({ x: c.reduce((s, p) => s + p.x, 0) / c.length, y: c.reduce((s, p) => s + p.y, 0) / c.length });
